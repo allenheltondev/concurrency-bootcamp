@@ -362,20 +362,29 @@ setTimeout(() => console.log('B'), 0);
 Promise.resolve().then(() => console.log('C'));
 console.log('D');`,
     options:["A B C D","A D C B","A D B C"], answer:1,
-    why:"Sync first (A, D). Then the microtask queue drains fully (C) before any macrotask. setTimeout (B) is a macrotask, so it runs last." },
+    whys:[
+      "Top-to-bottom as if it were all synchronous — but setTimeout and .then DEFER their callbacks. Only A and D run synchronously, so B can't be second.",
+      "Right. Sync code first (A, D). Then the microtask queue (.then → C) drains completely before any macrotask. setTimeout (B) is a macrotask, so it runs last.",
+      "Right that A and D are synchronous — but you put the timer (B) before the promise (C). Microtasks (.then → C) drain before any macrotask (setTimeout → B), so C beats B."] },
   { code:`async function f(){ console.log(1); await null; console.log(3); }
 console.log(0);
 f();
 console.log(2);`,
     options:["0 1 2 3","0 1 3 2","1 0 2 3"], answer:0,
-    why:"await null suspends f as a microtask. So f logs 1, yields, the rest of the sync code logs 2, then the microtask resumes and logs 3." },
+    whys:[
+      "Right. await null suspends f as a microtask: it logs 1, yields, the rest of the sync code logs 2, then the microtask resumes and logs 3.",
+      "This assumes f() runs to completion before returning. But await null suspends it — after 1 it yields, sync code logs 2, and only then does 3 run. So 2 precedes 3.",
+      "0 logs first: f() isn't called until after console.log(0). Code runs in source order until something suspends, and f() hasn't even been invoked when 0 prints."] },
   { code:`setTimeout(() => console.log('T1'));
 Promise.resolve()
   .then(() => console.log('P1'))
   .then(() => console.log('P2'));
 setTimeout(() => console.log('T2'));`,
     options:["T1 T2 P1 P2","P1 P2 T1 T2","P1 T1 P2 T2"], answer:1,
-    why:"The whole promise chain (P1 then P2) is microtasks and drains before the event loop ever reaches the timer queue (T1, T2)." },
+    whys:[
+      "Timers don't go first. The whole microtask chain (P1 then P2) drains before the event loop services the timer queue, so both promises print before either timeout.",
+      "Right. The promise chain (P1 then P2) is all microtasks and drains before the event loop ever reaches the timer queue (T1, T2).",
+      "Microtasks don't yield to timers between steps. After P1 runs it queues P2 as another microtask; the loop drains microtasks to exhaustion (P1, P2) before touching T1."] },
 ];
 
 /* ---- drill definitions (fill the blank) ---- */
@@ -798,9 +807,14 @@ function renderModel(){
       const b=el(`<button class="qopt">${esc(opt)}</button>`);
       b.onclick=()=>{
         if(card.dataset.done) return;
-        if(oi===q.answer){ b.classList.add("correct"); card.dataset.done="1";
-          card.appendChild(el(`<div class="why-line">${esc(q.why)}</div>`)); }
-        else { b.classList.add("wrong"); }
+        if(oi===q.answer){
+          b.classList.add("correct"); card.dataset.done="1";
+          card.appendChild(el(`<div class="why-line">${esc(q.whys[oi])}</div>`));
+        } else {
+          if(b.dataset.tried) return;          // explain once, then let them try again
+          b.dataset.tried="1"; b.classList.add("wrong");
+          b.appendChild(el(`<div class="why-line" style="margin-top:6px">${esc(q.whys[oi])}</div>`));
+        }
       };
       card.appendChild(b);
     });
