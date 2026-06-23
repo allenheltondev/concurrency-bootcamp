@@ -1,9 +1,10 @@
 # Concurrency Bootcamp
 
 A mobile-first, dependency-free web app for learning and practicing JavaScript
-concurrency. Five modules: the event-loop model (predict-output quiz), building
+concurrency. Six modules: the event-loop model (predict-output quiz), building
 synchronization primitives (tap-to-choose drills that run real reference code), a
-workers/atomics data-race demo, trade-off flashcards, and a problem bank.
+workers/atomics data-race demo, trade-off flashcards, a problem bank, and an
+interview kit (debounce, throttle, `Promise.all` from scratch, retry-with-backoff).
 
 Everything is tap-driven so it works one-handed on a phone. No accounts, no
 backend, no third-party scripts, no tracking.

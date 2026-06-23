@@ -206,6 +206,39 @@ class TokenBucket{
   #refill(){ const now=Date.now(); const gained=(now-this.#last)*this.#ratePerMs; this.#last=now; this.#tokens=Math.min(this.#capacity,this.#tokens+gained); }
   async take(){ this.#refill(); while(this.#tokens<1){ await sleep((1-this.#tokens)/this.#ratePerMs); this.#refill(); } this.#tokens-=1; }
 }
+function debounce(fn,wait){
+  let t;                                  // the pending timer
+  return function(...args){
+    clearTimeout(t);                      // cancel the prior pending call
+    t=setTimeout(()=>fn.apply(this,args),wait);
+  };
+}
+function throttle(fn,interval){
+  let last=0;
+  return function(...args){
+    const now=Date.now();
+    if(now-last>=interval){ last=now; fn.apply(this,args); }
+  };
+}
+function promiseAll(promises){
+  return new Promise((resolve,reject)=>{
+    const results=[]; let done=0;
+    if(promises.length===0) resolve(results);
+    promises.forEach((p,i)=>{
+      Promise.resolve(p).then(v=>{ results[i]=v; if(++done===promises.length) resolve(results); }, reject);
+    });
+  });
+}
+async function retry(fn,{tries=3,base=10}={}){
+  let attempt=0;
+  for(;;){
+    try{ return await fn(); }
+    catch(err){
+      if(++attempt>=tries) throw err;
+      await sleep(base*2**(attempt-1));   // exponential backoff
+    }
+  }
+}
 
 /* ===========================================================
    DEMOS  -> return {lines:[{t,cls}], pass:boolean}
@@ -282,6 +315,33 @@ async function demoTokenBucket(){
   const pass = burst===cap && total>=20;
   return {lines:[{t:`bucket: capacity ${cap}, ${ratePerSec}/sec`},{t:`take() at ms: ${at.map(t=>Math.round(t)).join(", ")}`},{t:`${burst} instant (burst), rest throttled`}], pass, verdict:pass?`burst of ${cap}, then steady ~${Math.round(1000/ratePerSec)}ms/token`:`rate-limit broke (burst ${burst}, total ${total}ms)`};
 }
+async function demoDebounce(){
+  let calls=0; const f=debounce(()=>{calls++;},40);
+  for(let i=0;i<5;i++){ f(); await sleep(4); }   // burst: 5 calls, ~4ms apart
+  await sleep(60);                                // let it settle past wait=40
+  const pass=calls===1;
+  return {lines:[{t:`5 rapid calls (~4ms apart), wait=40ms`},{t:`fn actually ran ${calls} time(s)`}], pass, verdict:pass?"collapsed a burst into 1 call":`ran ${calls}× (want 1)`};
+}
+async function demoThrottle(){
+  let calls=0; const f=throttle(()=>{calls++;},20);
+  for(let i=0;i<10;i++){ f(); await sleep(5); }   // 10 calls over ~50ms
+  const pass=calls>=2&&calls<=6;
+  return {lines:[{t:`10 calls over ~50ms, interval=20ms`},{t:`fn ran ${calls} time(s)`}], pass, verdict:pass?`throttled to ${calls} (≈ once / 20ms)`:`ran ${calls}× (want ~3)`};
+}
+async function demoPromiseAll(){
+  const mk=(v,ms)=>new Promise(r=>setTimeout(()=>r(v),ms));
+  const out=await promiseAll([mk("a",18),mk("b",2),mk("c",10)]);
+  const pass=out.join(",")==="a,b,c";
+  return {lines:[{t:`resolved [a@18ms, b@2ms, c@10ms]`},{t:`result: [${out.join(", ")}]`}], pass, verdict:pass?"input order preserved despite finish order":`got [${out.join(", ")}]`};
+}
+async function demoRetry(){
+  let n=0; const flaky=async()=>{ if(++n<3) throw new Error("fail "+n); return "ok@"+n; };
+  const t0=Date.now();
+  const r=await retry(flaky,{tries:5,base:8});
+  const ms=Date.now()-t0;
+  const pass=r==="ok@3"&&n===3&&ms>=24;          // backed off 8ms + 16ms before the 3rd try
+  return {lines:[{t:`fn fails twice, succeeds on attempt 3`},{t:`got "${r}" after ${n} tries, ~${ms}ms`}], pass, verdict:pass?"backed off 8ms→16ms, then succeeded":`r=${r} n=${n} ${ms}ms`};
+}
 
 /* ===========================================================
    CONTENT
@@ -292,6 +352,7 @@ const MODULES = [
   { id:"race", label:"workers & atomics", type:"sim" },
   { id:"tradeoffs", label:"trade-offs", type:"cards" },
   { id:"bank", label:"problem bank", type:"drills" },
+  { id:"toolkit", label:"interview kit", type:"drills" },
 ];
 
 /* ---- model module: predict-output quiz ---- */
@@ -568,6 +629,96 @@ const DRILLS = {
   }
 }` },
   ],
+
+  toolkit:[
+    { id:"debounce", title:"Debounce", why:"a burst of calls fires fn once, after it goes quiet", demo:demoDebounce,
+      pre:`function debounce(fn, wait) {
+  let t;                       // the pending timer
+  return function (...args) {`,
+      blank:{ q:"a burst of calls should fire fn ONCE, after it goes quiet. What goes here?",
+        options:[
+`    clearTimeout(t);          // cancel the prior pending call
+    t = setTimeout(() => fn.apply(this, args), wait);`,
+`    t = setTimeout(() => fn.apply(this, args), wait);`,
+`    clearTimeout(t);
+    fn.apply(this, args);      // call it right away`],
+        answer:0,
+        whys:["Right. Each call cancels the previous pending timer and starts a fresh one, so fn runs only after calls stop for `wait` ms — trailing-edge debounce.",
+              "Without clearing, every call schedules its own timer — fn fires once per call, not once per burst. That isn't debouncing at all.",
+              "Calling fn synchronously on every invocation ignores `wait` and fires on every keystroke — the exact thing debounce exists to stop."] },
+      post:`  };
+}` },
+
+    { id:"throttle", title:"Throttle", why:"run fn at most once per interval, however often it's called", demo:demoThrottle,
+      pre:`function throttle(fn, interval) {
+  let last = 0;                // when fn last ran
+  return function (...args) {`,
+      blank:{ q:"throttle runs fn at most once per `interval`. What gates the call?",
+        options:[
+`    const now = Date.now();
+    if (now - last >= interval) {
+      last = now; fn.apply(this, args);
+    }`,
+`    const now = Date.now();
+    last = now;
+    if (now - last >= interval) fn.apply(this, args);`,
+`    const now = Date.now();
+    if (now - last >= interval) fn.apply(this, args);`],
+        answer:0,
+        whys:["Right. fn fires only when at least `interval` ms have passed since the last accepted call, and `last` advances only then — leading-edge throttle.",
+              "Setting `last = now` before the check makes `now - last` always 0, so the condition never passes and fn never runs.",
+              "Never updating `last` means once the first interval elapses, every call fires — the rate limit is gone."] },
+      post:`  };
+}` },
+
+    { id:"promiseall", title:"Promise.all from scratch", why:"resolve to results in input order; reject on the first failure", demo:demoPromiseAll,
+      pre:`function promiseAll(promises) {
+  return new Promise((resolve, reject) => {
+    const results = [];
+    let done = 0;
+    if (promises.length === 0) resolve(results);
+    promises.forEach((p, i) => {
+      Promise.resolve(p).then((v) => {`,
+      blank:{ q:"each promise settles whenever it wants. Keep results in order and finish at the right time:",
+        options:[
+`        results[i] = v;        // slot by index, not push
+        if (++done === promises.length) resolve(results);`,
+`        results.push(v);
+        if (results.length === promises.length) resolve(results);`,
+`        results[i] = v;
+        resolve(results);      // resolve as each one settles`],
+        answer:0,
+        whys:["Right. Index assignment preserves input order no matter who finishes first, and the counter resolves exactly once — after the last one settles.",
+              "push records results in completion order, not input order: a fast promise at index 3 lands in slot 0 and the output is scrambled.",
+              "Resolving on the first settle returns a half-filled array. (A promise ignores resolve() after the first call, so the rest are silently dropped.)"] },
+      post:`      }, reject);   // any rejection rejects the whole thing
+    });
+  });
+}` },
+
+    { id:"retry", title:"Retry with backoff", why:"retry a flaky call — bounded, with exponential backoff", demo:demoRetry,
+      pre:`async function retry(fn, { tries = 3, base = 10 } = {}) {
+  let attempt = 0;
+  for (;;) {
+    try {
+      return await fn();
+    } catch (err) {`,
+      blank:{ q:"on failure, when do you give up vs wait and retry?",
+        options:[
+`      if (++attempt >= tries) throw err;       // out of tries -> surface it
+      await sleep(base * 2 ** (attempt - 1));  // else back off, then loop`,
+`      await sleep(base * 2 ** attempt);
+      attempt++;                               // try again, forever`,
+`      if (++attempt >= tries) throw err;
+      await sleep(base);                       // same delay every time`],
+        answer:0,
+        whys:["Right. Re-throw once attempts are exhausted; otherwise wait an exponentially growing delay before looping. Bounded and backed off.",
+              "No tries cap means a permanently-failing dependency loops forever — an unbounded retry storm. Always bound the attempts.",
+              "A constant delay hammers a struggling service at a fixed rate. Exponential backoff gives it room to recover and avoids synchronized retry stampedes."] },
+      post:`    }
+  }
+}` },
+  ],
 };
 
 /* ---- flashcards ---- */
@@ -583,7 +734,7 @@ const CARDS = [
 /* ===========================================================
    STATE + PERSISTENCE
    =========================================================== */
-const TOTAL = DRILLS.primitives.length + DRILLS.bank.length;
+const TOTAL = DRILLS.primitives.length + DRILLS.bank.length + DRILLS.toolkit.length;
 let state = { module:"model", solved:{} };
 
 const STORAGE_KEY="cbootcamp:solved";
@@ -660,9 +811,12 @@ function renderModel(){
 /* ---- drills (fill the blank) ---- */
 function renderDrills(modId){
   const list=DRILLS[modId];
-  const header = modId==="primitives"
-    ? {eb:"module 01", h:"Build the primitives", lead:"Each one is a queue of deferreds plus a rule for whose <code style='font-family:var(--mono)'>resolve()</code> you call next. Choose the correct line at each decision point, then run the reference to watch the invariant hold."}
-    : {eb:"module 04", h:"Problem bank", lead:"Classic concurrency problems, built on the same primitives. State the invariant in your head before you choose."};
+  const HEADERS = {
+    primitives:{eb:"module 01", h:"Build the primitives", lead:"Each one is a queue of deferreds plus a rule for whose <code style='font-family:var(--mono)'>resolve()</code> you call next. Choose the correct line at each decision point, then run the reference to watch the invariant hold."},
+    bank:{eb:"module 04", h:"Problem bank", lead:"Classic concurrency problems, built on the same primitives. State the invariant in your head before you choose."},
+    toolkit:{eb:"module 05", h:"Interview kit", lead:"The async utilities interviewers actually ask you to write — <code style='font-family:var(--mono)'>debounce</code>, <code style='font-family:var(--mono)'>throttle</code>, <code style='font-family:var(--mono)'>Promise.all</code>, retry. Same drill: pick the line that holds the invariant, then run it."},
+  };
+  const header = HEADERS[modId];
   main.appendChild(el(`<div><div class="eyebrow">${header.eb}</div><h1>${header.h}</h1><p class="lead">${header.lead}</p></div>`));
 
   list.forEach(d=>{
