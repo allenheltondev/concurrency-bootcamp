@@ -1,0 +1,910 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Concurrency Bootcamp</title>
+<style>
+  :root{
+    --bg:#14161f; --surface:#1b1f2e; --surface2:#232940; --line:#2c3350;
+    --text:#e7e9f3; --muted:#9298b0; --faint:#6a7090;
+    --ordered:#57e0b0;   /* in-order / correct */
+    --race:#ff9a6b;      /* lost / contention */
+    --accent:#8e86f0;    /* interactive */
+    --ok-bg:rgba(87,224,176,.12); --bad-bg:rgba(255,154,107,.12);
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --r:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--text); font-family:var(--sans);
+    line-height:1.55; -webkit-font-smoothing:antialiased;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .wrap{max-width:560px;margin:0 auto;padding:0 16px}
+
+  /* header */
+  header{
+    position:sticky;top:0;z-index:20;background:rgba(20,22,31,.86);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+    padding-top:env(safe-area-inset-top);
+  }
+  .hbar{display:flex;align-items:center;justify-content:space-between;padding:12px 0 10px}
+  .brand{display:flex;align-items:baseline;gap:8px}
+  .brand b{font-size:17px;letter-spacing:-.01em}
+  .brand .tick{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em}
+  .prog{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right}
+  .prog .n{color:var(--ordered)}
+  .bar{height:3px;background:var(--surface2);border-radius:3px;overflow:hidden;margin-bottom:10px}
+  .bar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--ordered));transition:width .4s ease}
+
+  /* module chips */
+  nav{display:flex;gap:8px;overflow-x:auto;padding:10px 0;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  nav::-webkit-scrollbar{display:none}
+  .chip{
+    flex:0 0 auto;font-family:var(--mono);font-size:12px;letter-spacing:.02em;
+    padding:8px 13px;border-radius:999px;border:1px solid var(--line);
+    background:var(--surface);color:var(--muted);cursor:pointer;white-space:nowrap;
+    min-height:38px;
+  }
+  .chip[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#11131c;font-weight:600}
+
+  /* eyebrow + headings */
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:26px 0 6px}
+  h1{font-size:26px;line-height:1.15;letter-spacing:-.02em;margin:0 0 8px}
+  h2{font-size:19px;letter-spacing:-.01em;margin:0 0 6px}
+  p.lead{color:var(--muted);margin:0 0 8px}
+  .sub{color:var(--muted);font-size:14px}
+
+  /* card */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin:14px 0}
+  .card h2{margin-bottom:2px}
+  .card .why{color:var(--faint);font-size:13px;font-family:var(--mono);margin:0 0 12px}
+
+  /* code */
+  pre.code{
+    background:#11131c;border:1px solid var(--line);border-radius:10px;
+    font-family:var(--mono);font-size:12.5px;line-height:1.7;color:#cdd2e6;
+    padding:12px;margin:10px 0;overflow-x:auto;white-space:pre;
+  }
+  pre.code .cm{color:var(--faint)}
+  pre.code .kw{color:var(--accent)}
+  pre.code .ok{color:var(--ordered)}
+
+  /* blank chooser */
+  .blank{margin:9px 0;border-left:2px solid var(--race);padding-left:10px}
+  .blank .q{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--race);text-transform:uppercase;margin-bottom:6px}
+  .blank.solved .q{color:var(--ordered)}
+  .opt{
+    display:block;width:100%;text-align:left;font-family:var(--mono);font-size:12px;line-height:1.55;
+    background:#11131c;border:1px solid var(--line);color:#cdd2e6;border-radius:9px;
+    padding:10px 11px;margin:7px 0;cursor:pointer;white-space:pre-wrap;
+  }
+  .opt:active{transform:scale(.995)}
+  .opt.correct{border-color:var(--ordered);background:var(--ok-bg);color:var(--ordered)}
+  .opt.wrong{border-color:var(--race);background:var(--bad-bg);color:var(--race);animation:shake .3s}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+  .why-line{font-size:12.5px;color:var(--muted);margin:6px 0 2px;padding-left:10px;border-left:2px solid var(--line)}
+
+  /* buttons */
+  .btn{
+    font-family:var(--mono);font-size:13px;letter-spacing:.02em;
+    padding:11px 15px;border-radius:10px;border:1px solid var(--line);
+    background:var(--surface2);color:var(--text);cursor:pointer;min-height:44px;
+  }
+  .btn.go{background:var(--accent);border-color:var(--accent);color:#11131c;font-weight:600}
+  .btn:disabled{opacity:.4;cursor:default}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+
+  /* console */
+  .console{
+    font-family:var(--mono);font-size:12px;line-height:1.65;background:#0d0f17;
+    border:1px solid var(--line);border-radius:10px;padding:11px;margin-top:10px;
+    white-space:pre-wrap;min-height:20px;color:#aeb4cf;
+  }
+  .console .pass{color:var(--ordered)}
+  .console .fail{color:var(--race)}
+
+  /* done badge */
+  .done{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--ordered);letter-spacing:.04em}
+  .done.hidden{display:none}
+
+  /* quiz / flashcard */
+  .qopt{display:block;width:100%;text-align:left;font-size:14px;background:var(--surface2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:12px;margin:7px 0;cursor:pointer;min-height:44px}
+  .qopt.correct{border-color:var(--ordered);background:var(--ok-bg)}
+  .qopt.wrong{border-color:var(--race);background:var(--bad-bg)}
+  .flash{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;min-height:120px;cursor:pointer;display:flex;flex-direction:column;justify-content:center}
+  .flash .face{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+  .flash .body{font-size:15.5px}
+  .flash.back .face{color:var(--ordered)}
+
+  /* simulator */
+  .ctrls{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:10px 0}
+  .ctrl{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .ctrl input[type=range]{vertical-align:middle;width:120px;accent-color:var(--accent)}
+  .toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-family:var(--mono);font-size:12px;min-height:38px}
+  .switch{width:42px;height:24px;border-radius:999px;background:var(--surface2);border:1px solid var(--line);position:relative;transition:background .2s}
+  .switch::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--muted);transition:transform .2s,background .2s}
+  .toggle.on .switch{background:var(--ordered)}
+  .toggle.on .switch::after{transform:translateX(18px);background:#11131c}
+  .tape{display:flex;flex-wrap:wrap;gap:4px;margin:12px 0}
+  .step{font-family:var(--mono);font-size:10.5px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:#11131c}
+  .result{font-family:var(--mono);font-size:13px;margin-top:8px;padding:11px;border-radius:10px;border:1px solid var(--line)}
+  .result.lost{border-color:var(--race);background:var(--bad-bg);color:var(--race)}
+  .result.exact{border-color:var(--ordered);background:var(--ok-bg);color:var(--ordered)}
+
+  footer{color:var(--faint);font-size:12px;text-align:center;padding:30px 0 40px;font-family:var(--mono)}
+  a{color:var(--accent)}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+
+<header>
+  <div class="wrap">
+    <div class="hbar">
+      <div class="brand"><b>Concurrency Bootcamp</b><span class="tick">// single thread, many turns</span></div>
+      <div class="prog">drills&nbsp;<span class="n" id="pn">0</span>/<span id="pt">8</span></div>
+    </div>
+    <div class="bar"><i id="progbar"></i></div>
+    <nav id="nav"></nav>
+  </div>
+</header>
+
+<main class="wrap" id="main"></main>
+<footer>built for thumb-driving on a phone · every drill runs real JS in your browser</footer>
+
+<script>
+"use strict";
+
+/* ---------- tiny helpers available to demos ---------- */
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+function deferred(){ let resolve,reject; const promise=new Promise((res,rej)=>{resolve=res;reject=rej;}); return {promise,resolve,reject}; }
+const rnd = (n) => Math.floor(Math.random()*n);
+
+/* ===========================================================
+   REFERENCE IMPLEMENTATIONS  (these power the Run buttons)
+   =========================================================== */
+class Mutex{
+  #locked=false; #queue=[];
+  async acquire(){ if(!this.#locked){this.#locked=true;return;} const d=deferred(); this.#queue.push(d); await d.promise; }
+  release(){ const n=this.#queue.shift(); if(n) n.resolve(); else this.#locked=false; }
+  async runExclusive(fn){ await this.acquire(); try{ return await fn(); } finally{ this.release(); } }
+}
+class Semaphore{
+  #permits; #queue=[];
+  constructor(p){ this.#permits=p; }
+  async acquire(){ if(this.#permits>0){this.#permits--;return;} const d=deferred(); this.#queue.push(d); await d.promise; }
+  release(){ const n=this.#queue.shift(); if(n) n.resolve(); else this.#permits++; }
+}
+class Latch{ #d=deferred(); wait(){return this.#d.promise;} open(){this.#d.resolve();} }
+class Barrier{
+  #parties; #count=0; #d=deferred();
+  constructor(p){ this.#parties=p; }
+  async arrive(label){ if(++this.#count===this.#parties) this.#d.resolve(); await this.#d.promise; return label; }
+}
+class AsyncQueue{
+  #values=[]; #waiters=[];
+  push(v){ const w=this.#waiters.shift(); if(w) w.resolve(v); else this.#values.push(v); }
+  async pull(){ if(this.#values.length) return this.#values.shift(); const d=deferred(); this.#waiters.push(d); return d.promise; }
+}
+class Sequencer{
+  #next=0; #gates=new Map();
+  acquire(seq){ if(seq<=this.#next) return Promise.resolve(); return new Promise(res=>this.#gates.set(seq,res)); }
+  release(seq){ this.#next=seq+1; const n=this.#gates.get(this.#next); if(n){ this.#gates.delete(this.#next); n(); } }
+}
+async function pool(items,limit,worker){
+  const results=[]; const executing=new Set();
+  for(const [i,item] of items.entries()){
+    const p=Promise.resolve().then(()=>worker(item,i));
+    results.push(p); executing.add(p); p.finally(()=>executing.delete(p));
+    if(executing.size>=limit) await Promise.race(executing);
+  }
+  return Promise.all(results);
+}
+class TokenBucket{
+  #capacity; #tokens; #ratePerMs; #last=Date.now();
+  constructor(capacity,ratePerSec){ this.#capacity=capacity; this.#tokens=capacity; this.#ratePerMs=ratePerSec/1000; }
+  #refill(){ const now=Date.now(); const gained=(now-this.#last)*this.#ratePerMs; this.#last=now; this.#tokens=Math.min(this.#capacity,this.#tokens+gained); }
+  async take(){ this.#refill(); while(this.#tokens<1){ await sleep((1-this.#tokens)/this.#ratePerMs); this.#refill(); } this.#tokens-=1; }
+}
+
+/* ===========================================================
+   DEMOS  -> return {lines:[{t,cls}], pass:boolean}
+   =========================================================== */
+async function demoMutex(){
+  const m=new Mutex(); let inside=0,max=0;
+  await Promise.all([1,2,3,4,5].map(()=>m.runExclusive(async()=>{inside++;max=Math.max(max,inside);await sleep(rnd(18));inside--;})));
+  return {lines:[{t:`5 tasks ran through one lock`},{t:`max concurrent holders = ${max}`}], pass:max===1, verdict:`max holders ${max} (want 1)`};
+}
+async function demoSemaphore(){
+  const s=new Semaphore(2); let inside=0,max=0;
+  await Promise.all([1,2,3,4,5,6].map(async()=>{await s.acquire();inside++;max=Math.max(max,inside);await sleep(rnd(18));inside--;s.release();}));
+  return {lines:[{t:`6 tasks, 2 permits`},{t:`max concurrent = ${max}`}], pass:max===2, verdict:`max concurrent ${max} (want 2)`};
+}
+async function demoLatch(){
+  const l=new Latch(); const order=[];
+  const w=[1,2,3].map(n=>l.wait().then(()=>order.push("released-"+n)));
+  order.push("all-waiting"); await sleep(12); l.open(); await Promise.all(w);
+  const pass=order[0]==="all-waiting"&&order.length===4;
+  return {lines:[{t:order.join("  ")}], pass, verdict:pass?"all waited, then released together":"order wrong"};
+}
+async function demoBarrier(){
+  const b=new Barrier(3); const log=[];
+  const ps=[8,28,14].map((d,i)=>sleep(d).then(()=>{log.push("arrive-"+i);return b.arrive(i).then(()=>log.push("go-"+i));}));
+  await Promise.all(ps);
+  const firstGo=log.findIndex(x=>x.startsWith("go"));
+  const pass=log.slice(0,firstGo).every(x=>x.startsWith("arrive"))&&firstGo===3;
+  return {lines:[{t:log.join("  ")}], pass, verdict:pass?"all 3 arrived before any proceeded":"a party left early"};
+}
+async function demoQueue(){
+  const q=new AsyncQueue(); const got=[];
+  const c=(async()=>{for(let i=0;i<3;i++)got.push(await q.pull());})();
+  await sleep(10); q.push("a"); await sleep(6); q.push("b"); q.push("c"); await c;
+  const pass=got.join(",")==="a,b,c";
+  return {lines:[{t:`consumer pulled: [${got.join(", ")}]`},{t:`(it blocked until each push arrived)`}], pass, verdict:pass?"delivered in order, no busy-wait":"out of order"};
+}
+async function demoSequencer(){
+  const seq=new Sequencer(); const out=[]; const pos={A:0,B:1,C:2}; const cyc={A:0,B:0,C:0};
+  const emit=async(slot)=>{const s=cyc[slot]++*3+pos[slot]; await seq.acquire(s); out.push(slot); seq.release(s);};
+  const prod=slot=>(async()=>{for(let c=0;c<4;c++){await sleep(rnd(10));await emit(slot);}})();
+  await Promise.all([prod("A"),prod("B"),prod("C")]);
+  const pass=out.join("")==="ABCABCABCABC";
+  return {lines:[{t:`emitted: ${out.join(" ")}`},{t:`(3 producers fired in random order)`}], pass, verdict:pass?"perfect A→B→C every cycle":"order broke"};
+}
+async function demoPrintOrder(){ return demoSequencer(); }
+async function demoPool(){
+  let inflight=0,max=0;
+  await pool([1,2,3,4,5,6],2,async()=>{inflight++;max=Math.max(max,inflight);await sleep(rnd(18));inflight--;});
+  return {lines:[{t:`6 jobs, limit 2`},{t:`max in-flight = ${max}`}], pass:max===2, verdict:`max in-flight ${max} (want 2)`};
+}
+async function demoDining(){
+  const n=5, rounds=2;
+  const fork=Array.from({length:n},()=>new Mutex());
+  let meals=0;
+  const seat=async(i)=>{
+    const left=i, right=(i+1)%n;
+    const [a,b]= left<right ? [left,right] : [right,left];   // global lock order
+    for(let r=0;r<rounds;r++){
+      await fork[a].acquire(); await fork[b].acquire();
+      try{ meals++; await sleep(rnd(6)); } finally{ fork[b].release(); fork[a].release(); }
+    }
+  };
+  await Promise.all(Array.from({length:n},(_,i)=>seat(i)));
+  const pass=meals===n*rounds;
+  return {lines:[{t:`${n} philosophers, ${rounds} rounds each`},{t:`${meals} meals served — ran to completion`}], pass, verdict:pass?`all ${meals} meals served, no deadlock`:`stalled at ${meals}/${n*rounds}`};
+}
+async function demoTokenBucket(){
+  const cap=3, ratePerSec=100;            // ~1 token / 10ms once the burst is spent
+  const tb=new TokenBucket(cap,ratePerSec);
+  const start=Date.now(); const at=[];
+  for(let i=0;i<6;i++){ await tb.take(); at.push(Date.now()-start); }
+  const burst=at.filter(t=>t<8).length;   // tokens served effectively instantly
+  const total=at[at.length-1];
+  const pass = burst===cap && total>=20;
+  return {lines:[{t:`bucket: capacity ${cap}, ${ratePerSec}/sec`},{t:`take() at ms: ${at.map(t=>Math.round(t)).join(", ")}`},{t:`${burst} instant (burst), rest throttled`}], pass, verdict:pass?`burst of ${cap}, then steady ~${Math.round(1000/ratePerSec)}ms/token`:`rate-limit broke (burst ${burst}, total ${total}ms)`};
+}
+
+/* ===========================================================
+   CONTENT
+   =========================================================== */
+const MODULES = [
+  { id:"model", label:"the model", type:"lesson" },
+  { id:"primitives", label:"primitives", type:"drills" },
+  { id:"race", label:"workers & atomics", type:"sim" },
+  { id:"tradeoffs", label:"trade-offs", type:"cards" },
+  { id:"bank", label:"problem bank", type:"drills" },
+];
+
+/* ---- model module: predict-output quiz ---- */
+const QUIZ = [
+  { code:`console.log('A');
+setTimeout(() => console.log('B'), 0);
+Promise.resolve().then(() => console.log('C'));
+console.log('D');`,
+    options:["A B C D","A D C B","A D B C"], answer:1,
+    why:"Sync first (A, D). Then the microtask queue drains fully (C) before any macrotask. setTimeout (B) is a macrotask, so it runs last." },
+  { code:`async function f(){ console.log(1); await null; console.log(3); }
+console.log(0);
+f();
+console.log(2);`,
+    options:["0 1 2 3","0 1 3 2","1 0 2 3"], answer:0,
+    why:"await null suspends f as a microtask. So f logs 1, yields, the rest of the sync code logs 2, then the microtask resumes and logs 3." },
+  { code:`setTimeout(() => console.log('T1'));
+Promise.resolve()
+  .then(() => console.log('P1'))
+  .then(() => console.log('P2'));
+setTimeout(() => console.log('T2'));`,
+    options:["T1 T2 P1 P2","P1 P2 T1 T2","P1 T1 P2 T2"], answer:1,
+    why:"The whole promise chain (P1 then P2) is microtasks and drains before the event loop ever reaches the timer queue (T1, T2)." },
+];
+
+/* ---- drill definitions (fill the blank) ---- */
+const DRILLS = {
+  primitives:[
+    { id:"mutex", title:"Mutex", why:"one holder at a time", demo:demoMutex,
+      pre:`class Mutex {
+  #locked = false;
+  #queue = [];
+  async acquire() {
+    if (!this.#locked) { this.#locked = true; return; }
+    const d = deferred();
+    this.#queue.push(d);
+    await d.promise;          // park until someone hands me the lock
+  }
+  release() {`,
+      blank:{ q:"how should release() pass the lock on?",
+        options:[
+`    const next = this.#queue.shift();
+    if (next) next.resolve();   // hand lock straight to next waiter
+    else this.#locked = false;  // nobody waiting -> truly unlock`,
+`    this.#locked = false;
+    const next = this.#queue.shift();
+    if (next) next.resolve();`,
+`    const next = this.#queue.shift();
+    if (next) next.resolve();`],
+        answer:0,
+        whys:["Right. The lock is never observably free while a waiter exists — it transfers directly, so no newcomer can slip in between.",
+              "This unlocks AND wakes a waiter, so a brand-new acquire() can grab the lock at the same time as the woken one. Two holders.",
+              "This never sets #locked = false, so once the queue empties the mutex is stuck locked forever."] },
+      post:`  }
+}` },
+
+    { id:"semaphore", title:"Semaphore", why:"N permits (a mutex is N = 1)", demo:demoSemaphore,
+      pre:`class Semaphore {
+  #permits; #queue = [];
+  constructor(p) { this.#permits = p; }
+  async acquire() {
+    if (this.#permits > 0) { this.#permits--; return; }
+    const d = deferred(); this.#queue.push(d); await d.promise;
+  }
+  release() {`,
+      blank:{ q:"how should release() return a permit?",
+        options:[
+`    const next = this.#queue.shift();
+    if (next) next.resolve();   // permit goes straight to a waiter
+    else this.#permits++;       // no waiter -> back to the pool`,
+`    this.#permits++;
+    const next = this.#queue.shift();
+    if (next) next.resolve();`,
+`    this.#permits++;`],
+        answer:0,
+        whys:["Right. Either a waiter inherits the permit directly, or it returns to the pool — never both.",
+              "Incrementing AND waking a waiter leaks a permit: capacity drifts above N over time.",
+              "Bumping the count without waking waiters means parked callers never resume — deadlock."] },
+      post:`  }
+}` },
+
+    { id:"latch", title:"Latch", why:"one-shot gate: open once, all waiters go", demo:demoLatch,
+      pre:`class Latch {
+  #d = deferred();
+  wait() { return this.#d.promise; }   // everyone awaits the same promise
+  open() {`,
+      blank:{ q:"what does open() do?",
+        options:[
+`    this.#d.resolve();   // resolve the shared promise -> all waiters proceed`,
+`    this.#d = deferred();   // replace the promise`,
+`    return this.#d.promise;`],
+        answer:0,
+        whys:["Right. One shared promise, resolved once. A latch is one-shot — it never re-closes (that's what makes it a latch, not a gate).",
+              "Replacing the promise leaves every existing waiter parked on the OLD one forever.",
+              "open() should release waiters, not return a promise. Nothing would ever resolve."] },
+      post:`  }
+}` },
+
+    { id:"barrier", title:"Barrier", why:"N parties; nobody proceeds until all arrive", demo:demoBarrier,
+      pre:`class Barrier {
+  #parties; #count = 0; #d = deferred();
+  constructor(p) { this.#parties = p; }
+  async arrive() {`,
+      blank:{ q:"how does arrive() hold everyone until the last one?",
+        options:[
+`    if (++this.#count === this.#parties) this.#d.resolve();
+    await this.#d.promise;   // park on the SHARED promise`,
+`    const d = deferred();
+    if (++this.#count === this.#parties) d.resolve();
+    await d.promise;`,
+`    await this.#d.promise;
+    if (++this.#count === this.#parties) this.#d.resolve();`],
+        answer:0,
+        whys:["Right. Everyone awaits one shared promise; the last arrival resolves it and the whole group releases together.",
+              "A fresh local deferred per call means each party waits on its own promise — nobody is ever released.",
+              "Awaiting before counting means the count never reaches #parties: all parties block before incrementing. Deadlock."] },
+      post:`  }
+}` },
+
+    { id:"queue", title:"Async Queue", why:"producer/consumer; pull() blocks for a value", demo:demoQueue,
+      pre:`class AsyncQueue {
+  #values = []; #waiters = [];
+  push(v) {`,
+      blank:{ q:"what should push() do with a new value?",
+        options:[
+`    const w = this.#waiters.shift();
+    if (w) w.resolve(v);     // a consumer is parked -> hand it over
+    else this.#values.push(v); // nobody waiting -> buffer it`,
+`    this.#values.push(v);`,
+`    this.#values.push(v);
+    const w = this.#waiters.shift();
+    if (w) w.resolve(v);`],
+        answer:0,
+        whys:["Right. If a consumer is already waiting, deliver straight to it; otherwise buffer. Exactly one of the two.",
+              "Always buffering means a consumer that called pull() first stays parked forever — the push never wakes it.",
+              "Buffering AND handing to a waiter delivers the value twice: once now, once when the buffer is later drained."] },
+      post:`  }
+  async pull() {
+    if (this.#values.length) return this.#values.shift();
+    const d = deferred(); this.#waiters.push(d); return d.promise;
+  }
+}` },
+
+    { id:"sequencer", title:"Sequencer", why:"release turns in a fixed order — the print-in-order pattern", demo:demoSequencer,
+      pre:`class Sequencer {
+  #next = 0; #gates = new Map();
+  acquire(seq) {
+    if (seq <= this.#next) return Promise.resolve();
+    return new Promise(res => this.#gates.set(seq, res));
+  }
+  release(seq) {`,
+      blank:{ q:"how does release() pass the turn forward?",
+        options:[
+`    this.#next = seq + 1;
+    const n = this.#gates.get(this.#next);
+    if (n) { this.#gates.delete(this.#next); n(); }`,
+`    this.#next = seq + 1;
+    for (const r of this.#gates.values()) r();`,
+`    const n = this.#gates.get(seq + 1);
+    if (n) n();`],
+        answer:0,
+        whys:["Right. Advance the turn, then wake only the one waiter whose turn it now is. The chain self-propagates.",
+              "Waking ALL waiters destroys the ordering — everyone runs at once instead of one turn at a time.",
+              "Forgetting to advance #next means the next acquire() never sees its turn as current, so it parks forever."] },
+      post:`  }
+}` },
+  ],
+
+  bank:[
+    { id:"printorder", title:"Print in Order", why:"the classic 'print in order' problem: A → B → C each cycle", demo:demoPrintOrder,
+      pre:`class OrderedLogger {
+  #pos = { first:0, second:1, third:2 };
+  #cycle = { first:0, second:0, third:0 };
+  #seq = new Sequencer();
+  async #run(slot, action) {
+    const cycle = this.#cycle[slot]++;`,
+      blank:{ q:"what global sequence number does this print get?",
+        options:[
+`    const seq = cycle * 3 + this.#pos[slot];   // 3 slots per cycle`,
+`    const seq = this.#pos[slot];`,
+`    const seq = cycle + this.#pos[slot];`],
+        answer:0,
+        whys:["Right. Cycle c, slot p maps to 3c + p, giving the flat order A0 B0 C0 A1 B1 C1 …",
+              "Without the cycle term, every cycle reuses seq 0/1/2 — the second cycle can never advance past the first.",
+              "cycle + pos collides (cycle 1 slot 0 = 1 = cycle 0 slot 1), so the ordering scrambles."] },
+      post:`    await this.#seq.acquire(seq);
+    await action();          // release ONLY after success -> order survives a retry
+    this.#seq.release(seq);
+  }
+  printFirst(a){return this.#run('first',a);}
+  printSecond(a){return this.#run('second',a);}
+  printThird(a){return this.#run('third',a);}
+}` },
+
+    { id:"pool", title:"Concurrency Pool", why:"run N at a time, no more (the p-limit pattern)", demo:demoPool,
+      pre:`async function pool(items, limit, worker) {
+  const results = []; const executing = new Set();
+  for (const [i, item] of items.entries()) {
+    const p = Promise.resolve().then(() => worker(item, i));
+    results.push(p);
+    executing.add(p);
+    p.finally(() => executing.delete(p));`,
+      blank:{ q:"how do you cap concurrency at `limit`?",
+        options:[
+`    if (executing.size >= limit) await Promise.race(executing);`,
+`    if (executing.size >= limit) await Promise.all(executing);`,
+`    await Promise.race(executing);`],
+        answer:0,
+        whys:["Right. When full, wait for the FIRST job to finish (race), freeing exactly one slot, then continue.",
+              "Promise.all drains the whole batch before starting the next — that's batching, not a steady pool, and tanks throughput.",
+              "Racing on every iteration (no size check) serializes everything: you never let the pool fill to `limit`."] },
+      post:`  }
+  return Promise.all(results);
+}` },
+
+    { id:"dining", title:"Dining Philosophers", why:"break the circular wait with a global lock order", demo:demoDining,
+      pre:`async function dine(n, rounds) {
+  const fork = Array.from({ length: n }, () => new Mutex());
+  let meals = 0;
+  const seat = async (i) => {
+    const left = i, right = (i + 1) % n;
+    for (let r = 0; r < rounds; r++) {`,
+      blank:{ q:"to avoid deadlock, which fork does philosopher i lock first?",
+        options:[
+`      // global order: always the lower-numbered fork first
+      const [a, b] = left < right ? [left, right] : [right, left];`,
+`      // left fork first, then the right
+      const [a, b] = [left, right];`,
+`      // right fork first, then the left
+      const [a, b] = [right, left];`],
+        answer:0,
+        whys:["Right. One global lock order (lowest index first) makes a circular wait impossible — the wrap-around philosopher reaches for fork 0 first, so the five can't each hold a left fork and block on the right.",
+              "The classic deadlock: every philosopher grabs their left fork at the same await point, then all block forever on a right fork their neighbor is holding.",
+              "Still an inconsistent order — most philosophers grab the higher fork first, but the wrap-around one doesn't, so the circular wait just re-forms the other way."] },
+      post:`      await fork[a].acquire();
+      await fork[b].acquire();
+      try { meals++; await sleep(rnd(6)); }   // eat
+      finally { fork[b].release(); fork[a].release(); }
+    }
+  };
+  await Promise.all(Array.from({ length: n }, (_, i) => seat(i)));
+  return meals;
+}` },
+
+    { id:"tokenbucket", title:"Token Bucket", why:"rate limiter: burst up to capacity, then steady refill", demo:demoTokenBucket,
+      pre:`class TokenBucket {
+  #capacity; #tokens; #ratePerMs; #last = Date.now();
+  constructor(capacity, ratePerSec) {
+    this.#capacity = capacity;
+    this.#tokens = capacity;            // start full: one burst allowed
+    this.#ratePerMs = ratePerSec / 1000;
+  }
+  #refill() {
+    const now = Date.now();
+    const gained = (now - this.#last) * this.#ratePerMs;
+    this.#last = now;`,
+      blank:{ q:"add the refilled tokens — but how do you respect the cap?",
+        options:[
+`    this.#tokens = Math.min(this.#capacity, this.#tokens + gained);`,
+`    this.#tokens = this.#tokens + gained;`,
+`    this.#tokens = Math.min(this.#capacity, gained);`],
+        answer:0,
+        whys:["Right. Tokens accrue while the bucket is idle but never past capacity — that ceiling is what bounds the burst. Drain it and you're throttled to the steady refill rate.",
+              "No ceiling: tokens pile up without limit while idle, so after a long pause one caller can fire an unbounded burst and the rate limit silently disappears.",
+              "This throws away the tokens already saved and counts only the latest drip, so a steady caller is throttled far below the intended rate."] },
+      post:`  }
+  async take() {
+    this.#refill();
+    while (this.#tokens < 1) {            // empty: wait for a token to drip in
+      await sleep((1 - this.#tokens) / this.#ratePerMs);
+      this.#refill();
+    }
+    this.#tokens -= 1;
+  }
+}` },
+  ],
+};
+
+/* ---- flashcards ---- */
+const CARDS = [
+  ["When is spinning a thread the wrong call?","Per-unit work is tiny (~1ms). Spawn + message-passing + serialization cost dwarfs the work. Threads pay off only for CPU-bound work big enough to amortize them."],
+  ["I/O-bound vs CPU-bound — which wants workers?","CPU-bound wants workers (genuine parallel compute). I/O-bound is better single-threaded async: you're waiting, not computing, so a thread just sits idle."],
+  ["Where do data races actually exist in JS?","Only across worker_threads / Web Workers sharing a SharedArrayBuffer. Single-threaded run-to-completion rules them out everywhere else."],
+  ["What does strict ordering cost you?","Availability. A stalled producer blocks everyone behind it. Ordering trades availability for consistency — recognize the trade before it bites you."],
+  ["Unbounded retry against a dead dependency?","An unbounded backlog. Robustness isn't free: cap retries, add a circuit breaker or dead-letter path, and bound the queue."],
+  ["Why Atomics.add over view[0]++ across threads?","view[0]++ is read-modify-write — three steps that interleave and lose updates. Atomics.add is one indivisible step."],
+];
+
+/* ===========================================================
+   STATE + PERSISTENCE
+   =========================================================== */
+const TOTAL = DRILLS.primitives.length + DRILLS.bank.length;
+let state = { module:"model", solved:{} };
+
+const STORAGE_KEY="cbootcamp:solved";
+function loadProgress(){
+  try{ const raw=localStorage.getItem(STORAGE_KEY); if(raw) state.solved=JSON.parse(raw); }
+  catch(e){ /* private mode / blocked storage -> stay in-memory */ }
+  renderProgress();
+}
+function saveProgress(){
+  renderProgress();
+  try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(state.solved)); }catch(e){}
+}
+function renderProgress(){
+  const n=Object.keys(state.solved).length;
+  document.getElementById("pn").textContent=n;
+  document.getElementById("pt").textContent=TOTAL;
+  document.getElementById("progbar").style.width=(100*n/TOTAL)+"%";
+}
+
+/* ===========================================================
+   RENDER
+   =========================================================== */
+const main=document.getElementById("main");
+const nav=document.getElementById("nav");
+
+function renderNav(){
+  nav.innerHTML="";
+  MODULES.forEach(m=>{
+    const b=document.createElement("button");
+    b.className="chip"; b.textContent=m.label; b.setAttribute("role","tab");
+    b.setAttribute("aria-selected", state.module===m.id ? "true":"false");
+    b.onclick=()=>{ state.module=m.id; render(); window.scrollTo({top:0}); };
+    nav.appendChild(b);
+  });
+}
+
+function el(html){ const d=document.createElement("div"); d.innerHTML=html.trim(); return d.firstElementChild; }
+
+function render(){
+  renderNav();
+  main.innerHTML="";
+  const m=MODULES.find(x=>x.id===state.module);
+  if(m.type==="lesson") renderModel();
+  else if(m.type==="drills") renderDrills(state.module);
+  else if(m.type==="sim") renderSim();
+  else if(m.type==="cards") renderCards();
+}
+
+/* ---- model ---- */
+function renderModel(){
+  main.appendChild(el(`<div>
+    <div class="eyebrow">module 00</div>
+    <h1>The model</h1>
+    <p class="lead">One thread. One stack. A synchronous block runs start to finish before anything else gets a turn — that's why there's no torn read until you add real threads. Async work waits in two queues: <b style="color:var(--text)">microtasks</b> (promise callbacks) drain completely after each task; <b style="color:var(--text)">macrotasks</b> (setTimeout, I/O) get one per loop.</p>
+    <p class="sub">Predict each output before you tap. These are the warm-ups: get them cold and everything else stands on solid ground.</p>
+  </div>`));
+
+  QUIZ.forEach((q,qi)=>{
+    const card=el(`<div class="card"><div class="why">// predict the console output</div><pre class="code">${esc(q.code)}</pre></div>`);
+    q.options.forEach((opt,oi)=>{
+      const b=el(`<button class="qopt">${esc(opt)}</button>`);
+      b.onclick=()=>{
+        if(card.dataset.done) return;
+        if(oi===q.answer){ b.classList.add("correct"); card.dataset.done="1";
+          card.appendChild(el(`<div class="why-line">${esc(q.why)}</div>`)); }
+        else { b.classList.add("wrong"); }
+      };
+      card.appendChild(b);
+    });
+    main.appendChild(card);
+  });
+}
+
+/* ---- drills (fill the blank) ---- */
+function renderDrills(modId){
+  const list=DRILLS[modId];
+  const header = modId==="primitives"
+    ? {eb:"module 01", h:"Build the primitives", lead:"Each one is a queue of deferreds plus a rule for whose <code style='font-family:var(--mono)'>resolve()</code> you call next. Choose the correct line at each decision point, then run the reference to watch the invariant hold."}
+    : {eb:"module 04", h:"Problem bank", lead:"Classic concurrency problems, built on the same primitives. State the invariant in your head before you choose."};
+  main.appendChild(el(`<div><div class="eyebrow">${header.eb}</div><h1>${header.h}</h1><p class="lead">${header.lead}</p></div>`));
+
+  list.forEach(d=>{
+    const solved = !!state.solved[d.id];
+    const card=el(`<div class="card">
+      <h2>${d.title}</h2>
+      <div class="why">// ${d.why}</div>
+      <span class="done ${solved?"":"hidden"}" data-done>✓ solved</span>
+      <pre class="code">${esc(d.pre)}</pre>
+    </div>`);
+
+    // blank chooser
+    const blank=el(`<div class="blank ${solved?"solved":""}"><div class="q">${esc(d.blank.q)}</div></div>`);
+    if(solved){
+      blank.appendChild(el(`<div class="opt correct">${esc(d.blank.options[d.blank.answer])}</div>`));
+      blank.appendChild(el(`<div class="why-line">${esc(d.blank.whys[d.blank.answer])}</div>`));
+    } else {
+      d.blank.options.forEach((opt,oi)=>{
+        const b=el(`<button class="opt">${esc(opt)}</button>`);
+        b.onclick=()=>{
+          if(blank.classList.contains("solved")) return;
+          if(oi===d.blank.answer){
+            b.classList.add("correct");
+            blank.classList.add("solved");
+            blank.querySelector(".q").classList.add("solved");
+            blank.appendChild(el(`<div class="why-line">${esc(d.blank.whys[oi])}</div>`));
+            card.querySelector("[data-done]").classList.remove("hidden");
+            // disable others
+            blank.querySelectorAll(".opt").forEach(x=>{ if(x!==b) x.style.display="none"; });
+            state.solved[d.id]=true; saveProgress();
+          } else {
+            b.classList.add("wrong");
+            b.appendChild(el(`<div class="why-line" style="margin-top:6px">${esc(d.blank.whys[oi])}</div>`));
+          }
+        };
+        blank.appendChild(b);
+      });
+    }
+    card.appendChild(blank);
+    card.appendChild(el(`<pre class="code">${esc(d.post)}</pre>`));
+
+    // run
+    const runRow=el(`<div class="row"></div>`);
+    const runBtn=el(`<button class="btn go">▶ run reference</button>`);
+    const cons=el(`<div class="console" style="display:none"></div>`);
+    runBtn.onclick=async()=>{
+      runBtn.disabled=true; cons.style.display="block"; cons.textContent="running…";
+      try{
+        const r=await d.demo();
+        cons.innerHTML=r.lines.map(l=>esc(l.t)).join("\n")
+          +`\n<span class="${r.pass?"pass":"fail"}">${r.pass?"✓ PASS":"✗ FAIL"} — ${esc(r.verdict)}</span>`;
+      }catch(e){ cons.innerHTML=`<span class="fail">error: ${esc(String(e))}</span>`; }
+      runBtn.disabled=false;
+    };
+    runRow.appendChild(runBtn);
+    card.appendChild(runRow);
+    card.appendChild(cons);
+    main.appendChild(card);
+  });
+}
+
+/* ---- workers & atomics simulator ---- */
+let sim={threads:3,iters:3,atomic:false};
+const ITER_SCALE=1_000_000;                 // each "increment" notch = 1,000,000 real ops
+// Real SharedArrayBuffer + shared-memory Atomics only exist on a cross-origin-isolated page.
+const REAL_RACE=(typeof SharedArrayBuffer!=="undefined") && (self.crossOriginIsolated===true);
+const fmt=(n)=>n.toLocaleString("en-US");
+
+// The genuine race: N Worker threads incrementing one shared Int32 over a SharedArrayBuffer.
+// Every worker parks on Atomics.wait until the gate opens, so they collide head-on.
+function runRealRace({threads,iters,atomic}){
+  return new Promise((resolve,reject)=>{
+    let view;
+    try{
+      const sab=new SharedArrayBuffer(8);   // [0] = counter, [1] = start gate
+      view=new Int32Array(sab);
+      const workers=[]; let ready=0, done=0;
+      const cleanup=()=>workers.forEach(w=>w.terminate());
+      for(let i=0;i<threads;i++){
+        const w=new Worker("worker.js");
+        w.onerror=(err)=>{ cleanup(); reject(err.message||"worker failed to load"); };
+        w.onmessage=(e)=>{
+          if(e.data.ready){
+            if(++ready===threads){ Atomics.store(view,1,1); Atomics.notify(view,1); }  // open the gate for all at once
+          }else if(e.data.done){
+            if(++done===threads){
+              cleanup();
+              resolve({mem:Atomics.load(view,0),expected:threads*iters,threads,iters,atomic});
+            }
+          }
+        };
+        w.postMessage({buffer:sab,iters,atomic});
+        workers.push(w);
+      }
+    }catch(err){ reject(err.message||String(err)); }
+  });
+}
+
+function renderSim(){
+  const real=REAL_RACE;
+  main.appendChild(el(`<div>
+    <div class="eyebrow">module 02</div>
+    <h1>Workers &amp; Atomics</h1>
+    <p class="lead">This is the one place JS has a real data race: multiple worker threads touching the same <b style="color:var(--text)">SharedArrayBuffer</b>. A plain <code style="font-family:var(--mono)">counter++</code> is three steps — read, add, write — and concurrent threads interleave those steps and clobber each other.</p>
+    <p class="sub">${real
+      ? `This page is <b style="color:var(--ordered)">cross-origin isolated</b>, so the run below spins up <b style="color:var(--text)">real Worker threads</b> over a genuine SharedArrayBuffer. With <b style="color:var(--text)">Atomic</b> off the count comes out wrong — and differently wrong each run. Flip it on and it&rsquo;s exact every time.`
+      : `Real SharedArrayBuffer needs cross-origin isolation, which isn&rsquo;t available here, so the run below <b style="color:var(--text)">simulates</b> the interleaving step by step. The lost-update behavior is identical. Flip <b style="color:var(--text)">Atomic</b> off and run it a few times.`}</p>
+  </div>`));
+
+  const card=el(`<div class="card"><h2>${real?"Live data race":"Interleaving simulator"}</h2><div class="why">// each thread increments a shared counter</div></div>`);
+
+  // isolation status badge
+  const badge=el(`<div class="result ${real?"exact":""}" style="display:flex;align-items:center;gap:8px;margin:0 0 4px">
+    ${real
+      ? `<b style="color:var(--ordered)">● real threads</b> <span class="sub" style="font-size:12px">crossOriginIsolated = true · SharedArrayBuffer live</span>`
+      : `<b style="color:var(--race)">● simulated</b> <span class="sub" style="font-size:12px">crossOriginIsolated = false · stepwise model</span>`}
+  </div>`);
+  if(!real) badge.style.borderColor="var(--line)";
+  card.appendChild(badge);
+
+  const ctrls=el(`<div class="ctrls"></div>`);
+  const tEl=el(`<label class="ctrl">threads <input type="range" min="2" max="4" value="${sim.threads}"> <b style="color:var(--text)" data-tv>${sim.threads}</b></label>`);
+  const iEl=el(`<label class="ctrl">${real?"×&nbsp;million inc":"×&nbsp;increments"} <input type="range" min="2" max="4" value="${sim.iters}"> <b style="color:var(--text)" data-iv>${sim.iters}</b></label>`);
+  const aEl=el(`<div class="toggle ${sim.atomic?"on":""}"><div class="switch"></div> Atomic</div>`);
+  tEl.querySelector("input").oninput=e=>{sim.threads=+e.target.value;tEl.querySelector("[data-tv]").textContent=sim.threads;};
+  iEl.querySelector("input").oninput=e=>{sim.iters=+e.target.value;iEl.querySelector("[data-iv]").textContent=sim.iters;};
+  aEl.onclick=()=>{sim.atomic=!sim.atomic;aEl.classList.toggle("on",sim.atomic);};
+  ctrls.append(tEl,iEl,aEl);
+  card.appendChild(ctrls);
+
+  const runBtn=el(`<button class="btn go">▶ ${real?"run real threads":"run interleaving"}</button>`);
+  const tape=el(`<div class="tape"></div>`);
+  const result=el(`<div class="result" style="display:none"></div>`);
+  const colors=["var(--accent)","var(--ordered)","var(--race)","#e0c25a"];
+
+  const showResult=(mem,expected,extra)=>{
+    result.style.display="block";
+    const lost=expected-mem;
+    result.className="result "+(lost===0?"exact":"lost");
+    const head = lost===0
+      ? `counter = ${fmt(mem)}  ·  expected ${fmt(expected)}  ·  exact`
+      : `counter = ${fmt(mem)}  ·  expected ${fmt(expected)}  ·  ${fmt(lost)} update${lost>1?"s":""} lost`;
+    result.textContent = extra ? head+"  ·  "+extra : head;
+  };
+
+  if(real){
+    runBtn.onclick=async()=>{
+      runBtn.disabled=true; const old=runBtn.textContent; runBtn.textContent="running…";
+      tape.innerHTML="";
+      const iters=sim.iters*ITER_SCALE;
+      try{
+        const out=await runRealRace({threads:sim.threads,iters,atomic:sim.atomic});
+        showResult(out.mem,out.expected,`${out.threads} workers × ${fmt(iters)} · ${out.atomic?"Atomics.add":"view[0]=view[0]+1"}`);
+      }catch(err){
+        result.style.display="block"; result.className="result lost";
+        result.textContent="worker error: "+err;
+      }
+      runBtn.disabled=false; runBtn.textContent=old;
+    };
+  }else{
+    runBtn.onclick=()=>{
+      const out=simulate(sim);
+      tape.innerHTML="";
+      out.tape.forEach(s=>{
+        const label = s.op==="add" ? `T${s.t} add→${s.mem}`
+          : s.op==="read" ? `T${s.t} read ${s.val}` : `T${s.t} write ${s.val}`;
+        const chip=el(`<span class="step">${label}</span>`);
+        chip.style.borderColor=colors[s.t]; chip.style.color=colors[s.t];
+        tape.appendChild(chip);
+      });
+      showResult(out.mem,out.expected);
+    };
+  }
+  card.appendChild(el(`<div class="row"></div>`)).appendChild(runBtn);
+  card.appendChild(tape);
+  card.appendChild(result);
+  main.appendChild(card);
+
+  main.appendChild(el(`<div class="card">
+    <div class="why">// the fix, in real worker code</div>
+    <pre class="code"><span class="cm">// racy — read, add, write can interleave</span>
+counter[0] = counter[0] + 1;
+
+<span class="cm">// safe — one indivisible operation</span>
+<span class="ok">Atomics.add(counter, 0, 1);</span>
+
+<span class="cm">// Atomics.wait / Atomics.notify build a real
+// blocking lock across threads — the worker-world mutex.</span></pre>
+    <p class="sub" style="margin-bottom:0">${real
+      ? `This is exactly what runs above: <code style="font-family:var(--mono)">worker.js</code> increments a shared <code style="font-family:var(--mono)">Int32Array</code>, parked on <code style="font-family:var(--mono)">Atomics.wait</code> until every worker is ready so they collide head-on.`
+      : `In the browser, real SharedArrayBuffer needs cross-origin isolation headers (<code style="font-family:var(--mono)">COOP</code> + <code style="font-family:var(--mono)">COEP</code>). On a host that sets them, this exact module runs genuine threads via <code style="font-family:var(--mono)">worker.js</code> instead of simulating.`}</p>
+  </div>`));
+}
+
+function simulate({threads,iters,atomic}){
+  const expected=threads*iters;
+  if(atomic){
+    const tape=[]; let mem=0;
+    const seq=[]; for(let t=0;t<threads;t++) for(let k=0;k<iters;k++) seq.push(t);
+    // shuffle
+    for(let i=seq.length-1;i>0;i--){const j=rnd(i+1);[seq[i],seq[j]]=[seq[j],seq[i]];}
+    seq.forEach(t=>{mem+=1;tape.push({t,op:"add",mem});});
+    return {mem,tape,expected};
+  }
+  // non-atomic: each increment = read then write, with a private register
+  let mem=0; const reg=new Array(threads).fill(0);
+  const phase=new Array(threads).fill("read"); const remaining=new Array(threads).fill(iters);
+  const tape=[]; let steps=threads*iters*2;
+  while(steps>0){
+    const active=[]; for(let i=0;i<threads;i++) if(remaining[i]>0) active.push(i);
+    const t=active[rnd(active.length)];
+    if(phase[t]==="read"){ reg[t]=mem; tape.push({t,op:"read",val:mem}); phase[t]="write"; }
+    else { mem=reg[t]+1; tape.push({t,op:"write",val:mem}); phase[t]="read"; remaining[t]--; }
+    steps--;
+  }
+  return {mem,tape,expected};
+}
+
+/* ---- flashcards ---- */
+let cardIdx=0, cardFlipped=false;
+function renderCards(){
+  main.appendChild(el(`<div><div class="eyebrow">module 03</div><h1>Trade-offs</h1>
+    <p class="lead">No code here — just the judgment calls that separate using concurrency from understanding it. Tap to flip, then advance. Rehearse until they're reflexive.</p></div>`));
+  const [front,back]=CARDS[cardIdx];
+  const fc=el(`<div class="flash ${cardFlipped?"back":""}">
+    <div class="face">${cardFlipped?"the answer":"prompt "+(cardIdx+1)+" / "+CARDS.length}</div>
+    <div class="body">${esc(cardFlipped?back:front)}</div>
+  </div>`);
+  fc.onclick=()=>{ cardFlipped=!cardFlipped; renderCards(); };
+  main.appendChild(fc);
+  const row=el(`<div class="row"></div>`);
+  const prev=el(`<button class="btn">‹ prev</button>`);
+  const next=el(`<button class="btn go">next ›</button>`);
+  prev.onclick=()=>{ cardIdx=(cardIdx-1+CARDS.length)%CARDS.length; cardFlipped=false; renderCards(); };
+  next.onclick=()=>{ cardIdx=(cardIdx+1)%CARDS.length; cardFlipped=false; renderCards(); };
+  row.append(prev,next);
+  main.appendChild(row);
+}
+
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+/* ---- go ---- */
+loadProgress();
+render();
+</script>

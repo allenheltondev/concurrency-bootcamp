@@ -1,0 +1,8 @@
+# SAM / build artifacts
+.aws-sam/
+samconfig.toml.bak
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
