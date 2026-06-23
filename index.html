@@ -746,6 +746,11 @@ const CARDS = [
 const TOTAL = DRILLS.primitives.length + DRILLS.bank.length + DRILLS.toolkit.length;
 let state = { module:"model", solved:{} };
 
+/* one-at-a-time stepping: where we are inside each stepped module */
+let modelIdx = 0;                                          // current quiz question
+let drillIdx = { primitives:0, bank:0, toolkit:0 };        // current drill per module
+let quizDone = {};                                         // qi -> answered correctly (in-memory)
+
 const STORAGE_KEY="cbootcamp:solved";
 function loadProgress(){
   try{ const raw=localStorage.getItem(STORAGE_KEY); if(raw) state.solved=JSON.parse(raw); }
@@ -792,34 +797,58 @@ function render(){
   else if(m.type==="cards") renderCards();
 }
 
-/* ---- model ---- */
+/* ---- one-at-a-time stepper control (prev · n/total · next) ---- */
+function stepperRow(idx, total, go){
+  const row=el(`<div class="row" style="justify-content:space-between;align-items:center;margin-top:14px"></div>`);
+  const prev=el(`<button class="btn">‹ prev</button>`);
+  const pos=el(`<span class="ctrl">${idx+1} / ${total}</span>`);
+  const next=el(`<button class="btn go">next ›</button>`);
+  if(idx===0) prev.disabled=true;
+  if(idx===total-1) next.disabled=true;
+  prev.onclick=()=>go(idx-1);
+  next.onclick=()=>go(idx+1);
+  row.append(prev,pos,next);
+  return row;
+}
+
+/* ---- model: one quiz question at a time ---- */
+function buildQuizCard(q, qi){
+  const done=!!quizDone[qi];
+  const card=el(`<div class="card"><div class="why">// predict the console output</div><pre class="code">${esc(q.code)}</pre></div>`);
+  q.options.forEach((opt,oi)=>{
+    if(done){
+      card.appendChild(el(`<button class="qopt ${oi===q.answer?"correct":""}" disabled>${esc(opt)}</button>`));
+      return;
+    }
+    const b=el(`<button class="qopt">${esc(opt)}</button>`);
+    b.onclick=()=>{
+      if(card.dataset.done) return;
+      if(oi===q.answer){
+        b.classList.add("correct"); card.dataset.done="1"; quizDone[qi]=true;
+        card.appendChild(el(`<div class="why-line">${esc(q.whys[oi])}</div>`));
+      } else {
+        if(b.dataset.tried) return;            // explain once, then let them try again
+        b.dataset.tried="1"; b.classList.add("wrong");
+        b.appendChild(el(`<div class="why-line" style="margin-top:6px">${esc(q.whys[oi])}</div>`));
+      }
+    };
+    card.appendChild(b);
+  });
+  if(done) card.appendChild(el(`<div class="why-line">${esc(q.whys[q.answer])}</div>`));
+  return card;
+}
+
 function renderModel(){
   main.appendChild(el(`<div>
     <div class="eyebrow">module 00</div>
     <h1>The model</h1>
     <p class="lead">One thread. One stack. A synchronous block runs start to finish before anything else gets a turn — that's why there's no torn read until you add real threads. Async work waits in two queues: <b style="color:var(--text)">microtasks</b> (promise callbacks) drain completely after each task; <b style="color:var(--text)">macrotasks</b> (setTimeout, I/O) get one per loop.</p>
-    <p class="sub">Predict each output before you tap. These are the warm-ups: get them cold and everything else stands on solid ground.</p>
+    <p class="sub">Predict each output before you tap. One at a time — answer, read why, then step on.</p>
   </div>`));
 
-  QUIZ.forEach((q,qi)=>{
-    const card=el(`<div class="card"><div class="why">// predict the console output</div><pre class="code">${esc(q.code)}</pre></div>`);
-    q.options.forEach((opt,oi)=>{
-      const b=el(`<button class="qopt">${esc(opt)}</button>`);
-      b.onclick=()=>{
-        if(card.dataset.done) return;
-        if(oi===q.answer){
-          b.classList.add("correct"); card.dataset.done="1";
-          card.appendChild(el(`<div class="why-line">${esc(q.whys[oi])}</div>`));
-        } else {
-          if(b.dataset.tried) return;          // explain once, then let them try again
-          b.dataset.tried="1"; b.classList.add("wrong");
-          b.appendChild(el(`<div class="why-line" style="margin-top:6px">${esc(q.whys[oi])}</div>`));
-        }
-      };
-      card.appendChild(b);
-    });
-    main.appendChild(card);
-  });
+  modelIdx=Math.max(0,Math.min(modelIdx,QUIZ.length-1));
+  main.appendChild(buildQuizCard(QUIZ[modelIdx], modelIdx));
+  main.appendChild(stepperRow(modelIdx, QUIZ.length, (i)=>{ modelIdx=i; render(); window.scrollTo({top:0}); }));
 }
 
 /* ---- drills (fill the blank) ---- */
@@ -833,63 +862,68 @@ function renderDrills(modId){
   const header = HEADERS[modId];
   main.appendChild(el(`<div><div class="eyebrow">${header.eb}</div><h1>${header.h}</h1><p class="lead">${header.lead}</p></div>`));
 
-  list.forEach(d=>{
-    const solved = !!state.solved[d.id];
-    const card=el(`<div class="card">
-      <h2>${d.title}</h2>
-      <div class="why">// ${d.why}</div>
-      <span class="done ${solved?"":"hidden"}" data-done>✓ solved</span>
-      <pre class="code">${esc(d.pre)}</pre>
-    </div>`);
+  const idx=Math.max(0,Math.min(drillIdx[modId]||0, list.length-1));
+  drillIdx[modId]=idx;
+  main.appendChild(buildDrillCard(list[idx]));
+  main.appendChild(stepperRow(idx, list.length, (i)=>{ drillIdx[modId]=i; render(); window.scrollTo({top:0}); }));
+}
 
-    // blank chooser
-    const blank=el(`<div class="blank ${solved?"solved":""}"><div class="q">${esc(d.blank.q)}</div></div>`);
-    if(solved){
-      blank.appendChild(el(`<div class="opt correct">${esc(d.blank.options[d.blank.answer])}</div>`));
-      blank.appendChild(el(`<div class="why-line">${esc(d.blank.whys[d.blank.answer])}</div>`));
-    } else {
-      d.blank.options.forEach((opt,oi)=>{
-        const b=el(`<button class="opt">${esc(opt)}</button>`);
-        b.onclick=()=>{
-          if(blank.classList.contains("solved")) return;
-          if(oi===d.blank.answer){
-            b.classList.add("correct");
-            blank.classList.add("solved");
-            blank.querySelector(".q").classList.add("solved");
-            blank.appendChild(el(`<div class="why-line">${esc(d.blank.whys[oi])}</div>`));
-            card.querySelector("[data-done]").classList.remove("hidden");
-            // disable others
-            blank.querySelectorAll(".opt").forEach(x=>{ if(x!==b) x.style.display="none"; });
-            state.solved[d.id]=true; saveProgress();
-          } else {
-            b.classList.add("wrong");
-            b.appendChild(el(`<div class="why-line" style="margin-top:6px">${esc(d.blank.whys[oi])}</div>`));
-          }
-        };
-        blank.appendChild(b);
-      });
-    }
-    card.appendChild(blank);
-    card.appendChild(el(`<pre class="code">${esc(d.post)}</pre>`));
+function buildDrillCard(d){
+  const solved = !!state.solved[d.id];
+  const card=el(`<div class="card">
+    <h2>${d.title}</h2>
+    <div class="why">// ${d.why}</div>
+    <span class="done ${solved?"":"hidden"}" data-done>✓ solved</span>
+    <pre class="code">${esc(d.pre)}</pre>
+  </div>`);
 
-    // run
-    const runRow=el(`<div class="row"></div>`);
-    const runBtn=el(`<button class="btn go">▶ run reference</button>`);
-    const cons=el(`<div class="console" style="display:none"></div>`);
-    runBtn.onclick=async()=>{
-      runBtn.disabled=true; cons.style.display="block"; cons.textContent="running…";
-      try{
-        const r=await d.demo();
-        cons.innerHTML=r.lines.map(l=>esc(l.t)).join("\n")
-          +`\n<span class="${r.pass?"pass":"fail"}">${r.pass?"✓ PASS":"✗ FAIL"} — ${esc(r.verdict)}</span>`;
-      }catch(e){ cons.innerHTML=`<span class="fail">error: ${esc(String(e))}</span>`; }
-      runBtn.disabled=false;
-    };
-    runRow.appendChild(runBtn);
-    card.appendChild(runRow);
-    card.appendChild(cons);
-    main.appendChild(card);
-  });
+  // blank chooser
+  const blank=el(`<div class="blank ${solved?"solved":""}"><div class="q">${esc(d.blank.q)}</div></div>`);
+  if(solved){
+    blank.appendChild(el(`<div class="opt correct">${esc(d.blank.options[d.blank.answer])}</div>`));
+    blank.appendChild(el(`<div class="why-line">${esc(d.blank.whys[d.blank.answer])}</div>`));
+  } else {
+    d.blank.options.forEach((opt,oi)=>{
+      const b=el(`<button class="opt">${esc(opt)}</button>`);
+      b.onclick=()=>{
+        if(blank.classList.contains("solved")) return;
+        if(oi===d.blank.answer){
+          b.classList.add("correct");
+          blank.classList.add("solved");
+          blank.querySelector(".q").classList.add("solved");
+          blank.appendChild(el(`<div class="why-line">${esc(d.blank.whys[oi])}</div>`));
+          card.querySelector("[data-done]").classList.remove("hidden");
+          // disable others
+          blank.querySelectorAll(".opt").forEach(x=>{ if(x!==b) x.style.display="none"; });
+          state.solved[d.id]=true; saveProgress();
+        } else {
+          b.classList.add("wrong");
+          b.appendChild(el(`<div class="why-line" style="margin-top:6px">${esc(d.blank.whys[oi])}</div>`));
+        }
+      };
+      blank.appendChild(b);
+    });
+  }
+  card.appendChild(blank);
+  card.appendChild(el(`<pre class="code">${esc(d.post)}</pre>`));
+
+  // run
+  const runRow=el(`<div class="row"></div>`);
+  const runBtn=el(`<button class="btn go">▶ run reference</button>`);
+  const cons=el(`<div class="console" style="display:none"></div>`);
+  runBtn.onclick=async()=>{
+    runBtn.disabled=true; cons.style.display="block"; cons.textContent="running…";
+    try{
+      const r=await d.demo();
+      cons.innerHTML=r.lines.map(l=>esc(l.t)).join("\n")
+        +`\n<span class="${r.pass?"pass":"fail"}">${r.pass?"✓ PASS":"✗ FAIL"} — ${esc(r.verdict)}</span>`;
+    }catch(e){ cons.innerHTML=`<span class="fail">error: ${esc(String(e))}</span>`; }
+    runBtn.disabled=false;
+  };
+  runRow.appendChild(runBtn);
+  card.appendChild(runRow);
+  card.appendChild(cons);
+  return card;
 }
 
 /* ---- workers & atomics simulator ---- */
