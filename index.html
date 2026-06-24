@@ -206,6 +206,63 @@ class TokenBucket{
   #refill(){ const now=Date.now(); const gained=(now-this.#last)*this.#ratePerMs; this.#last=now; this.#tokens=Math.min(this.#capacity,this.#tokens+gained); }
   async take(){ this.#refill(); while(this.#tokens<1){ await sleep((1-this.#tokens)/this.#ratePerMs); this.#refill(); } this.#tokens-=1; }
 }
+function debounce(fn,wait){
+  let t;                                  // the pending timer
+  return function(...args){
+    clearTimeout(t);                      // cancel the prior pending call
+    t=setTimeout(()=>fn.apply(this,args),wait);
+  };
+}
+function throttle(fn,interval){
+  let last=0;
+  return function(...args){
+    const now=Date.now();
+    if(now-last>=interval){ last=now; fn.apply(this,args); }
+  };
+}
+function promiseAll(promises){
+  return new Promise((resolve,reject)=>{
+    const results=[]; let done=0;
+    if(promises.length===0) resolve(results);
+    promises.forEach((p,i)=>{
+      Promise.resolve(p).then(v=>{ results[i]=v; if(++done===promises.length) resolve(results); }, reject);
+    });
+  });
+}
+async function retry(fn,{tries=3,base=10}={}){
+  let attempt=0;
+  for(;;){
+    try{ return await fn(); }
+    catch(err){
+      if(++attempt>=tries) throw err;
+      await sleep(base*2**(attempt-1));   // exponential backoff
+    }
+  }
+}
+/* ---- durable-execution helpers (replay determinism, durable timeout, condition) ---- */
+function makeRuntime(history){
+  let cursor=0;
+  return {
+    // first run: execute fn and record it. replay: return the recorded value verbatim.
+    sideEffect(fn){
+      if(cursor<history.length) return history[cursor++];
+      const v=fn(); history.push(v); cursor++; return v;
+    }
+  };
+}
+function withTimeout(work,ms){
+  return Promise.race([                          // first to settle wins
+    work,
+    sleep(ms).then(()=>({timedOut:true})),
+  ]);
+}
+function makeCondition(){
+  let waiters=[];
+  return {
+    notify(){ const w=waiters; waiters=[]; w.forEach(r=>r()); },
+    async wait(pred){ while(!pred()){ const d=deferred(); waiters.push(d.resolve); await d.promise; } }
+  };
+}
 
 /* ===========================================================
    DEMOS  -> return {lines:[{t,cls}], pass:boolean}
@@ -282,6 +339,70 @@ async function demoTokenBucket(){
   const pass = burst===cap && total>=20;
   return {lines:[{t:`bucket: capacity ${cap}, ${ratePerSec}/sec`},{t:`take() at ms: ${at.map(t=>Math.round(t)).join(", ")}`},{t:`${burst} instant (burst), rest throttled`}], pass, verdict:pass?`burst of ${cap}, then steady ~${Math.round(1000/ratePerSec)}ms/token`:`rate-limit broke (burst ${burst}, total ${total}ms)`};
 }
+async function demoDebounce(){
+  let calls=0; const f=debounce(()=>{calls++;},40);
+  for(let i=0;i<5;i++){ f(); await sleep(4); }   // burst: 5 calls, ~4ms apart
+  await sleep(60);                                // let it settle past wait=40
+  const pass=calls===1;
+  return {lines:[{t:`5 rapid calls (~4ms apart), wait=40ms`},{t:`fn actually ran ${calls} time(s)`}], pass, verdict:pass?"collapsed a burst into 1 call":`ran ${calls}× (want 1)`};
+}
+async function demoThrottle(){
+  let calls=0; const f=throttle(()=>{calls++;},20);
+  for(let i=0;i<10;i++){ f(); await sleep(5); }   // 10 calls over ~50ms
+  const pass=calls>=2&&calls<=6;
+  return {lines:[{t:`10 calls over ~50ms, interval=20ms`},{t:`fn ran ${calls} time(s)`}], pass, verdict:pass?`throttled to ${calls} (≈ once / 20ms)`:`ran ${calls}× (want ~3)`};
+}
+async function demoPromiseAll(){
+  const mk=(v,ms)=>new Promise(r=>setTimeout(()=>r(v),ms));
+  const out=await promiseAll([mk("a",18),mk("b",2),mk("c",10)]);
+  const pass=out.join(",")==="a,b,c";
+  return {lines:[{t:`resolved [a@18ms, b@2ms, c@10ms]`},{t:`result: [${out.join(", ")}]`}], pass, verdict:pass?"input order preserved despite finish order":`got [${out.join(", ")}]`};
+}
+async function demoRetry(){
+  let n=0; const flaky=async()=>{ if(++n<3) throw new Error("fail "+n); return "ok@"+n; };
+  const t0=Date.now();
+  const r=await retry(flaky,{tries:5,base:8});
+  const ms=Date.now()-t0;
+  const pass=r==="ok@3"&&n===3&&ms>=24;          // backed off 8ms + 16ms before the 3rd try
+  return {lines:[{t:`fn fails twice, succeeds on attempt 3`},{t:`got "${r}" after ${n} tries, ~${ms}ms`}], pass, verdict:pass?"backed off 8ms→16ms, then succeeded":`r=${r} n=${n} ${ms}ms`};
+}
+async function demoReplay(){
+  const decide=(rt)=> rt.sideEffect(()=>Math.random())<0.5 ? "refund" : "ship";
+  const history=[];
+  const first=decide(makeRuntime(history));                     // first run records
+  const replays=[0,0,0].map(()=>decide(makeRuntime(history.slice())));
+  const deterministic=replays.every(d=>d===first);
+  const naive=Array.from({length:8},()=> Math.random()<0.5?"refund":"ship");
+  return {lines:[{t:`first run decided: ${first}`},{t:`3 replays from recorded history: ${replays.join(", ")}`},{t:`raw Math.random() over 8 runs: ${new Set(naive).size} distinct outcome(s)`}], pass:deterministic, verdict:deterministic?`replay reproduced "${first}" every time — raw randomness wouldn't`:`replay diverged: ${replays.join(",")}`};
+}
+async function demoDurableTimeout(){
+  const activity=(delay,val)=>sleep(delay).then(()=>({ok:val}));
+  const a=await withTimeout(activity(5,"charged"),40);          // activity wins
+  const b=await withTimeout(activity(60,"charged"),20);         // timer wins
+  const pass=a.ok==="charged" && b.timedOut===true;
+  return {lines:[{t:`activity 5ms vs timer 40ms → ${a.timedOut?"timeout":"ok:"+a.ok}`},{t:`activity 60ms vs timer 20ms → ${b.timedOut?"timeout":"ok:"+b.ok}`}], pass, verdict:pass?"first to settle wins — the durable-timeout race":`a=${JSON.stringify(a)} b=${JSON.stringify(b)}`};
+}
+async function demoSignalMutex(){
+  const run=async(useMutex)=>{
+    let balance=100; const m=new Mutex();
+    const withdraw=async(amt)=>{
+      const body=async()=>{ const b=balance; await sleep(rnd(8)); balance=b-amt; };
+      if(useMutex) await m.runExclusive(body); else await body();
+    };
+    await Promise.all([withdraw(30),withdraw(30),withdraw(30)]);
+    return balance;
+  };
+  const racy=await run(false), safe=await run(true);
+  const pass=safe===10 && racy!==10;
+  return {lines:[{t:`3 concurrent withdrawals of 30 from 100`},{t:`no mutex → balance ${racy}  (updates lost)`},{t:`mutex.runExclusive → balance ${safe}`}], pass, verdict:pass?"mutex serialized the read-modify-write across the await":`racy=${racy} safe=${safe}`};
+}
+async function demoCondition(){
+  let ready=false; const cond=makeCondition(); const order=[];
+  const wf=(async()=>{ order.push("await"); await cond.wait(()=>ready); order.push("proceed"); })();
+  await sleep(10); order.push("signal"); ready=true; cond.notify(); await wf;
+  const pass=order.join(",")==="await,signal,proceed";
+  return {lines:[{t:`order: ${order.join(" → ")}`}], pass, verdict:pass?"workflow parked on the predicate until a signal flipped it":`order: ${order.join(",")}`};
+}
 
 /* ===========================================================
    CONTENT
@@ -292,6 +413,8 @@ const MODULES = [
   { id:"race", label:"workers & atomics", type:"sim" },
   { id:"tradeoffs", label:"trade-offs", type:"cards" },
   { id:"bank", label:"problem bank", type:"drills" },
+  { id:"toolkit", label:"interview kit", type:"drills" },
+  { id:"durable", label:"durable execution", type:"drills" },
 ];
 
 /* ---- model module: predict-output quiz ---- */
@@ -301,20 +424,29 @@ setTimeout(() => console.log('B'), 0);
 Promise.resolve().then(() => console.log('C'));
 console.log('D');`,
     options:["A B C D","A D C B","A D B C"], answer:1,
-    why:"Sync first (A, D). Then the microtask queue drains fully (C) before any macrotask. setTimeout (B) is a macrotask, so it runs last." },
+    whys:[
+      "Top-to-bottom as if it were all synchronous — but setTimeout and .then DEFER their callbacks. Only A and D run synchronously, so B can't be second.",
+      "Right. Sync code first (A, D). Then the microtask queue (.then → C) drains completely before any macrotask. setTimeout (B) is a macrotask, so it runs last.",
+      "Right that A and D are synchronous — but you put the timer (B) before the promise (C). Microtasks (.then → C) drain before any macrotask (setTimeout → B), so C beats B."] },
   { code:`async function f(){ console.log(1); await null; console.log(3); }
 console.log(0);
 f();
 console.log(2);`,
     options:["0 1 2 3","0 1 3 2","1 0 2 3"], answer:0,
-    why:"await null suspends f as a microtask. So f logs 1, yields, the rest of the sync code logs 2, then the microtask resumes and logs 3." },
+    whys:[
+      "Right. await null suspends f as a microtask: it logs 1, yields, the rest of the sync code logs 2, then the microtask resumes and logs 3.",
+      "This assumes f() runs to completion before returning. But await null suspends it — after 1 it yields, sync code logs 2, and only then does 3 run. So 2 precedes 3.",
+      "0 logs first: f() isn't called until after console.log(0). Code runs in source order until something suspends, and f() hasn't even been invoked when 0 prints."] },
   { code:`setTimeout(() => console.log('T1'));
 Promise.resolve()
   .then(() => console.log('P1'))
   .then(() => console.log('P2'));
 setTimeout(() => console.log('T2'));`,
     options:["T1 T2 P1 P2","P1 P2 T1 T2","P1 T1 P2 T2"], answer:1,
-    why:"The whole promise chain (P1 then P2) is microtasks and drains before the event loop ever reaches the timer queue (T1, T2)." },
+    whys:[
+      "Timers don't go first. The whole microtask chain (P1 then P2) drains before the event loop services the timer queue, so both promises print before either timeout.",
+      "Right. The promise chain (P1 then P2) is all microtasks and drains before the event loop ever reaches the timer queue (T1, T2).",
+      "Microtasks don't yield to timers between steps. After P1 runs it queues P2 as another microtask; the loop drains microtasks to exhaustion (P1, P2) before touching T1."] },
 ];
 
 /* ---- drill definitions (fill the blank) ---- */
@@ -568,6 +700,197 @@ const DRILLS = {
   }
 }` },
   ],
+
+  toolkit:[
+    { id:"debounce", title:"Debounce", why:"a burst of calls fires fn once, after it goes quiet", demo:demoDebounce,
+      pre:`function debounce(fn, wait) {
+  let t;                       // the pending timer
+  return function (...args) {`,
+      blank:{ q:"a burst of calls should fire fn ONCE, after it goes quiet. What goes here?",
+        options:[
+`    clearTimeout(t);          // cancel the prior pending call
+    t = setTimeout(() => fn.apply(this, args), wait);`,
+`    t = setTimeout(() => fn.apply(this, args), wait);`,
+`    clearTimeout(t);
+    fn.apply(this, args);      // call it right away`],
+        answer:0,
+        whys:["Right. Each call cancels the previous pending timer and starts a fresh one, so fn runs only after calls stop for `wait` ms — trailing-edge debounce.",
+              "Without clearing, every call schedules its own timer — fn fires once per call, not once per burst. That isn't debouncing at all.",
+              "Calling fn synchronously on every invocation ignores `wait` and fires on every keystroke — the exact thing debounce exists to stop."] },
+      post:`  };
+}` },
+
+    { id:"throttle", title:"Throttle", why:"run fn at most once per interval, however often it's called", demo:demoThrottle,
+      pre:`function throttle(fn, interval) {
+  let last = 0;                // when fn last ran
+  return function (...args) {`,
+      blank:{ q:"throttle runs fn at most once per `interval`. What gates the call?",
+        options:[
+`    const now = Date.now();
+    if (now - last >= interval) {
+      last = now; fn.apply(this, args);
+    }`,
+`    const now = Date.now();
+    last = now;
+    if (now - last >= interval) fn.apply(this, args);`,
+`    const now = Date.now();
+    if (now - last >= interval) fn.apply(this, args);`],
+        answer:0,
+        whys:["Right. fn fires only when at least `interval` ms have passed since the last accepted call, and `last` advances only then — leading-edge throttle.",
+              "Setting `last = now` before the check makes `now - last` always 0, so the condition never passes and fn never runs.",
+              "Never updating `last` means once the first interval elapses, every call fires — the rate limit is gone."] },
+      post:`  };
+}` },
+
+    { id:"promiseall", title:"Promise.all from scratch", why:"resolve to results in input order; reject on the first failure", demo:demoPromiseAll,
+      pre:`function promiseAll(promises) {
+  return new Promise((resolve, reject) => {
+    const results = [];
+    let done = 0;
+    if (promises.length === 0) resolve(results);
+    promises.forEach((p, i) => {
+      Promise.resolve(p).then((v) => {`,
+      blank:{ q:"each promise settles whenever it wants. Keep results in order and finish at the right time:",
+        options:[
+`        results[i] = v;        // slot by index, not push
+        if (++done === promises.length) resolve(results);`,
+`        results.push(v);
+        if (results.length === promises.length) resolve(results);`,
+`        results[i] = v;
+        resolve(results);      // resolve as each one settles`],
+        answer:0,
+        whys:["Right. Index assignment preserves input order no matter who finishes first, and the counter resolves exactly once — after the last one settles.",
+              "push records results in completion order, not input order: a fast promise at index 3 lands in slot 0 and the output is scrambled.",
+              "Resolving on the first settle returns a half-filled array. (A promise ignores resolve() after the first call, so the rest are silently dropped.)"] },
+      post:`      }, reject);   // any rejection rejects the whole thing
+    });
+  });
+}` },
+
+    { id:"retry", title:"Retry with backoff", why:"retry a flaky call — bounded, with exponential backoff", demo:demoRetry,
+      pre:`async function retry(fn, { tries = 3, base = 10 } = {}) {
+  let attempt = 0;
+  for (;;) {
+    try {
+      return await fn();
+    } catch (err) {`,
+      blank:{ q:"on failure, when do you give up vs wait and retry?",
+        options:[
+`      if (++attempt >= tries) throw err;       // out of tries -> surface it
+      await sleep(base * 2 ** (attempt - 1));  // else back off, then loop`,
+`      await sleep(base * 2 ** attempt);
+      attempt++;                               // try again, forever`,
+`      if (++attempt >= tries) throw err;
+      await sleep(base);                       // same delay every time`],
+        answer:0,
+        whys:["Right. Re-throw once attempts are exhausted; otherwise wait an exponentially growing delay before looping. Bounded and backed off.",
+              "No tries cap means a permanently-failing dependency loops forever — an unbounded retry storm. Always bound the attempts.",
+              "A constant delay hammers a struggling service at a fixed rate. Exponential backoff gives it room to recover and avoids synchronized retry stampedes."] },
+      post:`    }
+  }
+}` },
+  ],
+
+  durable:[
+    { id:"replay", title:"Deterministic replay", why:"workflow code is re-run from history — nondeterminism must replay, not recompute", demo:demoReplay,
+      pre:`// A durable workflow is re-executed from its event history to rebuild
+// state. If the code branches differently on replay than it did the
+// first time, it no longer matches history and the run is rejected. So
+// any nondeterministic value (time, randomness) is recorded once, then
+// replayed verbatim.
+function sideEffect(fn) {
+  if (replaying) {`,
+      blank:{ q:"on replay, where does the value come from?",
+        options:[
+`    return history[cursor++];     // reuse the value recorded the first time`,
+`    return fn();                  // just run fn again`,
+`    const v = fn(); history.push(v); return v;`],
+        answer:0,
+        whys:["Right. On replay you return the exact value recorded on the first run, so every branch lands the same way and the code still matches history.",
+              "Re-running a nondeterministic fn on replay yields a different value, the workflow takes a branch history doesn't record, and Temporal rejects the run as nondeterministic.",
+              "Re-recording on every replay both re-runs the nondeterministic fn AND grows the log past where the cursor is — double nondeterminism."] },
+      post:`  }
+  const v = fn();                  // first run: execute it...
+  history.push(v); cursor++;       // ...and record it for future replays
+  return v;
+}` },
+
+    { id:"durabletimeout", title:"Durable timeout", why:"race the activity against a durable timer; first to settle wins", demo:demoDurableTimeout,
+      pre:`// Give an activity a deadline: run it and a durable timer concurrently
+// and take whichever finishes first. (In Temporal both survive a worker
+// crash; here we model the race itself.)
+function withTimeout(work, ms) {`,
+      blank:{ q:"race the work against a timer so a hung activity can't block forever:",
+        options:[
+`  return Promise.race([
+    work,
+    sleep(ms).then(() => ({ timedOut: true })),
+  ]);`,
+`  return Promise.all([
+    work,
+    sleep(ms).then(() => ({ timedOut: true })),
+  ]).then(([w]) => w);`,
+`  const w = await work;           // wait for the activity first
+  await sleep(ms);                // then start the timer
+  return w;`],
+        answer:0,
+        whys:["Right. race settles the moment either the activity finishes or the timer fires — the durable timeout. The loser keeps running unless you cancel it (Temporal uses a CancellationScope).",
+              "Promise.all waits for BOTH to settle, so a hung activity is never cut off — there is no timeout at all.",
+              "Awaiting the work before the timer makes them sequential: a hung activity blocks forever and the timer never gets to fire."] },
+      post:`}` },
+
+    { id:"signalmutex", title:"Serialize concurrent signals", why:"signal handlers interleave at awaits — a critical section needs a lock", demo:demoSignalMutex,
+      pre:`// A running workflow receives signals concurrently. Handlers are
+// coroutines on one thread — no mid-statement preemption, but they DO
+// interleave at every await. A read-modify-write that spans an await
+// loses updates without a lock.
+const mutex = new Mutex();
+async function onWithdraw(amount) {`,
+      blank:{ q:"keep two concurrent withdraw signals from losing updates:",
+        options:[
+`  await mutex.runExclusive(async () => {
+    const bal = balance;          // read
+    await checkLimits(amount);    // await — others would interleave here
+    balance = bal - amount;       // write
+  });`,
+`  const bal = balance;            // read
+  await checkLimits(amount);      // await
+  balance = bal - amount;         // write`,
+`  const bal = balance;
+  balance = bal - amount;         // write before awaiting
+  await checkLimits(amount);`],
+        answer:0,
+        whys:["Right. The mutex serializes the whole read-await-write, so a second signal can't read `balance` until the first has written it back — no lost updates.",
+              "With no lock, a second signal reads `balance` during the first one's await; both write back stale values — a lost update across the await.",
+              "Writing before the await dodges this one case, but it commits the change before checkLimits can reject it, and any handler that must await between read and write is still unsafe."] },
+      post:`}` },
+
+    { id:"condition", title:"Wait for a signal", why:"block the workflow until a signal flips state true — Temporal's condition()", demo:demoCondition,
+      pre:`// condition(): suspend the workflow until a signal makes the predicate
+// true. Re-check on every wake — a still-false predicate (another
+// signal, a spurious wake) has to keep waiting.
+async function wait(pred) {`,
+      blank:{ q:"block until pred() holds, re-checking on each notify:",
+        options:[
+`  while (!pred()) {                // re-check after every wake
+    const d = deferred();
+    waiters.push(d.resolve);
+    await d.promise;
+  }`,
+`  if (!pred()) {                   // check once
+    const d = deferred();
+    waiters.push(d.resolve);
+    await d.promise;
+  }`,
+`  while (!pred()) {
+    await sleep(0);                // poll the predicate
+  }`],
+        answer:0,
+        whys:["Right. Park on a deferred, and on every notify re-check the predicate in a loop — you only proceed once it's genuinely true.",
+              "An `if` proceeds on the first notify even if the predicate is still false (a different signal, a spurious wake). Re-check in a loop, not once.",
+              "Polling with sleep(0) busy-waits the event loop instead of parking until a signal arrives — wasteful, and in a deterministic workflow, nondeterministic."] },
+      post:`}` },
+  ],
 };
 
 /* ---- flashcards ---- */
@@ -578,13 +901,22 @@ const CARDS = [
   ["What does strict ordering cost you?","Availability. A stalled producer blocks everyone behind it. Ordering trades availability for consistency — recognize the trade before it bites you."],
   ["Unbounded retry against a dead dependency?","An unbounded backlog. Robustness isn't free: cap retries, add a circuit breaker or dead-letter path, and bound the queue."],
   ["Why Atomics.add over view[0]++ across threads?","view[0]++ is read-modify-write — three steps that interleave and lose updates. Atomics.add is one indivisible step."],
+  ["Why can't a durable workflow call Date.now() or Math.random() directly?","Workflow code is re-executed from history on replay to rebuild state. Wall-clock and randomness differ each run, so replay would diverge from history. Route them through the runtime (workflow time, sideEffect) so the recorded value replays exactly."],
+  ["A long-running workflow's event history keeps growing — then what?","History is replayed on every wake, so unbounded history means unbounded replay cost and a hard size cap. continue-as-new starts a fresh execution, carrying state forward with an empty history — the same instinct as capping a queue."],
+  ["An activity ran, then the worker died before its result was recorded. Does it run again?","Yes — execution is at-least-once, so an activity can run more than once. Make activities idempotent (dedupe by a stable key) so a retry doesn't double-charge."],
+  ["Two signals hit a running workflow at once — is its state safe?","Handlers are coroutines on one thread: no mid-statement preemption, but they interleave at every await. A read-modify-write spanning an await needs a mutex — the same hazard as any async critical section."],
 ];
 
 /* ===========================================================
    STATE + PERSISTENCE
    =========================================================== */
-const TOTAL = DRILLS.primitives.length + DRILLS.bank.length;
+const TOTAL = DRILLS.primitives.length + DRILLS.bank.length + DRILLS.toolkit.length + DRILLS.durable.length;
 let state = { module:"model", solved:{} };
+
+/* one-at-a-time stepping: where we are inside each stepped module */
+let modelIdx = 0;                                          // current quiz question
+let drillIdx = { primitives:0, bank:0, toolkit:0, durable:0 };  // current drill per module
+let quizDone = {};                                         // qi -> answered correctly (in-memory)
 
 const STORAGE_KEY="cbootcamp:solved";
 function loadProgress(){
@@ -632,96 +964,134 @@ function render(){
   else if(m.type==="cards") renderCards();
 }
 
-/* ---- model ---- */
+/* ---- one-at-a-time stepper control (prev · n/total · next) ---- */
+function stepperRow(idx, total, go){
+  const row=el(`<div class="row" style="justify-content:space-between;align-items:center;margin-top:14px"></div>`);
+  const prev=el(`<button class="btn">‹ prev</button>`);
+  const pos=el(`<span class="ctrl">${idx+1} / ${total}</span>`);
+  const next=el(`<button class="btn go">next ›</button>`);
+  if(idx===0) prev.disabled=true;
+  if(idx===total-1) next.disabled=true;
+  prev.onclick=()=>go(idx-1);
+  next.onclick=()=>go(idx+1);
+  row.append(prev,pos,next);
+  return row;
+}
+
+/* ---- model: one quiz question at a time ---- */
+function buildQuizCard(q, qi){
+  const done=!!quizDone[qi];
+  const card=el(`<div class="card"><div class="why">// predict the console output</div><pre class="code">${esc(q.code)}</pre></div>`);
+  q.options.forEach((opt,oi)=>{
+    if(done){
+      card.appendChild(el(`<button class="qopt ${oi===q.answer?"correct":""}" disabled>${esc(opt)}</button>`));
+      return;
+    }
+    const b=el(`<button class="qopt">${esc(opt)}</button>`);
+    b.onclick=()=>{
+      if(card.dataset.done) return;
+      if(oi===q.answer){
+        b.classList.add("correct"); card.dataset.done="1"; quizDone[qi]=true;
+        card.appendChild(el(`<div class="why-line">${esc(q.whys[oi])}</div>`));
+      } else {
+        if(b.dataset.tried) return;            // explain once, then let them try again
+        b.dataset.tried="1"; b.classList.add("wrong");
+        b.appendChild(el(`<div class="why-line" style="margin-top:6px">${esc(q.whys[oi])}</div>`));
+      }
+    };
+    card.appendChild(b);
+  });
+  if(done) card.appendChild(el(`<div class="why-line">${esc(q.whys[q.answer])}</div>`));
+  return card;
+}
+
 function renderModel(){
   main.appendChild(el(`<div>
     <div class="eyebrow">module 00</div>
     <h1>The model</h1>
     <p class="lead">One thread. One stack. A synchronous block runs start to finish before anything else gets a turn — that's why there's no torn read until you add real threads. Async work waits in two queues: <b style="color:var(--text)">microtasks</b> (promise callbacks) drain completely after each task; <b style="color:var(--text)">macrotasks</b> (setTimeout, I/O) get one per loop.</p>
-    <p class="sub">Predict each output before you tap. These are the warm-ups: get them cold and everything else stands on solid ground.</p>
+    <p class="sub">Predict each output before you tap. One at a time — answer, read why, then step on.</p>
   </div>`));
 
-  QUIZ.forEach((q,qi)=>{
-    const card=el(`<div class="card"><div class="why">// predict the console output</div><pre class="code">${esc(q.code)}</pre></div>`);
-    q.options.forEach((opt,oi)=>{
-      const b=el(`<button class="qopt">${esc(opt)}</button>`);
-      b.onclick=()=>{
-        if(card.dataset.done) return;
-        if(oi===q.answer){ b.classList.add("correct"); card.dataset.done="1";
-          card.appendChild(el(`<div class="why-line">${esc(q.why)}</div>`)); }
-        else { b.classList.add("wrong"); }
-      };
-      card.appendChild(b);
-    });
-    main.appendChild(card);
-  });
+  modelIdx=Math.max(0,Math.min(modelIdx,QUIZ.length-1));
+  main.appendChild(buildQuizCard(QUIZ[modelIdx], modelIdx));
+  main.appendChild(stepperRow(modelIdx, QUIZ.length, (i)=>{ modelIdx=i; render(); window.scrollTo({top:0}); }));
 }
 
 /* ---- drills (fill the blank) ---- */
 function renderDrills(modId){
   const list=DRILLS[modId];
-  const header = modId==="primitives"
-    ? {eb:"module 01", h:"Build the primitives", lead:"Each one is a queue of deferreds plus a rule for whose <code style='font-family:var(--mono)'>resolve()</code> you call next. Choose the correct line at each decision point, then run the reference to watch the invariant hold."}
-    : {eb:"module 04", h:"Problem bank", lead:"Classic concurrency problems, built on the same primitives. State the invariant in your head before you choose."};
+  const HEADERS = {
+    primitives:{eb:"module 01", h:"Build the primitives", lead:"Each one is a queue of deferreds plus a rule for whose <code style='font-family:var(--mono)'>resolve()</code> you call next. Choose the correct line at each decision point, then run the reference to watch the invariant hold."},
+    bank:{eb:"module 04", h:"Problem bank", lead:"Classic concurrency problems, built on the same primitives. State the invariant in your head before you choose."},
+    toolkit:{eb:"module 05", h:"Interview kit", lead:"The async utilities interviewers actually ask you to write — <code style='font-family:var(--mono)'>debounce</code>, <code style='font-family:var(--mono)'>throttle</code>, <code style='font-family:var(--mono)'>Promise.all</code>, retry. Same drill: pick the line that holds the invariant, then run it."},
+    durable:{eb:"module 06", h:"Durable execution", lead:"The concurrency model behind workflow engines like <b style='color:var(--text)'>Temporal</b>: code that's re-run from history must stay deterministic, race durable timers, and serialize concurrent signals. Same hazards as async JS — with replay raising the stakes."},
+  };
+  const header = HEADERS[modId];
   main.appendChild(el(`<div><div class="eyebrow">${header.eb}</div><h1>${header.h}</h1><p class="lead">${header.lead}</p></div>`));
 
-  list.forEach(d=>{
-    const solved = !!state.solved[d.id];
-    const card=el(`<div class="card">
-      <h2>${d.title}</h2>
-      <div class="why">// ${d.why}</div>
-      <span class="done ${solved?"":"hidden"}" data-done>✓ solved</span>
-      <pre class="code">${esc(d.pre)}</pre>
-    </div>`);
+  const idx=Math.max(0,Math.min(drillIdx[modId]||0, list.length-1));
+  drillIdx[modId]=idx;
+  main.appendChild(buildDrillCard(list[idx]));
+  main.appendChild(stepperRow(idx, list.length, (i)=>{ drillIdx[modId]=i; render(); window.scrollTo({top:0}); }));
+}
 
-    // blank chooser
-    const blank=el(`<div class="blank ${solved?"solved":""}"><div class="q">${esc(d.blank.q)}</div></div>`);
-    if(solved){
-      blank.appendChild(el(`<div class="opt correct">${esc(d.blank.options[d.blank.answer])}</div>`));
-      blank.appendChild(el(`<div class="why-line">${esc(d.blank.whys[d.blank.answer])}</div>`));
-    } else {
-      d.blank.options.forEach((opt,oi)=>{
-        const b=el(`<button class="opt">${esc(opt)}</button>`);
-        b.onclick=()=>{
-          if(blank.classList.contains("solved")) return;
-          if(oi===d.blank.answer){
-            b.classList.add("correct");
-            blank.classList.add("solved");
-            blank.querySelector(".q").classList.add("solved");
-            blank.appendChild(el(`<div class="why-line">${esc(d.blank.whys[oi])}</div>`));
-            card.querySelector("[data-done]").classList.remove("hidden");
-            // disable others
-            blank.querySelectorAll(".opt").forEach(x=>{ if(x!==b) x.style.display="none"; });
-            state.solved[d.id]=true; saveProgress();
-          } else {
-            b.classList.add("wrong");
-            b.appendChild(el(`<div class="why-line" style="margin-top:6px">${esc(d.blank.whys[oi])}</div>`));
-          }
-        };
-        blank.appendChild(b);
-      });
-    }
-    card.appendChild(blank);
-    card.appendChild(el(`<pre class="code">${esc(d.post)}</pre>`));
+function buildDrillCard(d){
+  const solved = !!state.solved[d.id];
+  const card=el(`<div class="card">
+    <h2>${d.title}</h2>
+    <div class="why">// ${d.why}</div>
+    <span class="done ${solved?"":"hidden"}" data-done>✓ solved</span>
+    <pre class="code">${esc(d.pre)}</pre>
+  </div>`);
 
-    // run
-    const runRow=el(`<div class="row"></div>`);
-    const runBtn=el(`<button class="btn go">▶ run reference</button>`);
-    const cons=el(`<div class="console" style="display:none"></div>`);
-    runBtn.onclick=async()=>{
-      runBtn.disabled=true; cons.style.display="block"; cons.textContent="running…";
-      try{
-        const r=await d.demo();
-        cons.innerHTML=r.lines.map(l=>esc(l.t)).join("\n")
-          +`\n<span class="${r.pass?"pass":"fail"}">${r.pass?"✓ PASS":"✗ FAIL"} — ${esc(r.verdict)}</span>`;
-      }catch(e){ cons.innerHTML=`<span class="fail">error: ${esc(String(e))}</span>`; }
-      runBtn.disabled=false;
-    };
-    runRow.appendChild(runBtn);
-    card.appendChild(runRow);
-    card.appendChild(cons);
-    main.appendChild(card);
-  });
+  // blank chooser
+  const blank=el(`<div class="blank ${solved?"solved":""}"><div class="q">${esc(d.blank.q)}</div></div>`);
+  if(solved){
+    blank.appendChild(el(`<div class="opt correct">${esc(d.blank.options[d.blank.answer])}</div>`));
+    blank.appendChild(el(`<div class="why-line">${esc(d.blank.whys[d.blank.answer])}</div>`));
+  } else {
+    d.blank.options.forEach((opt,oi)=>{
+      const b=el(`<button class="opt">${esc(opt)}</button>`);
+      b.onclick=()=>{
+        if(blank.classList.contains("solved")) return;
+        if(oi===d.blank.answer){
+          b.classList.add("correct");
+          blank.classList.add("solved");
+          blank.querySelector(".q").classList.add("solved");
+          blank.appendChild(el(`<div class="why-line">${esc(d.blank.whys[oi])}</div>`));
+          card.querySelector("[data-done]").classList.remove("hidden");
+          // disable others
+          blank.querySelectorAll(".opt").forEach(x=>{ if(x!==b) x.style.display="none"; });
+          state.solved[d.id]=true; saveProgress();
+        } else {
+          b.classList.add("wrong");
+          b.appendChild(el(`<div class="why-line" style="margin-top:6px">${esc(d.blank.whys[oi])}</div>`));
+        }
+      };
+      blank.appendChild(b);
+    });
+  }
+  card.appendChild(blank);
+  card.appendChild(el(`<pre class="code">${esc(d.post)}</pre>`));
+
+  // run
+  const runRow=el(`<div class="row"></div>`);
+  const runBtn=el(`<button class="btn go">▶ run reference</button>`);
+  const cons=el(`<div class="console" style="display:none"></div>`);
+  runBtn.onclick=async()=>{
+    runBtn.disabled=true; cons.style.display="block"; cons.textContent="running…";
+    try{
+      const r=await d.demo();
+      cons.innerHTML=r.lines.map(l=>esc(l.t)).join("\n")
+        +`\n<span class="${r.pass?"pass":"fail"}">${r.pass?"✓ PASS":"✗ FAIL"} — ${esc(r.verdict)}</span>`;
+    }catch(e){ cons.innerHTML=`<span class="fail">error: ${esc(String(e))}</span>`; }
+    runBtn.disabled=false;
+  };
+  runRow.appendChild(runBtn);
+  card.appendChild(runRow);
+  card.appendChild(cons);
+  return card;
 }
 
 /* ---- workers & atomics simulator ---- */
