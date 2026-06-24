@@ -239,6 +239,30 @@ async function retry(fn,{tries=3,base=10}={}){
     }
   }
 }
+/* ---- durable-execution helpers (replay determinism, durable timeout, condition) ---- */
+function makeRuntime(history){
+  let cursor=0;
+  return {
+    // first run: execute fn and record it. replay: return the recorded value verbatim.
+    sideEffect(fn){
+      if(cursor<history.length) return history[cursor++];
+      const v=fn(); history.push(v); cursor++; return v;
+    }
+  };
+}
+function withTimeout(work,ms){
+  return Promise.race([                          // first to settle wins
+    work,
+    sleep(ms).then(()=>({timedOut:true})),
+  ]);
+}
+function makeCondition(){
+  let waiters=[];
+  return {
+    notify(){ const w=waiters; waiters=[]; w.forEach(r=>r()); },
+    async wait(pred){ while(!pred()){ const d=deferred(); waiters.push(d.resolve); await d.promise; } }
+  };
+}
 
 /* ===========================================================
    DEMOS  -> return {lines:[{t,cls}], pass:boolean}
@@ -342,6 +366,43 @@ async function demoRetry(){
   const pass=r==="ok@3"&&n===3&&ms>=24;          // backed off 8ms + 16ms before the 3rd try
   return {lines:[{t:`fn fails twice, succeeds on attempt 3`},{t:`got "${r}" after ${n} tries, ~${ms}ms`}], pass, verdict:pass?"backed off 8ms→16ms, then succeeded":`r=${r} n=${n} ${ms}ms`};
 }
+async function demoReplay(){
+  const decide=(rt)=> rt.sideEffect(()=>Math.random())<0.5 ? "refund" : "ship";
+  const history=[];
+  const first=decide(makeRuntime(history));                     // first run records
+  const replays=[0,0,0].map(()=>decide(makeRuntime(history.slice())));
+  const deterministic=replays.every(d=>d===first);
+  const naive=Array.from({length:8},()=> Math.random()<0.5?"refund":"ship");
+  return {lines:[{t:`first run decided: ${first}`},{t:`3 replays from recorded history: ${replays.join(", ")}`},{t:`raw Math.random() over 8 runs: ${new Set(naive).size} distinct outcome(s)`}], pass:deterministic, verdict:deterministic?`replay reproduced "${first}" every time — raw randomness wouldn't`:`replay diverged: ${replays.join(",")}`};
+}
+async function demoDurableTimeout(){
+  const activity=(delay,val)=>sleep(delay).then(()=>({ok:val}));
+  const a=await withTimeout(activity(5,"charged"),40);          // activity wins
+  const b=await withTimeout(activity(60,"charged"),20);         // timer wins
+  const pass=a.ok==="charged" && b.timedOut===true;
+  return {lines:[{t:`activity 5ms vs timer 40ms → ${a.timedOut?"timeout":"ok:"+a.ok}`},{t:`activity 60ms vs timer 20ms → ${b.timedOut?"timeout":"ok:"+b.ok}`}], pass, verdict:pass?"first to settle wins — the durable-timeout race":`a=${JSON.stringify(a)} b=${JSON.stringify(b)}`};
+}
+async function demoSignalMutex(){
+  const run=async(useMutex)=>{
+    let balance=100; const m=new Mutex();
+    const withdraw=async(amt)=>{
+      const body=async()=>{ const b=balance; await sleep(rnd(8)); balance=b-amt; };
+      if(useMutex) await m.runExclusive(body); else await body();
+    };
+    await Promise.all([withdraw(30),withdraw(30),withdraw(30)]);
+    return balance;
+  };
+  const racy=await run(false), safe=await run(true);
+  const pass=safe===10 && racy!==10;
+  return {lines:[{t:`3 concurrent withdrawals of 30 from 100`},{t:`no mutex → balance ${racy}  (updates lost)`},{t:`mutex.runExclusive → balance ${safe}`}], pass, verdict:pass?"mutex serialized the read-modify-write across the await":`racy=${racy} safe=${safe}`};
+}
+async function demoCondition(){
+  let ready=false; const cond=makeCondition(); const order=[];
+  const wf=(async()=>{ order.push("await"); await cond.wait(()=>ready); order.push("proceed"); })();
+  await sleep(10); order.push("signal"); ready=true; cond.notify(); await wf;
+  const pass=order.join(",")==="await,signal,proceed";
+  return {lines:[{t:`order: ${order.join(" → ")}`}], pass, verdict:pass?"workflow parked on the predicate until a signal flipped it":`order: ${order.join(",")}`};
+}
 
 /* ===========================================================
    CONTENT
@@ -353,6 +414,7 @@ const MODULES = [
   { id:"tradeoffs", label:"trade-offs", type:"cards" },
   { id:"bank", label:"problem bank", type:"drills" },
   { id:"toolkit", label:"interview kit", type:"drills" },
+  { id:"durable", label:"durable execution", type:"drills" },
 ];
 
 /* ---- model module: predict-output quiz ---- */
@@ -728,6 +790,107 @@ const DRILLS = {
   }
 }` },
   ],
+
+  durable:[
+    { id:"replay", title:"Deterministic replay", why:"workflow code is re-run from history — nondeterminism must replay, not recompute", demo:demoReplay,
+      pre:`// A durable workflow is re-executed from its event history to rebuild
+// state. If the code branches differently on replay than it did the
+// first time, it no longer matches history and the run is rejected. So
+// any nondeterministic value (time, randomness) is recorded once, then
+// replayed verbatim.
+function sideEffect(fn) {
+  if (replaying) {`,
+      blank:{ q:"on replay, where does the value come from?",
+        options:[
+`    return history[cursor++];     // reuse the value recorded the first time`,
+`    return fn();                  // just run fn again`,
+`    const v = fn(); history.push(v); return v;`],
+        answer:0,
+        whys:["Right. On replay you return the exact value recorded on the first run, so every branch lands the same way and the code still matches history.",
+              "Re-running a nondeterministic fn on replay yields a different value, the workflow takes a branch history doesn't record, and Temporal rejects the run as nondeterministic.",
+              "Re-recording on every replay both re-runs the nondeterministic fn AND grows the log past where the cursor is — double nondeterminism."] },
+      post:`  }
+  const v = fn();                  // first run: execute it...
+  history.push(v); cursor++;       // ...and record it for future replays
+  return v;
+}` },
+
+    { id:"durabletimeout", title:"Durable timeout", why:"race the activity against a durable timer; first to settle wins", demo:demoDurableTimeout,
+      pre:`// Give an activity a deadline: run it and a durable timer concurrently
+// and take whichever finishes first. (In Temporal both survive a worker
+// crash; here we model the race itself.)
+function withTimeout(work, ms) {`,
+      blank:{ q:"race the work against a timer so a hung activity can't block forever:",
+        options:[
+`  return Promise.race([
+    work,
+    sleep(ms).then(() => ({ timedOut: true })),
+  ]);`,
+`  return Promise.all([
+    work,
+    sleep(ms).then(() => ({ timedOut: true })),
+  ]).then(([w]) => w);`,
+`  const w = await work;           // wait for the activity first
+  await sleep(ms);                // then start the timer
+  return w;`],
+        answer:0,
+        whys:["Right. race settles the moment either the activity finishes or the timer fires — the durable timeout. The loser keeps running unless you cancel it (Temporal uses a CancellationScope).",
+              "Promise.all waits for BOTH to settle, so a hung activity is never cut off — there is no timeout at all.",
+              "Awaiting the work before the timer makes them sequential: a hung activity blocks forever and the timer never gets to fire."] },
+      post:`}` },
+
+    { id:"signalmutex", title:"Serialize concurrent signals", why:"signal handlers interleave at awaits — a critical section needs a lock", demo:demoSignalMutex,
+      pre:`// A running workflow receives signals concurrently. Handlers are
+// coroutines on one thread — no mid-statement preemption, but they DO
+// interleave at every await. A read-modify-write that spans an await
+// loses updates without a lock.
+const mutex = new Mutex();
+async function onWithdraw(amount) {`,
+      blank:{ q:"keep two concurrent withdraw signals from losing updates:",
+        options:[
+`  await mutex.runExclusive(async () => {
+    const bal = balance;          // read
+    await checkLimits(amount);    // await — others would interleave here
+    balance = bal - amount;       // write
+  });`,
+`  const bal = balance;            // read
+  await checkLimits(amount);      // await
+  balance = bal - amount;         // write`,
+`  const bal = balance;
+  balance = bal - amount;         // write before awaiting
+  await checkLimits(amount);`],
+        answer:0,
+        whys:["Right. The mutex serializes the whole read-await-write, so a second signal can't read `balance` until the first has written it back — no lost updates.",
+              "With no lock, a second signal reads `balance` during the first one's await; both write back stale values — a lost update across the await.",
+              "Writing before the await dodges this one case, but it commits the change before checkLimits can reject it, and any handler that must await between read and write is still unsafe."] },
+      post:`}` },
+
+    { id:"condition", title:"Wait for a signal", why:"block the workflow until a signal flips state true — Temporal's condition()", demo:demoCondition,
+      pre:`// condition(): suspend the workflow until a signal makes the predicate
+// true. Re-check on every wake — a still-false predicate (another
+// signal, a spurious wake) has to keep waiting.
+async function wait(pred) {`,
+      blank:{ q:"block until pred() holds, re-checking on each notify:",
+        options:[
+`  while (!pred()) {                // re-check after every wake
+    const d = deferred();
+    waiters.push(d.resolve);
+    await d.promise;
+  }`,
+`  if (!pred()) {                   // check once
+    const d = deferred();
+    waiters.push(d.resolve);
+    await d.promise;
+  }`,
+`  while (!pred()) {
+    await sleep(0);                // poll the predicate
+  }`],
+        answer:0,
+        whys:["Right. Park on a deferred, and on every notify re-check the predicate in a loop — you only proceed once it's genuinely true.",
+              "An `if` proceeds on the first notify even if the predicate is still false (a different signal, a spurious wake). Re-check in a loop, not once.",
+              "Polling with sleep(0) busy-waits the event loop instead of parking until a signal arrives — wasteful, and in a deterministic workflow, nondeterministic."] },
+      post:`}` },
+  ],
 };
 
 /* ---- flashcards ---- */
@@ -738,17 +901,21 @@ const CARDS = [
   ["What does strict ordering cost you?","Availability. A stalled producer blocks everyone behind it. Ordering trades availability for consistency — recognize the trade before it bites you."],
   ["Unbounded retry against a dead dependency?","An unbounded backlog. Robustness isn't free: cap retries, add a circuit breaker or dead-letter path, and bound the queue."],
   ["Why Atomics.add over view[0]++ across threads?","view[0]++ is read-modify-write — three steps that interleave and lose updates. Atomics.add is one indivisible step."],
+  ["Why can't a durable workflow call Date.now() or Math.random() directly?","Workflow code is re-executed from history on replay to rebuild state. Wall-clock and randomness differ each run, so replay would diverge from history. Route them through the runtime (workflow time, sideEffect) so the recorded value replays exactly."],
+  ["A long-running workflow's event history keeps growing — then what?","History is replayed on every wake, so unbounded history means unbounded replay cost and a hard size cap. continue-as-new starts a fresh execution, carrying state forward with an empty history — the same instinct as capping a queue."],
+  ["An activity ran, then the worker died before its result was recorded. Does it run again?","Yes — execution is at-least-once, so an activity can run more than once. Make activities idempotent (dedupe by a stable key) so a retry doesn't double-charge."],
+  ["Two signals hit a running workflow at once — is its state safe?","Handlers are coroutines on one thread: no mid-statement preemption, but they interleave at every await. A read-modify-write spanning an await needs a mutex — the same hazard as any async critical section."],
 ];
 
 /* ===========================================================
    STATE + PERSISTENCE
    =========================================================== */
-const TOTAL = DRILLS.primitives.length + DRILLS.bank.length + DRILLS.toolkit.length;
+const TOTAL = DRILLS.primitives.length + DRILLS.bank.length + DRILLS.toolkit.length + DRILLS.durable.length;
 let state = { module:"model", solved:{} };
 
 /* one-at-a-time stepping: where we are inside each stepped module */
 let modelIdx = 0;                                          // current quiz question
-let drillIdx = { primitives:0, bank:0, toolkit:0 };        // current drill per module
+let drillIdx = { primitives:0, bank:0, toolkit:0, durable:0 };  // current drill per module
 let quizDone = {};                                         // qi -> answered correctly (in-memory)
 
 const STORAGE_KEY="cbootcamp:solved";
@@ -858,6 +1025,7 @@ function renderDrills(modId){
     primitives:{eb:"module 01", h:"Build the primitives", lead:"Each one is a queue of deferreds plus a rule for whose <code style='font-family:var(--mono)'>resolve()</code> you call next. Choose the correct line at each decision point, then run the reference to watch the invariant hold."},
     bank:{eb:"module 04", h:"Problem bank", lead:"Classic concurrency problems, built on the same primitives. State the invariant in your head before you choose."},
     toolkit:{eb:"module 05", h:"Interview kit", lead:"The async utilities interviewers actually ask you to write — <code style='font-family:var(--mono)'>debounce</code>, <code style='font-family:var(--mono)'>throttle</code>, <code style='font-family:var(--mono)'>Promise.all</code>, retry. Same drill: pick the line that holds the invariant, then run it."},
+    durable:{eb:"module 06", h:"Durable execution", lead:"The concurrency model behind workflow engines like <b style='color:var(--text)'>Temporal</b>: code that's re-run from history must stay deterministic, race durable timers, and serialize concurrent signals. Same hazards as async JS — with replay raising the stakes."},
   };
   const header = HEADERS[modId];
   main.appendChild(el(`<div><div class="eyebrow">${header.eb}</div><h1>${header.h}</h1><p class="lead">${header.lead}</p></div>`));
