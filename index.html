@@ -169,6 +169,15 @@
   .histtape{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
   .pulse{animation:pulse 2.2s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  /* lesson animations: .seq items reveal in --i order once .anim gets .playing */
+  .anim.playing .seq{animation:seqin .5s ease both;animation-delay:calc(var(--i,0) * var(--step,.6s))}
+  .anim.playing .seq.pop{animation:seqpop .52s ease both;animation-delay:calc(var(--i,0) * var(--step,.6s))}
+  @keyframes seqin{0%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:none}}
+  @keyframes seqpop{0%{opacity:0;transform:scale(.9)}60%{transform:scale(1.06)}100%{opacity:1;transform:none}}
+  .spin{display:inline-block;animation:spin 3.2s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .playbtn{font-family:var(--mono);font-size:12px;letter-spacing:.02em;padding:7px 13px;border-radius:9px;border:1px solid var(--line);background:var(--surface2);color:var(--text);cursor:pointer;min-height:36px;margin-top:2px}
+  .playbtn:active{transform:scale(.97)}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
@@ -1021,74 +1030,77 @@ const LESSONS = [
   { eb:"lesson 01 · the model", title:"One thread, many turns", html:`
     <p class="big">JavaScript runs your code on <b class="hl">one thread</b>. There's a single call stack, and a function runs to completion before anything else gets a turn — it is never interrupted mid-statement.</p>
     <p>So how does it juggle timers, clicks, and network calls at once? It <b class="hl">defers</b> them. That work doesn't run inline — it's queued and picked up later by the <b class="hl">event loop</b>, which runs one piece at a time in the gaps between your synchronous blocks.</p>
-    <div class="diagram">
+    <div class="diagram anim">
       <div class="dlabel">the runtime</div>
       <div class="dcols">
         <div class="dcol">
           <div class="dlabel">call stack · LIFO</div>
           <div class="stackcol">
-            <div class="frame">parse()</div>
-            <div class="frame">handleClick()</div>
-            <div class="frame">main()</div>
+            <div class="frame seq" style="--i:2">parse()</div>
+            <div class="frame seq" style="--i:1">handleClick()</div>
+            <div class="frame seq" style="--i:0">main()</div>
           </div>
         </div>
         <div class="dcol">
-          <div class="qbox micro"><div class="dlabel" style="color:var(--ordered);margin:0 0 6px">microtask queue</div><span class="chip2 micro">.then</span><span class="chip2 micro">await</span></div>
-          <div class="qbox macro"><div class="dlabel" style="color:var(--race);margin:0 0 6px">macrotask queue</div><span class="chip2 macro">setTimeout</span><span class="chip2 macro">I/O</span></div>
+          <div class="qbox micro"><div class="dlabel" style="color:var(--ordered);margin:0 0 6px">microtask queue</div><span class="chip2 micro seq" style="--i:3">.then</span><span class="chip2 micro seq" style="--i:4">await</span></div>
+          <div class="qbox macro"><div class="dlabel" style="color:var(--race);margin:0 0 6px">macrotask queue</div><span class="chip2 macro seq" style="--i:5">setTimeout</span><span class="chip2 macro seq" style="--i:6">I/O</span></div>
         </div>
       </div>
-      <div class="dnote"><span class="pulse" style="color:var(--accent)">&#8635;</span> <b style="color:var(--accent)">event loop:</b> run the stack to empty &rarr; drain <b style="color:var(--ordered)">all</b> microtasks &rarr; take <b style="color:var(--race)">one</b> macrotask &rarr; repeat.</div>
+      <div class="dnote seq" style="--i:7"><span class="spin" style="color:var(--accent)">&#8635;</span> <b style="color:var(--accent)">event loop:</b> run the stack to empty &rarr; drain <b style="color:var(--ordered)">all</b> microtasks &rarr; take <b style="color:var(--race)">one</b> macrotask &rarr; repeat.</div>
     </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
     <p><b class="hl">Why it matters:</b> because a block can't be interrupted, ordinary code is safe from torn reads. But the instant you <code>await</code>, you hand the thread back — and that gap is where the ordering surprises and the bugs in the next chapters live.</p>` },
 
   { eb:"lesson 02 · the model", title:"Microtasks beat macrotasks", html:`
     <p class="big">Deferred work isn't one queue. After each macrotask, the loop drains the <b class="hl">entire</b> microtask queue before it touches the next macrotask.</p>
     <p><b class="hl">Microtasks</b> are promise reactions — <code>.then</code>, <code>await</code> continuations, <code>queueMicrotask</code>. <b class="hl">Macrotasks</b> are <code>setTimeout</code>, message and I/O callbacks. Microtasks always cut the line.</p>
-    <div class="diagram">
+    <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">one tick &middot; what order prints?</div>
       <pre class="code" style="margin:0 0 12px">console.log('A');                        <span class="cm">// sync</span>
 setTimeout(() =&gt; console.log('B'));       <span class="cm">// macro</span>
 Promise.resolve().then(() =&gt; log('C'));   <span class="cm">// micro</span>
 console.log('D');                        <span class="cm">// sync</span></pre>
       <div class="histtape">
-        <span class="chip2 sync">A</span><span class="chip2 sync">D</span>
-        <span class="flowarrow" style="margin:0 2px">&rsaquo;</span>
-        <span class="chip2 micro">C</span>
-        <span class="flowarrow" style="margin:0 2px">&rsaquo;</span>
-        <span class="chip2 macro">B</span>
+        <span class="chip2 sync seq pop" style="--i:0">A</span><span class="chip2 sync seq pop" style="--i:1">D</span>
+        <span class="flowarrow seq" style="--i:2;margin:0 2px">&rsaquo;</span>
+        <span class="chip2 micro seq pop" style="--i:3">C</span>
+        <span class="flowarrow seq" style="--i:4;margin:0 2px">&rsaquo;</span>
+        <span class="chip2 macro seq pop" style="--i:5">B</span>
       </div>
-      <div class="dnote"><span style="color:var(--accent)">sync first</span> (A, D) &rarr; <span style="color:var(--ordered)">every microtask</span> (C) &rarr; <span style="color:var(--race)">then one macrotask</span> (B).</div>
+      <div class="dnote seq" style="--i:6"><span style="color:var(--accent)">sync first</span> (A, D) &rarr; <span style="color:var(--ordered)">every microtask</span> (C) &rarr; <span style="color:var(--race)">then one macrotask</span> (B).</div>
     </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
     <p><b class="hl">Why it matters:</b> a busy chain of <code>.then</code>s can starve a <code>setTimeout(fn, 0)</code> indefinitely. Knowing the drain order is how you predict — and debug — async sequencing.</p>` },
 
   { eb:"lesson 03 · primitives", title:"The hidden race across await", html:`
     <p class="big">Here's the twist: single-threaded does <b class="hl">not</b> mean race-free. When a function <code>await</code>s in the middle of a read-modify-write, another task can run in the gap and move the data underneath it.</p>
-    <div class="diagram">
+    <div class="diagram anim" style="--step:.85s">
       <div class="dlabel">two tasks share balance = 100, each withdraws 30</div>
       <div class="lanes">
-        <div class="lanehead">Task A</div><div class="lstep">read balance &rarr; 100</div>
-        <div class="lanehead">Task A</div><div class="lstep wait">await checkLimit() &hellip; yields the thread</div>
-        <div class="lanehead">Task B</div><div class="lstep">read balance &rarr; 100</div>
-        <div class="lanehead">Task B</div><div class="lstep">write 100 &minus; 30 = 70</div>
-        <div class="lanehead">Task A</div><div class="lstep bad">write 100 &minus; 30 = 70 &nbsp;&#10007; B's withdrawal lost</div>
+        <div class="lanehead seq" style="--i:0">Task A</div><div class="lstep seq" style="--i:0">read balance &rarr; 100</div>
+        <div class="lanehead seq" style="--i:1">Task A</div><div class="lstep wait seq" style="--i:1">await checkLimit() &hellip; yields the thread</div>
+        <div class="lanehead seq" style="--i:2">Task B</div><div class="lstep seq" style="--i:2">read balance &rarr; 100</div>
+        <div class="lanehead seq" style="--i:3">Task B</div><div class="lstep seq" style="--i:3">write 100 &minus; 30 = 70</div>
+        <div class="lanehead seq" style="--i:4">Task A</div><div class="lstep bad seq pop" style="--i:4">write 100 &minus; 30 = 70 &nbsp;&#10007; B's withdrawal lost</div>
       </div>
-      <div class="dnote">Final balance <b style="color:var(--race)">70</b>, but two withdrawals happened — it should be <b style="color:var(--ordered)">40</b>. One update was clobbered across the await.</div>
+      <div class="dnote seq" style="--i:5">Final balance <b style="color:var(--race)">70</b>, but two withdrawals happened — it should be <b style="color:var(--ordered)">40</b>. One update was clobbered across the await.</div>
     </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
     <p><b class="hl">Why it matters:</b> this is why JS still needs locks. A <b class="hl">critical section</b> — code that must run start-to-finish without interleaving — has to be serialized. That's the whole job of the primitives next.</p>` },
 
   { eb:"lesson 04 · primitives", title:"Primitives: who runs when", html:`
     <p class="big">Synchronization primitives are small tools that control <b class="hl">who runs when</b>. Nearly all of them are the same idea: a queue of parked promises, plus a rule for whose <code>resolve()</code> fires next.</p>
     <p><b class="hl">Mutex</b> — one holder at a time; wraps a critical section so it can't interleave. <b class="hl">Semaphore</b> — N permits (a mutex is N=1); caps concurrency. <b class="hl">Latch / barrier</b> — make tasks wait for an event, or for each other. <b class="hl">Queue</b> — hand work from producers to consumers without busy-waiting.</p>
-    <div class="diagram">
+    <div class="diagram anim" style="--step:.8s">
       <div class="dcols">
-        <div class="dcol">
+        <div class="dcol seq" style="--i:0">
           <div class="dlabel">mutex &middot; 1 permit</div>
           <div class="permits"><div class="permit"></div></div>
           <div style="margin-top:8px"><span class="chip2" style="border-color:var(--ordered);color:var(--ordered)">1 running</span></div>
           <div style="margin-top:4px"><span class="chip2" style="opacity:.55">waiting</span><span class="chip2" style="opacity:.55">waiting</span></div>
           <div class="dnote">release() hands the lock straight to the next waiter — never observably free.</div>
         </div>
-        <div class="dcol">
+        <div class="dcol seq" style="--i:1">
           <div class="dlabel">semaphore &middot; 3 permits</div>
           <div class="permits"><div class="permit"></div><div class="permit"></div><div class="permit used"></div></div>
           <div style="margin-top:8px"><span class="chip2" style="border-color:var(--ordered);color:var(--ordered)">2 running</span><span class="chip2" style="opacity:.55">1 waiting</span></div>
@@ -1096,36 +1108,41 @@ console.log('D');                        <span class="cm">// sync</span></pre>
         </div>
       </div>
     </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
     <p><b class="hl">Why it matters:</b> these turn "it usually works" into guarantees — exclusive access, bounded concurrency, ordered handoff — without ever blocking the thread.</p>` },
 
   { eb:"lesson 05 · workers & atomics", title:"Real threads, real races", html:`
     <p class="big">For genuine parallelism — CPU-bound work — JS uses <b class="hl">Workers</b>, separate OS threads. They don't share variables; they message-pass. The one exception is a <code>SharedArrayBuffer</code>, where threads touch the <b class="hl">same memory</b> — and that's where true data races appear.</p>
-    <div class="diagram">
-      <div class="dlabel">two threads, one shared counter, counter++</div>
-      <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin:8px 0">
-        <div class="threadbox">Thread 1<br><span style="color:var(--race)">read 5 &middot; +1 &middot; write 6</span></div>
-        <div class="memcell">6</div>
-        <div class="threadbox">Thread 2<br><span style="color:var(--race)">read 5 &middot; +1 &middot; write 6</span></div>
+    <div class="diagram anim" style="--step:.85s">
+      <div class="dlabel">two threads, one shared counter (starts at 5), each does counter++</div>
+      <div style="text-align:center;margin:4px 0 10px">shared cell &nbsp;<span class="memcell seq pop" style="--i:5">6</span></div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">Thread 1</div><div class="lstep seq" style="--i:0">read counter &rarr; 5</div>
+        <div class="lanehead seq" style="--i:1">Thread 2</div><div class="lstep seq" style="--i:1">read counter &rarr; 5</div>
+        <div class="lanehead seq" style="--i:2">Thread 1</div><div class="lstep seq" style="--i:2">write 5 + 1 = 6</div>
+        <div class="lanehead seq" style="--i:3">Thread 2</div><div class="lstep bad seq pop" style="--i:3">write 5 + 1 = 6 &nbsp;&#10007; should be 7</div>
       </div>
-      <div class="dnote"><code>counter++</code> is three steps — read, add, write. Both threads read <b>5</b>, both write <b>6</b>: two increments, but the count rose by one. <b style="color:var(--race)">Lost update.</b></div>
-      <div class="flowarrow">&darr; the fix</div>
-      <div class="dnote"><code style="color:var(--ordered)">Atomics.add(counter, 0, 1)</code> is one <b class="hl">indivisible</b> step — no thread can slip between read and write. <code>Atomics.wait</code> / <code>notify</code> build real cross-thread locks.</div>
+      <div class="dnote seq" style="--i:4"><code>counter++</code> is three steps — read, add, write. Both read <b>5</b>, both write <b>6</b>: two increments, the count rose by one. <b style="color:var(--race)">Lost update.</b></div>
+      <div class="flowarrow seq" style="--i:6">&darr; the fix</div>
+      <div class="dnote seq" style="--i:7"><code style="color:var(--ordered)">Atomics.add(counter, 0, 1)</code> is one <b class="hl">indivisible</b> step — no thread can slip between read and write. <code>Atomics.wait</code> / <code>notify</code> build real cross-thread locks.</div>
     </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
     <p><b class="hl">Why it matters:</b> threads pay off only for compute big enough to amortize their cost — and the moment you share memory, you need atomics or a lock, exactly like any other language.</p>` },
 
   { eb:"lesson 06 · durable execution", title:"Durable workflows & replay", html:`
     <p class="big">Some workflows run for days — an order that waits on payment, shipping, then a refund window. They can't just live in memory; a crash would lose them. Engines like <b class="hl">Temporal</b> persist them by recording every step to an <b class="hl">event history</b>, then <b class="hl">replaying</b> that history to rebuild state after any restart.</p>
-    <div class="diagram">
+    <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">event history &rarr; replay rebuilds state</div>
       <div class="histtape">
-        <span class="chip2 sync">Start</span>
-        <span class="chip2 macro">Timer fired</span>
-        <span class="chip2 micro">Activity &rarr; "charged"</span>
-        <span class="chip2 macro">Signal: approve</span>
+        <span class="chip2 sync seq pop" style="--i:0">Start</span>
+        <span class="chip2 macro seq pop" style="--i:1">Timer fired</span>
+        <span class="chip2 micro seq pop" style="--i:2">Activity &rarr; "charged"</span>
+        <span class="chip2 macro seq pop" style="--i:3">Signal: approve</span>
       </div>
-      <div class="flowarrow">&darr; replay re-runs the code over the tape</div>
-      <div class="dnote">The same history must produce the <b style="color:var(--ordered)">same decisions</b> every time. So workflow code must be <b class="hl">deterministic</b>: no <code>Date.now()</code>, no <code>Math.random()</code>, no direct I/O — those are recorded once, then replayed.</div>
+      <div class="flowarrow seq" style="--i:4">&darr; replay re-runs the code over the tape</div>
+      <div class="dnote seq" style="--i:5">The same history must produce the <b style="color:var(--ordered)">same decisions</b> every time. So workflow code must be <b class="hl">deterministic</b>: no <code>Date.now()</code>, no <code>Math.random()</code>, no direct I/O — those are recorded once, then replayed.</div>
     </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
     <p><b class="hl">Why it matters:</b> replay turns ordinary-looking code into a crash-proof process — but it bans nondeterminism, and the in-process hazards (signals interleaving at awaits, lesson 03) still apply. That's the durable-execution module.</p>
     <p class="sub" style="margin-top:14px">That's the map. Now work through the modules &mdash; tap a chip above to start drilling.</p>` },
 ];
@@ -1134,8 +1151,18 @@ function renderLearn(){
   learnIdx=Math.max(0,Math.min(learnIdx,LESSONS.length-1));
   const ch=LESSONS[learnIdx];
   main.appendChild(el(`<div><div class="eyebrow">${ch.eb}</div><h1>${ch.title}</h1></div>`));
-  main.appendChild(el(`<div class="card lesson">${ch.html}</div>`));
+  const card=el(`<div class="card lesson">${ch.html}</div>`);
+  main.appendChild(card);
   main.appendChild(stepperRow(learnIdx, LESSONS.length, (i)=>{ learnIdx=i; render(); window.scrollTo({top:0}); }));
+
+  // animate the diagram: replay restarts the staggered reveal; auto-play on view
+  const anim=card.querySelector(".anim");
+  if(anim){
+    const play=()=>{ anim.classList.remove("playing"); void anim.offsetWidth; anim.classList.add("playing"); };
+    const btn=card.querySelector("[data-play]");
+    if(btn) btn.onclick=play;
+    play();
+  }
 }
 
 /* ---- model: one quiz question at a time ---- */

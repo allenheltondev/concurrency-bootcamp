@@ -2,9 +2,10 @@
 
 A mobile-first, dependency-free web app for learning and practicing JavaScript
 concurrency. It opens with an illustrated **Lessons** primer (six stepped
-chapters with HTML/CSS diagrams that explain the event loop, the await-race
-hazard, the primitives, workers/atomics, and durable replay — the *how* and
-*why* behind each module), then seven hands-on modules: the event-loop model
+chapters with animated HTML/CSS diagrams — tap ▶ replay to watch each sequence
+step through — that explain the event loop, the await-race hazard, the
+primitives, workers/atomics, and durable replay, the *how* and *why* behind
+each module), then seven hands-on modules: the event-loop model
 (predict-output quiz), building
 synchronization primitives (tap-to-choose drills that run real reference code), a
 workers/atomics data-race demo, trade-off flashcards, a problem bank, an interview
