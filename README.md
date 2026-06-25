@@ -8,15 +8,18 @@ workers/atomics, durable replay, and blocking vs non-blocking vs async, the
 *how* and *why* behind each module), then seven hands-on modules: the event-loop model
 (predict-output quiz), building
 synchronization primitives — mutex, semaphore, latch, barrier, async queue,
-sequencer, condition variable (tap-to-choose drills that run real reference
-code), a workers/atomics data-race demo, trade-off flashcards, a problem bank
-(print-in-order, concurrency pool, dining philosophers, token bucket, bounded
-blocking queue, select / first-ready, and the concurrent log processor with
-fault tolerance), an interview kit (debounce, throttle, `Promise.all` from
-scratch, retry-with-backoff, async memoize / concurrent-call dedup),
-and a durable-execution module modeling workflow-engine (Temporal-style)
-concurrency hazards: deterministic replay, durable timeouts, serializing
-concurrent signals, and waiting on a signal predicate.
+sequencer, condition variable, atomic lock (CAS), read/write lock, run-once
+(tap-to-choose drills that run real reference code), a workers/atomics
+data-race demo, trade-off flashcards, a problem bank (print-in-order,
+concurrency pool, dining philosophers, token bucket, bounded blocking queue,
+select / first-ready, and the concurrent log processor with fault tolerance),
+an interview kit (debounce, throttle, `Promise.all` from scratch,
+retry-with-backoff, async memoize / dedup, cancel-the-loser timeout, and
+cancel-on-first-error / errgroup), and a durable-execution module modeling
+workflow-engine (Temporal-style) concurrency hazards: deterministic replay,
+durable timeouts, serializing concurrent signals, and waiting on a signal
+predicate. A **Test mode** then quizzes you across everything — shuffled
+options, first answer counts, scored — as a real readiness check.
 
 Drill and quiz modules step one card at a time (prev · n/total · next) for
 one-handed mobile use; every tapped answer — right or wrong — explains itself.

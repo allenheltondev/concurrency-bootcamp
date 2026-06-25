@@ -336,6 +336,32 @@ class BoundedQueue{
   }
   size(){ return this.#buf.length; }
 }
+function atomicTryAcquire(cell){ return Atomics.compareExchange(cell,0,0,1)===0; }  // 0->1 iff free
+function atomicRelease(cell){ Atomics.store(cell,0,0); }
+class RWLock{
+  #readers=0; #writing=false; #rq=[]; #wq=[];
+  async acquireRead(){ if(this.#writing||this.#wq.length){ const d=deferred(); this.#rq.push(d); await d.promise; } else this.#readers++; }
+  releaseRead(){ this.#readers--; this.#dispatch(); }
+  async acquireWrite(){ if(this.#writing||this.#readers>0||this.#wq.length){ const d=deferred(); this.#wq.push(d); await d.promise; } else this.#writing=true; }
+  releaseWrite(){ this.#writing=false; this.#dispatch(); }
+  #dispatch(){
+    if(this.#writing) return;
+    if(this.#readers===0 && this.#wq.length){ this.#writing=true; this.#wq.shift().resolve(); }
+    else if(!this.#wq.length){ while(this.#rq.length){ this.#readers++; this.#rq.shift().resolve(); } }
+  }
+}
+function once(fn){ let p; return ()=> (p ??= fn()); }
+function withTimeoutCancel(workFn,ms){
+  const ctrl=new AbortController();
+  const work=workFn(ctrl.signal).then(v=>({ok:v}),()=>({aborted:true}));
+  const timer=sleep(ms).then(()=>{ ctrl.abort(); return {timedOut:true}; });   // cancel the loser
+  return Promise.race([work,timer]);
+}
+async function errgroup(taskFns){
+  const ctrl=new AbortController();
+  const tasks=taskFns.map(fn=>fn(ctrl.signal).catch(err=>{ ctrl.abort(); throw err; }));  // first failure cancels the rest
+  return Promise.all(tasks);
+}
 
 /* ===========================================================
    DEMOS  -> return {lines:[{t,cls}], pass:boolean}
@@ -515,6 +541,45 @@ async function demoMemoize(){
   const pass=calls===2 && results.join(",")==="X,X,X,Y,X";
   return {lines:[{t:`5 concurrent calls: x, x, x, y, x`},{t:`underlying fn ran ${calls}× (once per distinct key)`},{t:`results: ${results.join(", ")}`}], pass, verdict:pass?"concurrent calls for a key deduped to one computation":`ran ${calls}× → ${results.join(",")}`};
 }
+async function demoAtomicLock(){
+  const cell=new Int32Array(1);   // 0 = free, 1 = held (a SharedArrayBuffer across real threads)
+  const a=atomicTryAcquire(cell), b=atomicTryAcquire(cell);
+  atomicRelease(cell);
+  const c=atomicTryAcquire(cell); atomicRelease(cell);
+  const pass=a&&!b&&c;
+  return {lines:[{t:`acquire while free → ${a}`},{t:`acquire while already held → ${b}`},{t:`acquire after release → ${c}`}], pass, verdict:pass?"compare-and-swap gives exclusive ownership in one indivisible step":`a=${a} b=${b} c=${c}`};
+}
+async function demoRWLock(){
+  const rw=new RWLock(); let readers=0,maxR=0,writing=false,violation=false;
+  const reader=async()=>{ await rw.acquireRead(); readers++; maxR=Math.max(maxR,readers); if(writing)violation=true; await sleep(rnd(10)); readers--; rw.releaseRead(); };
+  const writer=async()=>{ await rw.acquireWrite(); writing=true; if(readers>0)violation=true; await sleep(8); writing=false; rw.releaseWrite(); };
+  await Promise.all([reader(),reader(),reader(),writer(),reader(),writer()]);
+  const pass=!violation && maxR>=2;
+  return {lines:[{t:`4 readers + 2 writers contend`},{t:`max concurrent readers: ${maxR}`},{t:`reader/writer overlaps: ${violation?"yes":"none"}`}], pass, verdict:pass?`readers ran in parallel (max ${maxR}); writers stayed exclusive`:`maxR=${maxR} violation=${violation}`};
+}
+async function demoOnce(){
+  let calls=0; const init=once(async()=>{ calls++; await sleep(5); return "ready"; });
+  const rs=await Promise.all([init(),init(),init(),init()]);
+  const pass=calls===1 && rs.every(r=>r==="ready");
+  return {lines:[{t:`4 concurrent init() calls`},{t:`initializer ran ${calls}× (want 1)`}], pass, verdict:pass?"initialized exactly once; all callers shared the result":`ran ${calls}×`};
+}
+async function demoCancelTimeout(){
+  let cleanedUp=false;
+  const workFn=(signal)=> new Promise((resolve,reject)=>{ const t=setTimeout(()=>resolve("done"),1000); signal.addEventListener("abort",()=>{ clearTimeout(t); cleanedUp=true; reject(new Error("aborted")); },{once:true}); });
+  const r=await withTimeoutCancel(workFn,20); await sleep(5);
+  const pass=r.timedOut===true && cleanedUp===true;
+  return {lines:[{t:`work takes 1000ms, timeout 20ms`},{t:`result: ${r.timedOut?"timeout":"ok"} · losing work cleaned up: ${cleanedUp}`}], pass, verdict:pass?"timed out AND cancelled the losing work — no leak":`timedOut=${r.timedOut} cleaned=${cleanedUp}`};
+}
+async function demoErrgroup(){
+  let aborts=0;
+  const slow=(ms)=>(signal)=> new Promise((resolve,reject)=>{ const t=setTimeout(()=>resolve("ok"),ms); signal.addEventListener("abort",()=>{ clearTimeout(t); aborts++; reject(new Error("aborted")); },{once:true}); });
+  const failing=(ms)=>()=> sleep(ms).then(()=>{ throw new Error("boom"); });
+  let caught=false;
+  try{ await errgroup([slow(1000),failing(10),slow(1000)]); }catch(e){ caught=true; }
+  await sleep(5);
+  const pass=caught && aborts===2;
+  return {lines:[{t:`3 tasks; #2 fails at 10ms, #1 and #3 take 1000ms`},{t:`group rejected: ${caught} · siblings cancelled: ${aborts}`}], pass, verdict:pass?"first failure cancelled the siblings (errgroup)":`caught=${caught} aborts=${aborts}`};
+}
 
 /* ===========================================================
    CONTENT
@@ -528,6 +593,7 @@ const MODULES = [
   { id:"bank", label:"problem bank", type:"drills" },
   { id:"toolkit", label:"interview kit", type:"drills" },
   { id:"durable", label:"durable execution", type:"drills" },
+  { id:"test", label:"test yourself", type:"test" },
 ];
 
 /* ---- model module: predict-output quiz ---- */
@@ -730,6 +796,76 @@ class CondVar {
               "Waking only one waiter risks a lost wakeup: if that waiter's predicate is still false it parks again, while another waiter whose condition IS true was never woken.",
               "Resolving without clearing leaves already-resolved deferreds queued; the next signal 'wakes' stale entries and real waiters get miscounted. Wake, then clear."] },
       post:`  }
+}` },
+
+    { id:"atomiclock", title:"Atomic Lock (CAS)", why:"build a lock from one shared int + compare-and-swap — atomics are what locks are made of", demo:demoAtomicLock,
+      pre:`// A lock with no higher-level primitive — just one shared integer and an
+// atomic compare-and-swap. 0 = free, 1 = held. (Across real threads the
+// cell lives in a SharedArrayBuffer.)
+const cell = new Int32Array(1);
+function tryAcquire() {`,
+      blank:{ q:"atomically take the lock only if it's currently free:",
+        options:[
+`  return Atomics.compareExchange(cell, 0, 0, 1) === 0;   // 0 -> 1 iff it was 0`,
+`  if (cell[0] === 0) { cell[0] = 1; return true; }
+  return false;`,
+`  Atomics.store(cell, 0, 1);
+  return true;`],
+        answer:0,
+        whys:["Right. compareExchange sets 0→1 only if it's currently 0, in one indivisible step, and tells you whether you won. That test-and-set is the heart of every lock.",
+              "Read-then-write is two steps — two threads can both read 0 and both 'acquire'. The whole point of CAS is to test and set atomically.",
+              "Storing 1 unconditionally 'acquires' even when another thread already holds it — that's not a lock, it's a clobber."] },
+      post:`}
+function release() {
+  Atomics.store(cell, 0, 0);            // free it
+}
+// Blocking version: park on Atomics.wait, wake waiters with Atomics.notify.` },
+
+    { id:"rwlock", title:"Read/Write Lock", why:"many readers in parallel, or one exclusive writer", demo:demoRWLock,
+      pre:`// Many readers can hold it at once, but a writer needs it alone (no
+// readers, no other writer). Grant the lock at release time — hand it off.
+class RWLock {
+  #readers = 0; #writing = false; #rq = []; #wq = [];
+  async acquireRead()  { if (this.#writing || this.#wq.length) { const d = deferred(); this.#rq.push(d); await d.promise; } else this.#readers++; }
+  releaseRead()  { this.#readers--; this.#dispatch(); }
+  async acquireWrite() { if (this.#writing || this.#readers > 0 || this.#wq.length) { const d = deferred(); this.#wq.push(d); await d.promise; } else this.#writing = true; }
+  releaseWrite() { this.#writing = false; this.#dispatch(); }
+  #dispatch() {`,
+      blank:{ q:"when the lock frees, who gets woken — staying exclusive for writers?",
+        options:[
+`    if (this.#writing) return;
+    if (this.#readers === 0 && this.#wq.length) {     // no readers -> grant ONE writer
+      this.#writing = true; this.#wq.shift().resolve();
+    } else if (!this.#wq.length) {                     // no writer waiting -> wake ALL readers
+      while (this.#rq.length) { this.#readers++; this.#rq.shift().resolve(); }
+    }`,
+`    while (this.#rq.length) { this.#readers++; this.#rq.shift().resolve(); }
+    if (this.#wq.length) { this.#writing = true; this.#wq.shift().resolve(); }`,
+`    if (this.#wq.length) { this.#writing = true; this.#wq.shift().resolve(); }`],
+        answer:0,
+        whys:["Right. Grant a writer only when no readers hold it (one at a time); otherwise release all waiting readers — but only when no writer is queued, so writers don't starve.",
+              "Waking readers first and then a writer regardless of readers lets the writer run while readers are active, and starves writers behind a steady reader stream.",
+              "Granting a writer without checking #readers lets it run while readers still hold the lock — exactly the overlap a RW lock must prevent."] },
+      post:`  }
+}` },
+
+    { id:"once", title:"Run Once (lazy init)", why:"initialize exactly once, even under concurrent callers", demo:demoOnce,
+      pre:`// Run an initializer at most once, even if called concurrently; every
+// caller gets the same result (lazy singleton — a one-shot memo).
+function once(fn) {
+  let p;                       // the single in-flight / settled promise
+  return () => {`,
+      blank:{ q:"start fn at most once and hand every caller the same result:",
+        options:[
+`    return (p ??= fn());     // call + store only the first time`,
+`    return fn();             // just call it`,
+`    if (!p) p = fn();
+    return fn();`],
+        answer:0,
+        whys:["Right. ??= calls fn() and stores its promise only the first time; every later call returns that same promise — one initialization, shared by all.",
+              "Calling fn() unconditionally runs the initializer on every call — there's no 'once' at all.",
+              "Storing p but then returning a fresh fn() still runs the initializer every call — the guard does nothing."] },
+      post:`  };
 }` },
   ],
 
@@ -1036,6 +1172,48 @@ function memoizeAsync(fn) {
               "Caching the promise dedupes, but a rejected promise stays cached forever, so every future caller inherits the failure. Evict on error."] },
       post:`  };
 }` },
+
+    { id:"canceltimeout", title:"Cancel the Loser", why:"a timeout that actually cancels the slow work (AbortController)", demo:demoCancelTimeout,
+      pre:`// Promise.race alone leaves the losing work running in the background.
+// Pass an AbortSignal and abort it when the timer wins, so the slow work
+// stops and cleans up.
+function withTimeout(workFn, ms) {
+  const ctrl = new AbortController();
+  const work = workFn(ctrl.signal).then(v => ({ ok: v }), () => ({ aborted: true }));
+  const timer = sleep(ms).then(() => {`,
+      blank:{ q:"the timer fired first — stop the work and report the timeout:",
+        options:[
+`    ctrl.abort();               // cancel the still-running work
+    return { timedOut: true };`,
+`    return { timedOut: true };  // just report it`,
+`    ctrl.abort();               // abort, but return nothing`],
+        answer:0,
+        whys:["Right. Abort the signal so the losing work stops and cleans up, and return a marker so the caller knows it was a timeout — no leaked background work.",
+              "Returning the marker without aborting leaves the slow work running to completion in the background — the resource leak the timeout was meant to prevent.",
+              "Aborting without returning a result resolves the race with undefined, so the caller can't tell a timeout happened."] },
+      post:`  });
+  return Promise.race([work, timer]);
+}` },
+
+    { id:"errgroup", title:"Cancel on First Error", why:"run tasks together; the first failure cancels the rest (errgroup)", demo:demoErrgroup,
+      pre:`// Run tasks concurrently, but the FIRST failure cancels the others — no
+// point finishing work whose result you'll throw away. Each task gets a
+// shared AbortSignal.
+async function errgroup(taskFns) {
+  const ctrl = new AbortController();
+  const tasks = taskFns.map(fn =>`,
+      blank:{ q:"on the first failure, cancel the siblings and propagate the error:",
+        options:[
+`    fn(ctrl.signal).catch(err => { ctrl.abort(); throw err; })`,
+`    fn(ctrl.signal)`,
+`    fn(ctrl.signal).catch(() => { ctrl.abort(); })`],
+        answer:0,
+        whys:["Right. Share one signal; the first task to fail aborts it (cancelling the siblings) and rethrows, so Promise.all rejects with the real error.",
+              "Without aborting on failure, Promise.all still rejects on the first error — but the other tasks keep running to completion, wasting work you've already decided to discard.",
+              "Swallowing the error makes the failed task resolve to undefined, so Promise.all never rejects and the caller never learns it failed."] },
+      post:`  );
+  return Promise.all(tasks);
+}` },
   ],
 
   durable:[
@@ -1170,6 +1348,7 @@ let state = { module:"learn", solved:{} };
 /* one-at-a-time stepping: where we are inside each stepped module */
 let learnIdx = 0;                                          // current lesson chapter
 let modelIdx = 0;                                          // current quiz question
+let test = { on:false, qs:[], idx:0, score:0, answered:false };  // scored test mode
 let drillIdx = { primitives:0, bank:0, toolkit:0, durable:0 };  // current drill per module
 let quizDone = {};                                         // qi -> answered correctly (in-memory)
 
@@ -1218,6 +1397,7 @@ function render(){
   else if(m.type==="drills") renderDrills(state.module);
   else if(m.type==="sim") renderSim();
   else if(m.type==="cards") renderCards();
+  else if(m.type==="test") renderTest();
 }
 
 /* ---- one-at-a-time stepper control (prev · n/total · next) ---- */
@@ -1684,6 +1864,77 @@ function renderCards(){
   next.onclick=()=>{ cardIdx=(cardIdx+1)%CARDS.length; cardFlipped=false; renderCards(); };
   row.append(prev,next);
   main.appendChild(row);
+}
+
+/* ---- test mode: randomized, shuffled options, scored, no hints until you answer ---- */
+function testPool(){
+  const out=[];
+  Object.keys(DRILLS).forEach(mod=>DRILLS[mod].forEach(d=>out.push(
+    {title:d.title, context:d.pre, question:d.blank.q, options:d.blank.options, answer:d.blank.answer, whys:d.blank.whys})));
+  QUIZ.forEach(q=>out.push(
+    {title:"Predict the output", context:q.code, question:"What does this print, in order?", options:q.options, answer:q.answer, whys:q.whys}));
+  return out;
+}
+function shuffle(a){ const x=a.slice(); for(let i=x.length-1;i>0;i--){ const j=rnd(i+1); [x[i],x[j]]=[x[j],x[i]]; } return x; }
+function shuffleOptions(q){
+  const order=shuffle(q.options.map((_,i)=>i));
+  return { ...q, options:order.map(i=>q.options[i]), whys:q.whys?order.map(i=>q.whys[i]):null, answer:order.indexOf(q.answer) };
+}
+function startTest(n){
+  let pool=shuffle(testPool());
+  if(n!=="all") pool=pool.slice(0,n);
+  test={ on:true, qs:pool.map(shuffleOptions), idx:0, score:0, answered:false };
+  render(); window.scrollTo({top:0});
+}
+function renderTest(){
+  if(!test.on){
+    main.appendChild(el(`<div>
+      <div class="eyebrow">test yourself</div><h1>Test mode</h1>
+      <p class="lead">No hints. First answer counts, and the options are shuffled — so you can't lean on "it's usually the first one." Random questions, a score at the end: a real check on whether it's stuck.</p>
+      <p class="sub">Prep tip: once you can pass these cold, rebuild each pattern in a blank file while talking it through out loud — that's the skill the interview actually grades.</p>
+    </div>`));
+    const row=el(`<div class="row"></div>`);
+    [["10 questions",10],["20 questions",20],["all "+testPool().length,"all"]].forEach(([label,n])=>{
+      const b=el(`<button class="btn go">${label}</button>`); b.onclick=()=>startTest(n); row.appendChild(b);
+    });
+    main.appendChild(row);
+    return;
+  }
+  if(test.idx>=test.qs.length){
+    const n=test.qs.length, s=test.score, pct=Math.round(100*s/n);
+    const msg = pct>=90?"Sharp — you're ready." : pct>=70?"Solid. Patch the misses and you're close." : "Worth another pass through the drills.";
+    main.appendChild(el(`<div><div class="eyebrow">result</div><h1>${s} / ${n} <span class="sub" style="font-size:17px">· ${pct}%</span></h1><p class="lead">${msg}</p></div>`));
+    const row=el(`<div class="row"></div>`);
+    const again=el(`<button class="btn go">▶ retake</button>`); again.onclick=()=>{ test.on=false; render(); window.scrollTo({top:0}); };
+    row.appendChild(again); main.appendChild(row);
+    return;
+  }
+  const q=test.qs[test.idx];
+  main.appendChild(el(`<div class="eyebrow">question ${test.idx+1} / ${test.qs.length} · ${test.score} correct</div>`));
+  const card=el(`<div class="card"><h2>${esc(q.title)}</h2><pre class="code">${esc(q.context)}</pre></div>`);
+  const blank=el(`<div class="blank"><div class="q">${esc(q.question)}</div></div>`);
+  q.options.forEach((opt,oi)=>{
+    const b=el(`<button class="opt">${esc(opt)}</button>`);
+    b.onclick=()=>{
+      if(test.answered) return;
+      test.answered=true;
+      const correct=oi===q.answer;
+      if(correct) test.score++;
+      blank.querySelectorAll(".opt").forEach((x,xi)=>{
+        if(xi===q.answer) x.classList.add("correct");
+        if(xi===oi && !correct) x.classList.add("wrong");
+        x.style.pointerEvents="none";
+      });
+      if(q.whys) blank.appendChild(el(`<div class="why-line">${esc(q.whys[q.answer])}</div>`));
+      const nrow=el(`<div class="row"></div>`);
+      const nb=el(`<button class="btn go">${test.idx+1<test.qs.length?"next ›":"see score ›"}</button>`);
+      nb.onclick=()=>{ test.idx++; test.answered=false; render(); window.scrollTo({top:0}); };
+      nrow.appendChild(nb); card.appendChild(nrow);
+    };
+    blank.appendChild(b);
+  });
+  card.appendChild(blank);
+  main.appendChild(card);
 }
 
 function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
