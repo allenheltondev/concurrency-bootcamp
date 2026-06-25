@@ -178,12 +178,6 @@
   @keyframes spin{to{transform:rotate(360deg)}}
   .playbtn{font-family:var(--mono);font-size:12px;letter-spacing:.02em;padding:7px 13px;border-radius:9px;border:1px solid var(--line);background:var(--surface2);color:var(--text);cursor:pointer;min-height:36px;margin-top:2px}
   .playbtn:active{transform:scale(.97)}
-  .tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:10px}
-  .ltable{border-collapse:collapse;font-family:var(--mono);font-size:11px;min-width:540px;width:100%}
-  .ltable th,.ltable td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
-  .ltable th{color:var(--faint);text-transform:uppercase;letter-spacing:.05em;font-size:9.5px;background:#11131c}
-  .ltable td:first-child,.ltable th:first-child{color:var(--accent);white-space:nowrap}
-  .ltable td{color:#cdd2e6}
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
@@ -473,10 +467,10 @@ async function demoCondVar(){
   let a=false,b=false; const cv=makeCondition(); const done=[];
   const w1=(async()=>{ await cv.wait(()=>a); done.push("A"); })();
   const w2=(async()=>{ await cv.wait(()=>b); done.push("B"); })();
-  await sleep(5); a=true; b=true; cv.notify();   // notifyAll → both re-check their own predicate
+  await sleep(5); a=true; b=true; cv.notify();   // one signal → both re-check their own predicate
   await Promise.all([w1,w2]);
   const pass=done.length===2 && done.includes("A") && done.includes("B");
-  return {lines:[{t:`two waiters on different predicates`},{t:`one notifyAll woke both → [${done.join(", ")}]`}], pass, verdict:pass?"notifyAll let each waiter re-check and proceed":`woke ${done.join(",")}`};
+  return {lines:[{t:`two waiters on different predicates`},{t:`one signalAll woke both → [${done.join(", ")}]`}], pass, verdict:pass?"signalAll let each waiter re-check and proceed":`woke ${done.join(",")}`};
 }
 async function demoBoundedQueue(){
   const q=new BoundedQueue(2); let maxLen=0; const got=[];
@@ -684,9 +678,9 @@ const DRILLS = {
       post:`  }
 }` },
 
-    { id:"condvar", title:"Condition Variable", why:"wait for a predicate; signal when it changes (Java wait/notify, Go sync.Cond)", demo:demoCondVar,
-      pre:`// Threads wait for a predicate to hold; a producer signals when state
-// changes. Maps to Java wait()/notify()/notifyAll() and Go sync.Cond.
+    { id:"condvar", title:"Condition Variable", why:"wait for a predicate; signal when the state it depends on changes", demo:demoCondVar,
+      pre:`// Tasks wait for a predicate to hold; a producer signals when the state
+// it depends on changes, so the waiters can re-check and proceed.
 class CondVar {
   #waiters = [];
   async wait(pred) {                  // park until pred() is true
@@ -696,7 +690,7 @@ class CondVar {
       await d.promise;
     }
   }
-  signalAll() {                       // state changed — like notifyAll()`,
+  signalAll() {                       // state changed: wake the waiters to re-check`,
       blank:{ q:"wake the waiters so each can re-check its predicate:",
         options:[
 `    const ws = this.#waiters;
@@ -706,8 +700,8 @@ class CondVar {
     if (w) w();                         // wake just one`,
 `    this.#waiters.forEach(resolve => resolve());  // wake all, keep the list`],
         answer:0,
-        whys:["Right. notifyAll(): wake every waiter and clear the list. Each re-tests its own predicate in the while-loop, so only those whose condition now holds proceed.",
-              "Waking only one (notify, not notifyAll) risks a lost wakeup: if that waiter's predicate is still false it parks again, while another waiter whose condition IS true was never woken.",
+        whys:["Right. Wake every waiter and clear the list. Each re-tests its own predicate in the while-loop, so only those whose condition now holds proceed.",
+              "Waking only one waiter risks a lost wakeup: if that waiter's predicate is still false it parks again, while another waiter whose condition IS true was never woken.",
               "Resolving without clearing leaves already-resolved deferreds queued; the next signal 'wakes' stale entries and real waiters get miscounted. Wake, then clear."] },
       post:`  }
 }` },
@@ -824,7 +818,7 @@ class CondVar {
     { id:"boundedqueue", title:"Bounded Blocking Queue", why:"producer/consumer with capacity — block when full (backpressure)", demo:demoBoundedQueue,
       pre:`// Producers block when the queue is full; consumers block when it's
 // empty. Capacity IS backpressure — it stops a fast producer from running
-// away from a slow consumer (Java BlockingQueue, Go buffered channel).
+// away from a slow consumer — the capacity is the flow control.
 class BoundedQueue {
   #cap; #buf = []; #pushW = []; #pullW = [];
   constructor(cap) { this.#cap = cap; }
@@ -1085,10 +1079,10 @@ const CARDS = [
   ["A long-running workflow's event history keeps growing — then what?","History is replayed on every wake, so unbounded history means unbounded replay cost and a hard size cap. continue-as-new starts a fresh execution, carrying state forward with an empty history — the same instinct as capping a queue."],
   ["An activity ran, then the worker died before its result was recorded. Does it run again?","Yes — execution is at-least-once, so an activity can run more than once. Make activities idempotent (dedupe by a stable key) so a retry doesn't double-charge."],
   ["Two signals hit a running workflow at once — is its state safe?","Handlers are coroutines on one thread: no mid-statement preemption, but they interleave at every await. A read-modify-write spanning an await needs a mutex — the same hazard as any async critical section."],
-  ["Condition variable: why `while (!ready) wait()` and never `if`?","Spurious wakeups and multiple waiters. A thread can wake while the predicate is still false (another waiter consumed the change, or a bare wake). Re-check in a loop — the Java and Go docs both mandate it."],
+  ["Condition variable: why `while (!ready) wait()` and never `if`?","Spurious wakeups and multiple waiters. A waiter can wake while the predicate is still false (another waiter consumed the change, or a bare wake). Re-check the predicate in a loop, not with a one-time `if`."],
   ["How do atomics implement a lock?","A lock sits on an atomic compare-and-swap: in one indivisible step, test 'is it 0?' and set it to 1. Win the CAS and you hold the lock; lose and you wait/retry. Atomics are the primitive beneath mutexes and semaphores."],
   ["Bounded vs unbounded queue?","Unbounded hides backpressure: a fast producer grows the backlog until memory dies. A bounded queue blocks the producer when full, pushing the slowdown back to the source — capacity IS the flow control."],
-  ["WaitGroup, thread.join(), Promise.all — one pattern?","'Wait for N tasks to finish.' Fan the work out, then join: Go `wg.Wait()`, a `join()` per thread, or `await Promise.all([...])`. The barrier here is 'all done' — distinct from a rendezvous barrier ('all start together')."],
+  ["Wait for N concurrent tasks to finish — how?","`await Promise.all([...])` resolves once every task settles (use `Promise.allSettled` to get results even when some reject). This barrier is 'all done' — distinct from a rendezvous barrier, which is 'all start together'."],
   ["Blocking vs non-blocking vs async, one line each?","Blocking: stop the thread until ready. Non-blocking: return now with success-or-not, caller retries. Async: hand off, keep going, get a callback later. You're trading thread-cost ↔ control ↔ throughput."],
 ];
 
@@ -1290,7 +1284,7 @@ console.log('D');                        <span class="cm">// sync</span></pre>
 
   { eb:"lesson 07 · interview essentials", title:"Blocking, non-blocking, async", html:`
     <p class="big">Three ways to deal with work that isn't ready yet — a distinction interviewers love to probe.</p>
-    <p><b class="hl">Blocking</b>: the caller stops and the thread does nothing until the result arrives (Java <code>queue.take()</code>, a Go unbuffered receive). Simple, but a parked thread is wasted. <b class="hl">Non-blocking</b>: the call returns immediately — success or "not yet" — and you decide whether to retry (<code>tryLock()</code>, <code>queue.poll()</code>). No waiting, but you may busy-poll. <b class="hl">Async</b>: hand the work off and keep going; a promise or callback delivers the result later (JS <code>await</code>, futures). One thread serves many in-flight operations.</p>
+    <p><b class="hl">Blocking</b>: the caller stops until the result is ready — <code>Atomics.wait()</code> in a worker, or <code>readFileSync</code>. JS avoids this on the main thread on purpose; a blocked thread does nothing. <b class="hl">Non-blocking</b>: the call returns immediately — success or "not yet" — and you decide whether to retry (a <code>tryAcquire()</code> that returns <code>false</code>, polling <code>Atomics.load</code>). No waiting, but you may busy-poll. <b class="hl">Async</b>: hand the work off and keep going; a promise delivers the result later (<code>await</code>). This is JS's default — one thread serves many in-flight operations.</p>
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">three ways to handle "not ready yet"</div>
       <div class="lanes">
@@ -1301,24 +1295,7 @@ console.log('D');                        <span class="cm">// sync</span></pre>
       <div class="dnote seq" style="--i:3">blocking trades a thread for simplicity &middot; non-blocking trades simplicity for control &middot; async trades control for throughput.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p><b class="hl">Why it matters:</b> naming which model you're in — and its trade-off — out loud is half of a concurrency interview.</p>` },
-
-  { eb:"lesson 08 · interview essentials", title:"Same idea, every language", html:`
-    <p class="big">The interview tests the primitives of <b class="hl">your</b> language — but it's the same handful of ideas everywhere. Learn the concept once; map it to the keyword.</p>
-    <div class="diagram">
-      <div class="dlabel">same idea, different keyword</div>
-      <div class="tablewrap"><table class="ltable">
-        <tr><th>concept</th><th>JavaScript</th><th>Go</th><th>Java</th></tr>
-        <tr><td>mutual exclusion</td><td>Mutex (module 01)</td><td>sync.Mutex</td><td>synchronized &middot; ReentrantLock</td></tr>
-        <tr><td>N permits</td><td>Semaphore</td><td>buffered channel</td><td>Semaphore</td></tr>
-        <tr><td>condition variable</td><td>predicate + notify</td><td>sync.Cond</td><td>wait / notify / notifyAll</td></tr>
-        <tr><td>wait for N</td><td>Promise.all</td><td>sync.WaitGroup</td><td>CountDownLatch &middot; join()</td></tr>
-        <tr><td>producer / consumer</td><td>AsyncQueue &middot; BoundedQueue</td><td>channel</td><td>BlockingQueue</td></tr>
-        <tr><td>atomic op</td><td>Atomics</td><td>sync/atomic</td><td>AtomicInteger &middot; volatile</td></tr>
-        <tr><td>spawn parallelism</td><td>Worker</td><td>goroutine</td><td>Thread &middot; ExecutorService</td></tr>
-      </table></div>
-    </div>
-    <p><b class="hl">Why it matters:</b> every drill in this app builds one of these rows. Saying "this is a condition variable — <code>sync.Cond</code> in Go, <code>wait/notify</code> in Java" demonstrates exactly the fluency they're checking.</p>
+    <p><b class="hl">Why it matters:</b> naming which model you're in — and its trade-off — out loud is half of a concurrency interview.</p>
     <p class="sub" style="margin-top:14px">That's the map. Now work through the modules &mdash; tap a chip above to start drilling.</p>` },
 ];
 

@@ -1,12 +1,11 @@
 # Concurrency Bootcamp
 
 A mobile-first, dependency-free web app for learning and practicing JavaScript
-concurrency. It opens with an illustrated **Lessons** primer (eight stepped
+concurrency. It opens with an illustrated **Lessons** primer (seven stepped
 chapters with animated HTML/CSS diagrams — tap ▶ replay to watch each sequence
 step through — covering the event loop, the await-race hazard, the primitives,
-workers/atomics, durable replay, blocking vs non-blocking vs async, and a
-cross-language primitive map (JS ↔ Go ↔ Java), the *how* and *why* behind each
-module), then seven hands-on modules: the event-loop model
+workers/atomics, durable replay, and blocking vs non-blocking vs async, the
+*how* and *why* behind each module), then seven hands-on modules: the event-loop model
 (predict-output quiz), building
 synchronization primitives — mutex, semaphore, latch, barrier, async queue,
 sequencer, condition variable (tap-to-choose drills that run real reference
