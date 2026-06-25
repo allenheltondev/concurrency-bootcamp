@@ -11,8 +11,9 @@ synchronization primitives — mutex, semaphore, latch, barrier, async queue,
 sequencer, condition variable (tap-to-choose drills that run real reference
 code), a workers/atomics data-race demo, trade-off flashcards, a problem bank
 (print-in-order, concurrency pool, dining philosophers, token bucket, bounded
-blocking queue, and the concurrent log processor with fault tolerance), an
-interview kit (debounce, throttle, `Promise.all` from scratch, retry-with-backoff),
+blocking queue, select / first-ready, and the concurrent log processor with
+fault tolerance), an interview kit (debounce, throttle, `Promise.all` from
+scratch, retry-with-backoff, async memoize / concurrent-call dedup),
 and a durable-execution module modeling workflow-engine (Temporal-style)
 concurrency hazards: deterministic replay, durable timeouts, serializing
 concurrent signals, and waiting on a signal predicate.
