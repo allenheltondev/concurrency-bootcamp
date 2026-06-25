@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    name: Validate template & JS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Set up Python (for SAM CLI)
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Set up AWS SAM CLI
+        uses: aws-actions/setup-sam@v3
+        with:
+          use-installer: true
+
+      - name: Lint SAM template
+        # No AWS creds needed: --lint runs cfn-lint locally against the template.
+        run: sam validate --lint --region us-east-1
+
+      - name: Check JavaScript syntax
+        # The app is a single inline <script> plus two standalone JS files.
+        # Parse all three so a typo can't ship a broken page or worker.
+        run: |
+          node --check worker.js
+          node --check workers-atomics.js
+          node -e '
+            const fs = require("fs");
+            const vm = require("vm");
+            const html = fs.readFileSync("index.html", "utf8");
+            const m = html.match(/<script>([\s\S]*?)<\/script>/);
+            if (!m) { console.error("no inline <script> found in index.html"); process.exit(1); }
+            new vm.Script(m[1]);
+            console.log("index.html inline script parses OK");
+          '
