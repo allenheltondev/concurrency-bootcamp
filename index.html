@@ -307,6 +307,35 @@ function makeCondition(){
     async wait(pred){ while(!pred()){ const d=deferred(); waiters.push(d.resolve); await d.promise; } }
   };
 }
+function select(sources){
+  // race tagged sources; resolve with {label,value} of whichever settles first
+  return Promise.race(sources.map(s=>s.promise.then(v=>({label:s.label,value:v}))));
+}
+function memoizeAsync(fn){
+  const cache=new Map();   // key -> in-flight or settled promise
+  return (key)=>{
+    if(cache.has(key)) return cache.get(key);                 // share the existing computation
+    const p=fn(key).catch(e=>{ cache.delete(key); throw e; }); // evict on failure
+    cache.set(key,p);
+    return p;
+  };
+}
+class BoundedQueue{
+  #cap; #buf=[]; #pushW=[]; #pullW=[];
+  constructor(cap){ this.#cap=cap; }
+  async push(v){
+    while(this.#buf.length>=this.#cap){ const d=deferred(); this.#pushW.push(d); await d.promise; }   // block while full
+    this.#buf.push(v);
+    const w=this.#pullW.shift(); if(w) w.resolve();      // wake a waiting consumer
+  }
+  async pull(){
+    while(this.#buf.length===0){ const d=deferred(); this.#pullW.push(d); await d.promise; }           // block while empty
+    const v=this.#buf.shift();
+    const w=this.#pushW.shift(); if(w) w.resolve();      // wake a blocked producer
+    return v;
+  }
+  size(){ return this.#buf.length; }
+}
 
 /* ===========================================================
    DEMOS  -> return {lines:[{t,cls}], pass:boolean}
@@ -446,6 +475,45 @@ async function demoCondition(){
   await sleep(10); order.push("signal"); ready=true; cond.notify(); await wf;
   const pass=order.join(",")==="await,signal,proceed";
   return {lines:[{t:`order: ${order.join(" → ")}`}], pass, verdict:pass?"workflow parked on the predicate until a signal flipped it":`order: ${order.join(",")}`};
+}
+async function demoCondVar(){
+  let a=false,b=false; const cv=makeCondition(); const done=[];
+  const w1=(async()=>{ await cv.wait(()=>a); done.push("A"); })();
+  const w2=(async()=>{ await cv.wait(()=>b); done.push("B"); })();
+  await sleep(5); a=true; b=true; cv.notify();   // one signal → both re-check their own predicate
+  await Promise.all([w1,w2]);
+  const pass=done.length===2 && done.includes("A") && done.includes("B");
+  return {lines:[{t:`two waiters on different predicates`},{t:`one signalAll woke both → [${done.join(", ")}]`}], pass, verdict:pass?"signalAll let each waiter re-check and proceed":`woke ${done.join(",")}`};
+}
+async function demoBoundedQueue(){
+  const q=new BoundedQueue(2); let maxLen=0; const got=[];
+  const producer=(async()=>{ for(let i=1;i<=6;i++){ await q.push(i); maxLen=Math.max(maxLen,q.size()); } })();
+  const consumer=(async()=>{ for(let i=0;i<6;i++){ await sleep(rnd(10)); got.push(await q.pull()); } })();
+  await Promise.all([producer,consumer]);
+  const pass=got.join(",")==="1,2,3,4,5,6" && maxLen<=2;
+  return {lines:[{t:`6 items, capacity 2, slow consumer`},{t:`consumed: [${got.join(", ")}]`},{t:`max buffered at once: ${maxLen}`}], pass, verdict:pass?`producer blocked at capacity (backpressure); all 6 in order, never >2 buffered`:`order ${got.join(",")} maxLen ${maxLen}`};
+}
+async function demoLogProcessor(){
+  const out=[]; const seq=new Sequencer(); const pos={A:0,B:1,C:2}; const cyc={A:0,B:0,C:0}; let bFails=1;
+  const action=(slot)=>async()=>{ if(slot==="B"&&bFails>0){ bFails--; throw new Error("B offline"); } out.push(slot); };
+  const run=(slot)=>async()=>{ const s=cyc[slot]++*3+pos[slot]; await seq.acquire(s); await retry(action(slot),{tries:5,base:2}); seq.release(s); };
+  const fire=(slot)=>(async()=>{ for(let c=0;c<2;c++){ await sleep(rnd(8)); await run(slot)(); } })();
+  await Promise.all([fire("A"),fire("B"),fire("C")]);
+  const pass=out.join("")==="ABCABC";
+  return {lines:[{t:`2 cycles · subsystem B fails once, then recovers`},{t:`processed: ${out.join(" ")}`}], pass, verdict:pass?"order A→B→C held across a transient failure":`got ${out.join("")}`};
+}
+async function demoSelect(){
+  const src=(label,ms,v)=>({label,promise:sleep(ms).then(()=>v)});
+  const r=await select([src("A",30,"a"),src("B",6,"b"),src("C",18,"c")]);
+  const pass=r.label==="B";
+  return {lines:[{t:`raced A@30ms, B@6ms, C@18ms`},{t:`select picked: ${r.label} (= ${r.value})`}], pass, verdict:pass?"first-ready source won the select":`picked ${r.label}`};
+}
+async function demoMemoize(){
+  let calls=0; const slow=async(k)=>{ calls++; await sleep(10); return k.toUpperCase(); };
+  const m=memoizeAsync(slow);
+  const results=await Promise.all(["x","x","x","y","x"].map(k=>m(k)));
+  const pass=calls===2 && results.join(",")==="X,X,X,Y,X";
+  return {lines:[{t:`5 concurrent calls: x, x, x, y, x`},{t:`underlying fn ran ${calls}× (once per distinct key)`},{t:`results: ${results.join(", ")}`}], pass, verdict:pass?"concurrent calls for a key deduped to one computation":`ran ${calls}× → ${results.join(",")}`};
 }
 
 /* ===========================================================
@@ -635,6 +703,34 @@ const DRILLS = {
               "Forgetting to advance #next means the next acquire() never sees its turn as current, so it parks forever."] },
       post:`  }
 }` },
+
+    { id:"condvar", title:"Condition Variable", why:"wait for a predicate; signal when the state it depends on changes", demo:demoCondVar,
+      pre:`// Tasks wait for a predicate to hold; a producer signals when the state
+// it depends on changes, so the waiters can re-check and proceed.
+class CondVar {
+  #waiters = [];
+  async wait(pred) {                  // park until pred() is true
+    while (!pred()) {                 // re-check on every wake — spurious wakeups!
+      const d = deferred();
+      this.#waiters.push(d.resolve);
+      await d.promise;
+    }
+  }
+  signalAll() {                       // state changed: wake the waiters to re-check`,
+      blank:{ q:"wake the waiters so each can re-check its predicate:",
+        options:[
+`    const ws = this.#waiters;
+    this.#waiters = [];
+    ws.forEach(resolve => resolve());   // wake ALL, then clear; each re-tests`,
+`    const w = this.#waiters.shift();
+    if (w) w();                         // wake just one`,
+`    this.#waiters.forEach(resolve => resolve());  // wake all, keep the list`],
+        answer:0,
+        whys:["Right. Wake every waiter and clear the list. Each re-tests its own predicate in the while-loop, so only those whose condition now holds proceed.",
+              "Waking only one waiter risks a lost wakeup: if that waiter's predicate is still false it parks again, while another waiter whose condition IS true was never woken.",
+              "Resolving without clearing leaves already-resolved deferreds queued; the next signal 'wakes' stale entries and real waiters get miscounted. Wake, then clear."] },
+      post:`  }
+}` },
   ],
 
   bank:[
@@ -744,6 +840,86 @@ const DRILLS = {
     this.#tokens -= 1;
   }
 }` },
+
+    { id:"boundedqueue", title:"Bounded Blocking Queue", why:"producer/consumer with capacity — block when full (backpressure)", demo:demoBoundedQueue,
+      pre:`// Producers block when the queue is full; consumers block when it's
+// empty. Capacity IS backpressure — it stops a fast producer from running
+// away from a slow consumer — the capacity is the flow control.
+class BoundedQueue {
+  #cap; #buf = []; #pushW = []; #pullW = [];
+  constructor(cap) { this.#cap = cap; }
+  async push(v) {`,
+      blank:{ q:"make push() block while the queue is at capacity:",
+        options:[
+`    while (this.#buf.length >= this.#cap) {
+      const d = deferred(); this.#pushW.push(d); await d.promise;
+    }
+    this.#buf.push(v);
+    const w = this.#pullW.shift(); if (w) w.resolve();`,
+`    this.#buf.push(v);                       // just append
+    const w = this.#pullW.shift(); if (w) w.resolve();`,
+`    if (this.#buf.length >= this.#cap) {
+      const d = deferred(); this.#pushW.push(d); await d.promise;
+    }
+    this.#buf.push(v);
+    const w = this.#pullW.shift(); if (w) w.resolve();`],
+        answer:0,
+        whys:["Right. Park while full, re-checking capacity on every wake; once there's room, enqueue and wake a blocked consumer. That's backpressure.",
+              "No capacity check makes it unbounded — a fast producer piles items up without limit, the backlog grows until memory dies, and backpressure is gone.",
+              "An `if` checks capacity only once; after a wake the queue can be full again (another producer raced in), so push proceeds and overflows the bound. Re-check in a while-loop."] },
+      post:`  }
+  async pull() {
+    while (this.#buf.length === 0) {
+      const d = deferred(); this.#pullW.push(d); await d.promise;
+    }
+    const v = this.#buf.shift();
+    const w = this.#pushW.shift(); if (w) w.resolve();   // wake a blocked producer
+    return v;
+  }
+}` },
+
+    { id:"logproc", title:"Concurrent Log Processor", why:"process A→B→C in order, and survive a subsystem failing mid-cycle", demo:demoLogProcessor,
+      pre:`// Subsystems A, B, C log independently and concurrently, but must be
+// PROCESSED in order A → B → C each cycle. Bonus: a subsystem can fail
+// transiently and must resume without breaking the order. Ordering via a
+// Sequencer; robustness via retry.
+async function process(slot, action) {
+  const seq = cycle[slot]++ * 3 + pos[slot];
+  await sequencer.acquire(seq);        // wait for this slot's turn`,
+      blank:{ q:"process the log — stay ordered AND survive a transient failure:",
+        options:[
+`  await retry(action, { tries: 5 });   // keep trying until it succeeds
+  sequencer.release(seq);              // release the turn ONLY after success`,
+`  try { await action(); }
+  finally { sequencer.release(seq); }  // always release, even on failure`,
+`  sequencer.release(seq);             // release first
+  await retry(action, { tries: 5 });`],
+        answer:0,
+        whys:["Right. Retry the action while still holding the turn, and release only once it has actually succeeded — a transient failure pauses the pipeline instead of corrupting the order. Bonus solved.",
+              "Releasing in finally advances the order even when the action threw — the next slot proceeds, so a failed B lets C run before B ever succeeds. Order broken on failure.",
+              "Releasing before doing the work lets the next slot start immediately — the ordering guarantee is gone whether or not anything fails."] },
+      post:`}` },
+
+    { id:"select", title:"Select (first ready)", why:"wait on several async sources; take whichever is ready first", demo:demoSelect,
+      pre:`// Proceed with whichever of several async sources is ready first —
+// first response wins, racing replicas, value-or-timeout, and so on.
+function select(sources) {           // sources: [{ label, promise }]`,
+      blank:{ q:"resolve with the first source that's ready, tagged by which one:",
+        options:[
+`  return Promise.race(
+    sources.map(s => s.promise.then(v => ({ label: s.label, value: v })))
+  );`,
+`  return Promise.all(
+    sources.map(s => s.promise.then(v => ({ label: s.label, value: v })))
+  );`,
+`  return sources[0].promise;`],
+        answer:0,
+        whys:["Right. Tag each source with its label, then race — the first to settle wins and you know which one it was.",
+              "Promise.all waits for EVERY source, so you lose the first-ready behaviour entirely — you block on the slowest.",
+              "Returning the first source ignores the others; you wanted whichever is ready FIRST, not the first in the list."] },
+      post:`}
+// A faithful channel-select also avoids consuming the losers;
+// Promise.race settles first but the other promises still run.` },
   ],
 
   toolkit:[
@@ -833,6 +1009,32 @@ const DRILLS = {
               "A constant delay hammers a struggling service at a fixed rate. Exponential backoff gives it room to recover and avoids synchronized retry stampedes."] },
       post:`    }
   }
+}` },
+
+    { id:"memoize", title:"Dedupe concurrent calls", why:"many callers ask for the same key at once — compute it only once", demo:demoMemoize,
+      pre:`// Cache an async function so concurrent callers for the same key share
+// ONE computation (request dedup / a safe concurrent memo). The trick:
+// cache the PROMISE, not the resolved value.
+function memoizeAsync(fn) {
+  const cache = new Map();        // key -> in-flight or settled promise
+  return (key) => {
+    if (cache.has(key)) return cache.get(key);`,
+      blank:{ q:"start the work, dedupe concurrent callers, and don't cache failures:",
+        options:[
+`    const p = fn(key).catch(e => { cache.delete(key); throw e; });
+    cache.set(key, p);            // store the PROMISE immediately
+    return p;`,
+`    const v = await fn(key);      // await before storing
+    cache.set(key, v);
+    return v;`,
+`    const p = fn(key);
+    cache.set(key, p);            // store the promise, keep it forever
+    return p;`],
+        answer:0,
+        whys:["Right. Store the in-flight promise immediately so concurrent callers share it; on failure, evict the key so a later call can retry.",
+              "Awaiting before storing means concurrent callers all miss the cache (nothing is set yet) and each starts its own fn — no dedup at all.",
+              "Caching the promise dedupes, but a rejected promise stays cached forever, so every future caller inherits the failure. Evict on error."] },
+      post:`  };
 }` },
   ],
 
@@ -950,6 +1152,13 @@ const CARDS = [
   ["A long-running workflow's event history keeps growing — then what?","History is replayed on every wake, so unbounded history means unbounded replay cost and a hard size cap. continue-as-new starts a fresh execution, carrying state forward with an empty history — the same instinct as capping a queue."],
   ["An activity ran, then the worker died before its result was recorded. Does it run again?","Yes — execution is at-least-once, so an activity can run more than once. Make activities idempotent (dedupe by a stable key) so a retry doesn't double-charge."],
   ["Two signals hit a running workflow at once — is its state safe?","Handlers are coroutines on one thread: no mid-statement preemption, but they interleave at every await. A read-modify-write spanning an await needs a mutex — the same hazard as any async critical section."],
+  ["Condition variable: why `while (!ready) wait()` and never `if`?","Spurious wakeups and multiple waiters. A waiter can wake while the predicate is still false (another waiter consumed the change, or a bare wake). Re-check the predicate in a loop, not with a one-time `if`."],
+  ["How do atomics implement a lock?","A lock sits on an atomic compare-and-swap: in one indivisible step, test 'is it 0?' and set it to 1. Win the CAS and you hold the lock; lose and you wait/retry. Atomics are the primitive beneath mutexes and semaphores."],
+  ["Bounded vs unbounded queue?","Unbounded hides backpressure: a fast producer grows the backlog until memory dies. A bounded queue blocks the producer when full, pushing the slowdown back to the source — capacity IS the flow control."],
+  ["Wait for N concurrent tasks to finish — how?","`await Promise.all([...])` resolves once every task settles (use `Promise.allSettled` to get results even when some reject). This barrier is 'all done' — distinct from a rendezvous barrier, which is 'all start together'."],
+  ["Blocking vs non-blocking vs async, one line each?","Blocking: stop the thread until ready. Non-blocking: return now with success-or-not, caller retries. Async: hand off, keep going, get a callback later. You're trading thread-cost ↔ control ↔ throughput."],
+  ["Thread pool / executor — the JS equivalent?","Bound parallelism with a concurrency pool: launch tasks up to a limit, then `await Promise.race(inFlight)` to free a slot before starting the next. Each task is just a promise you await — promises are JS's futures."],
+  ["Wait on whichever of several async sources is ready first?","Tag each source, then `Promise.race` them — the first to settle wins and you know which. (A true channel-select also avoids consuming the losers; race alone doesn't.)"],
 ];
 
 /* ===========================================================
@@ -1146,7 +1355,22 @@ console.log('D');                        <span class="cm">// sync</span></pre>
       <div class="dnote seq" style="--i:5">The same history must produce the <b style="color:var(--ordered)">same decisions</b> every time. So workflow code must be <b class="hl">deterministic</b>: no <code>Date.now()</code>, no <code>Math.random()</code>, no direct I/O — those are recorded once, then replayed.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p><b class="hl">Why it matters:</b> replay turns ordinary-looking code into a crash-proof process — but it bans nondeterminism, and the in-process hazards (signals interleaving at awaits, lesson 03) still apply. That's the durable-execution module.</p>
+    <p><b class="hl">Why it matters:</b> replay turns ordinary-looking code into a crash-proof process — but it bans nondeterminism, and the in-process hazards (signals interleaving at awaits, lesson 03) still apply. That's the durable-execution module.</p>` },
+
+  { eb:"lesson 07 · interview essentials", title:"Blocking, non-blocking, async", html:`
+    <p class="big">Three ways to deal with work that isn't ready yet — a distinction interviewers love to probe.</p>
+    <p><b class="hl">Blocking</b>: the caller stops until the result is ready — <code>Atomics.wait()</code> in a worker, or <code>readFileSync</code>. JS avoids this on the main thread on purpose; a blocked thread does nothing. <b class="hl">Non-blocking</b>: the call returns immediately — success or "not yet" — and you decide whether to retry (a <code>tryAcquire()</code> that returns <code>false</code>, polling <code>Atomics.load</code>). No waiting, but you may busy-poll. <b class="hl">Async</b>: hand the work off and keep going; a promise delivers the result later (<code>await</code>). This is JS's default — one thread serves many in-flight operations.</p>
+    <div class="diagram anim" style="--step:.7s">
+      <div class="dlabel">three ways to handle "not ready yet"</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">blocking</div><div class="lstep seq" style="--i:0">call &rarr; <span style="color:var(--faint)">&block;&block; thread parked, idle &block;&block;</span> &rarr; result</div>
+        <div class="lanehead seq" style="--i:1">non-block</div><div class="lstep seq" style="--i:1">try &rarr; not yet &rarr; try &rarr; not yet &rarr; got it</div>
+        <div class="lanehead seq" style="--i:2">async</div><div class="lstep good seq" style="--i:2">start &rarr; <span style="color:var(--ordered)">do other work</span> &rarr; callback: result</div>
+      </div>
+      <div class="dnote seq" style="--i:3">blocking trades a thread for simplicity &middot; non-blocking trades simplicity for control &middot; async trades control for throughput.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p><b class="hl">Why it matters:</b> naming which model you're in — and its trade-off — out loud is half of a concurrency interview.</p>
     <p class="sub" style="margin-top:14px">That's the map. Now work through the modules &mdash; tap a chip above to start drilling.</p>` },
 ];
 
