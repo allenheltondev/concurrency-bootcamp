@@ -336,6 +336,32 @@ class BoundedQueue{
   }
   size(){ return this.#buf.length; }
 }
+function atomicTryAcquire(cell){ return Atomics.compareExchange(cell,0,0,1)===0; }  // 0->1 iff free
+function atomicRelease(cell){ Atomics.store(cell,0,0); }
+class RWLock{
+  #readers=0; #writing=false; #rq=[]; #wq=[];
+  async acquireRead(){ if(this.#writing||this.#wq.length){ const d=deferred(); this.#rq.push(d); await d.promise; } else this.#readers++; }
+  releaseRead(){ this.#readers--; this.#dispatch(); }
+  async acquireWrite(){ if(this.#writing||this.#readers>0||this.#wq.length){ const d=deferred(); this.#wq.push(d); await d.promise; } else this.#writing=true; }
+  releaseWrite(){ this.#writing=false; this.#dispatch(); }
+  #dispatch(){
+    if(this.#writing) return;
+    if(this.#readers===0 && this.#wq.length){ this.#writing=true; this.#wq.shift().resolve(); }
+    else if(!this.#wq.length){ while(this.#rq.length){ this.#readers++; this.#rq.shift().resolve(); } }
+  }
+}
+function once(fn){ let p; return ()=> (p ??= fn()); }
+function withTimeoutCancel(workFn,ms){
+  const ctrl=new AbortController();
+  const work=workFn(ctrl.signal).then(v=>({ok:v}),()=>({aborted:true}));
+  const timer=sleep(ms).then(()=>{ ctrl.abort(); return {timedOut:true}; });   // cancel the loser
+  return Promise.race([work,timer]);
+}
+async function errgroup(taskFns){
+  const ctrl=new AbortController();
+  const tasks=taskFns.map(fn=>fn(ctrl.signal).catch(err=>{ ctrl.abort(); throw err; }));  // first failure cancels the rest
+  return Promise.all(tasks);
+}
 
 /* ===========================================================
    DEMOS  -> return {lines:[{t,cls}], pass:boolean}
@@ -515,6 +541,45 @@ async function demoMemoize(){
   const pass=calls===2 && results.join(",")==="X,X,X,Y,X";
   return {lines:[{t:`5 concurrent calls: x, x, x, y, x`},{t:`underlying fn ran ${calls}× (once per distinct key)`},{t:`results: ${results.join(", ")}`}], pass, verdict:pass?"concurrent calls for a key deduped to one computation":`ran ${calls}× → ${results.join(",")}`};
 }
+async function demoAtomicLock(){
+  const cell=new Int32Array(1);   // 0 = free, 1 = held (a SharedArrayBuffer across real threads)
+  const a=atomicTryAcquire(cell), b=atomicTryAcquire(cell);
+  atomicRelease(cell);
+  const c=atomicTryAcquire(cell); atomicRelease(cell);
+  const pass=a&&!b&&c;
+  return {lines:[{t:`acquire while free → ${a}`},{t:`acquire while already held → ${b}`},{t:`acquire after release → ${c}`}], pass, verdict:pass?"compare-and-swap gives exclusive ownership in one indivisible step":`a=${a} b=${b} c=${c}`};
+}
+async function demoRWLock(){
+  const rw=new RWLock(); let readers=0,maxR=0,writing=false,violation=false;
+  const reader=async()=>{ await rw.acquireRead(); readers++; maxR=Math.max(maxR,readers); if(writing)violation=true; await sleep(rnd(10)); readers--; rw.releaseRead(); };
+  const writer=async()=>{ await rw.acquireWrite(); writing=true; if(readers>0)violation=true; await sleep(8); writing=false; rw.releaseWrite(); };
+  await Promise.all([reader(),reader(),reader(),writer(),reader(),writer()]);
+  const pass=!violation && maxR>=2;
+  return {lines:[{t:`4 readers + 2 writers contend`},{t:`max concurrent readers: ${maxR}`},{t:`reader/writer overlaps: ${violation?"yes":"none"}`}], pass, verdict:pass?`readers ran in parallel (max ${maxR}); writers stayed exclusive`:`maxR=${maxR} violation=${violation}`};
+}
+async function demoOnce(){
+  let calls=0; const init=once(async()=>{ calls++; await sleep(5); return "ready"; });
+  const rs=await Promise.all([init(),init(),init(),init()]);
+  const pass=calls===1 && rs.every(r=>r==="ready");
+  return {lines:[{t:`4 concurrent init() calls`},{t:`initializer ran ${calls}× (want 1)`}], pass, verdict:pass?"initialized exactly once; all callers shared the result":`ran ${calls}×`};
+}
+async function demoCancelTimeout(){
+  let cleanedUp=false;
+  const workFn=(signal)=> new Promise((resolve,reject)=>{ const t=setTimeout(()=>resolve("done"),1000); signal.addEventListener("abort",()=>{ clearTimeout(t); cleanedUp=true; reject(new Error("aborted")); },{once:true}); });
+  const r=await withTimeoutCancel(workFn,20); await sleep(5);
+  const pass=r.timedOut===true && cleanedUp===true;
+  return {lines:[{t:`work takes 1000ms, timeout 20ms`},{t:`result: ${r.timedOut?"timeout":"ok"} · losing work cleaned up: ${cleanedUp}`}], pass, verdict:pass?"timed out AND cancelled the losing work — no leak":`timedOut=${r.timedOut} cleaned=${cleanedUp}`};
+}
+async function demoErrgroup(){
+  let aborts=0;
+  const slow=(ms)=>(signal)=> new Promise((resolve,reject)=>{ const t=setTimeout(()=>resolve("ok"),ms); signal.addEventListener("abort",()=>{ clearTimeout(t); aborts++; reject(new Error("aborted")); },{once:true}); });
+  const failing=(ms)=>()=> sleep(ms).then(()=>{ throw new Error("boom"); });
+  let caught=false;
+  try{ await errgroup([slow(1000),failing(10),slow(1000)]); }catch(e){ caught=true; }
+  await sleep(5);
+  const pass=caught && aborts===2;
+  return {lines:[{t:`3 tasks; #2 fails at 10ms, #1 and #3 take 1000ms`},{t:`group rejected: ${caught} · siblings cancelled: ${aborts}`}], pass, verdict:pass?"first failure cancelled the siblings (errgroup)":`caught=${caught} aborts=${aborts}`};
+}
 
 /* ===========================================================
    CONTENT
@@ -528,6 +593,7 @@ const MODULES = [
   { id:"bank", label:"problem bank", type:"drills" },
   { id:"toolkit", label:"interview kit", type:"drills" },
   { id:"durable", label:"durable execution", type:"drills" },
+  { id:"test", label:"test yourself", type:"test" },
 ];
 
 /* ---- model module: predict-output quiz ---- */
@@ -730,6 +796,76 @@ class CondVar {
               "Waking only one waiter risks a lost wakeup: if that waiter's predicate is still false it parks again, while another waiter whose condition IS true was never woken.",
               "Resolving without clearing leaves already-resolved deferreds queued; the next signal 'wakes' stale entries and real waiters get miscounted. Wake, then clear."] },
       post:`  }
+}` },
+
+    { id:"atomiclock", title:"Atomic Lock (CAS)", why:"build a lock from one shared int + compare-and-swap — atomics are what locks are made of", demo:demoAtomicLock,
+      pre:`// A lock with no higher-level primitive — just one shared integer and an
+// atomic compare-and-swap. 0 = free, 1 = held. (Across real threads the
+// cell lives in a SharedArrayBuffer.)
+const cell = new Int32Array(1);
+function tryAcquire() {`,
+      blank:{ q:"atomically take the lock only if it's currently free:",
+        options:[
+`  return Atomics.compareExchange(cell, 0, 0, 1) === 0;   // 0 -> 1 iff it was 0`,
+`  if (cell[0] === 0) { cell[0] = 1; return true; }
+  return false;`,
+`  Atomics.store(cell, 0, 1);
+  return true;`],
+        answer:0,
+        whys:["Right. compareExchange sets 0→1 only if it's currently 0, in one indivisible step, and tells you whether you won. That test-and-set is the heart of every lock.",
+              "Read-then-write is two steps — two threads can both read 0 and both 'acquire'. The whole point of CAS is to test and set atomically.",
+              "Storing 1 unconditionally 'acquires' even when another thread already holds it — that's not a lock, it's a clobber."] },
+      post:`}
+function release() {
+  Atomics.store(cell, 0, 0);            // free it
+}
+// Blocking version: park on Atomics.wait, wake waiters with Atomics.notify.` },
+
+    { id:"rwlock", title:"Read/Write Lock", why:"many readers in parallel, or one exclusive writer", demo:demoRWLock,
+      pre:`// Many readers can hold it at once, but a writer needs it alone (no
+// readers, no other writer). Grant the lock at release time — hand it off.
+class RWLock {
+  #readers = 0; #writing = false; #rq = []; #wq = [];
+  async acquireRead()  { if (this.#writing || this.#wq.length) { const d = deferred(); this.#rq.push(d); await d.promise; } else this.#readers++; }
+  releaseRead()  { this.#readers--; this.#dispatch(); }
+  async acquireWrite() { if (this.#writing || this.#readers > 0 || this.#wq.length) { const d = deferred(); this.#wq.push(d); await d.promise; } else this.#writing = true; }
+  releaseWrite() { this.#writing = false; this.#dispatch(); }
+  #dispatch() {`,
+      blank:{ q:"when the lock frees, who gets woken — staying exclusive for writers?",
+        options:[
+`    if (this.#writing) return;
+    if (this.#readers === 0 && this.#wq.length) {     // no readers -> grant ONE writer
+      this.#writing = true; this.#wq.shift().resolve();
+    } else if (!this.#wq.length) {                     // no writer waiting -> wake ALL readers
+      while (this.#rq.length) { this.#readers++; this.#rq.shift().resolve(); }
+    }`,
+`    while (this.#rq.length) { this.#readers++; this.#rq.shift().resolve(); }
+    if (this.#wq.length) { this.#writing = true; this.#wq.shift().resolve(); }`,
+`    if (this.#wq.length) { this.#writing = true; this.#wq.shift().resolve(); }`],
+        answer:0,
+        whys:["Right. Grant a writer only when no readers hold it (one at a time); otherwise release all waiting readers — but only when no writer is queued, so writers don't starve.",
+              "Waking readers first and then a writer regardless of readers lets the writer run while readers are active, and starves writers behind a steady reader stream.",
+              "Granting a writer without checking #readers lets it run while readers still hold the lock — exactly the overlap a RW lock must prevent."] },
+      post:`  }
+}` },
+
+    { id:"once", title:"Run Once (lazy init)", why:"initialize exactly once, even under concurrent callers", demo:demoOnce,
+      pre:`// Run an initializer at most once, even if called concurrently; every
+// caller gets the same result (lazy singleton — a one-shot memo).
+function once(fn) {
+  let p;                       // the single in-flight / settled promise
+  return () => {`,
+      blank:{ q:"start fn at most once and hand every caller the same result:",
+        options:[
+`    return (p ??= fn());     // call + store only the first time`,
+`    return fn();             // just call it`,
+`    if (!p) p = fn();
+    return fn();`],
+        answer:0,
+        whys:["Right. ??= calls fn() and stores its promise only the first time; every later call returns that same promise — one initialization, shared by all.",
+              "Calling fn() unconditionally runs the initializer on every call — there's no 'once' at all.",
+              "Storing p but then returning a fresh fn() still runs the initializer every call — the guard does nothing."] },
+      post:`  };
 }` },
   ],
 
@@ -1036,6 +1172,48 @@ function memoizeAsync(fn) {
               "Caching the promise dedupes, but a rejected promise stays cached forever, so every future caller inherits the failure. Evict on error."] },
       post:`  };
 }` },
+
+    { id:"canceltimeout", title:"Cancel the Loser", why:"a timeout that actually cancels the slow work (AbortController)", demo:demoCancelTimeout,
+      pre:`// Promise.race alone leaves the losing work running in the background.
+// Pass an AbortSignal and abort it when the timer wins, so the slow work
+// stops and cleans up.
+function withTimeout(workFn, ms) {
+  const ctrl = new AbortController();
+  const work = workFn(ctrl.signal).then(v => ({ ok: v }), () => ({ aborted: true }));
+  const timer = sleep(ms).then(() => {`,
+      blank:{ q:"the timer fired first — stop the work and report the timeout:",
+        options:[
+`    ctrl.abort();               // cancel the still-running work
+    return { timedOut: true };`,
+`    return { timedOut: true };  // just report it`,
+`    ctrl.abort();               // abort, but return nothing`],
+        answer:0,
+        whys:["Right. Abort the signal so the losing work stops and cleans up, and return a marker so the caller knows it was a timeout — no leaked background work.",
+              "Returning the marker without aborting leaves the slow work running to completion in the background — the resource leak the timeout was meant to prevent.",
+              "Aborting without returning a result resolves the race with undefined, so the caller can't tell a timeout happened."] },
+      post:`  });
+  return Promise.race([work, timer]);
+}` },
+
+    { id:"errgroup", title:"Cancel on First Error", why:"run tasks together; the first failure cancels the rest (errgroup)", demo:demoErrgroup,
+      pre:`// Run tasks concurrently, but the FIRST failure cancels the others — no
+// point finishing work whose result you'll throw away. Each task gets a
+// shared AbortSignal.
+async function errgroup(taskFns) {
+  const ctrl = new AbortController();
+  const tasks = taskFns.map(fn =>`,
+      blank:{ q:"on the first failure, cancel the siblings and propagate the error:",
+        options:[
+`    fn(ctrl.signal).catch(err => { ctrl.abort(); throw err; })`,
+`    fn(ctrl.signal)`,
+`    fn(ctrl.signal).catch(() => { ctrl.abort(); })`],
+        answer:0,
+        whys:["Right. Share one signal; the first task to fail aborts it (cancelling the siblings) and rethrows, so Promise.all rejects with the real error.",
+              "Without aborting on failure, Promise.all still rejects on the first error — but the other tasks keep running to completion, wasting work you've already decided to discard.",
+              "Swallowing the error makes the failed task resolve to undefined, so Promise.all never rejects and the caller never learns it failed."] },
+      post:`  );
+  return Promise.all(tasks);
+}` },
   ],
 
   durable:[
@@ -1170,6 +1348,7 @@ let state = { module:"learn", solved:{} };
 /* one-at-a-time stepping: where we are inside each stepped module */
 let learnIdx = 0;                                          // current lesson chapter
 let modelIdx = 0;                                          // current quiz question
+let test = { on:false, qs:[], idx:0, score:0, answered:false };  // scored test mode
 let drillIdx = { primitives:0, bank:0, toolkit:0, durable:0 };  // current drill per module
 let quizDone = {};                                         // qi -> answered correctly (in-memory)
 
@@ -1218,6 +1397,7 @@ function render(){
   else if(m.type==="drills") renderDrills(state.module);
   else if(m.type==="sim") renderSim();
   else if(m.type==="cards") renderCards();
+  else if(m.type==="test") renderTest();
 }
 
 /* ---- one-at-a-time stepper control (prev · n/total · next) ---- */
@@ -1323,7 +1503,82 @@ console.log('D');                        <span class="cm">// sync</span></pre>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
     <p><b class="hl">Why it matters:</b> these turn "it usually works" into guarantees — exclusive access, bounded concurrency, ordered handoff — without ever blocking the thread.</p>` },
 
-  { eb:"lesson 05 · workers & atomics", title:"Real threads, real races", html:`
+  { eb:"lesson 05 · primitives", title:"Latch & barrier", html:`
+    <p class="big">Two coordination gates. A <b class="hl">latch</b> opens once and lets everyone through (a start signal). A <b class="hl">barrier</b> holds N parties until the last one arrives, then releases them together (a rendezvous).</p>
+    <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">latch &middot; open once, all waiters go</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">w1</div><div class="lstep wait seq" style="--i:0">await latch &hellip; parked</div>
+        <div class="lanehead seq" style="--i:1">w2</div><div class="lstep wait seq" style="--i:1">await latch &hellip; parked</div>
+        <div class="lanehead seq" style="--i:2">main</div><div class="lstep seq" style="--i:2">open()</div>
+        <div class="lanehead seq" style="--i:3">w1, w2</div><div class="lstep good seq pop" style="--i:3">released together &rarr; go</div>
+      </div>
+      <div class="dnote seq" style="--i:4">A barrier(N) is the mirror image: each party <code>arrive()</code>s and blocks; the <b>last</b> arrival opens the gate for everyone.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p><b class="hl">Why it matters:</b> a latch releases work on a one-time signal (config loaded, race start); a barrier syncs phases (all workers finish step 1 before any starts step 2).</p>` },
+
+  { eb:"lesson 06 · primitives", title:"Condition variable", html:`
+    <p class="big">A <b class="hl">condition variable</b> parks a task until a predicate becomes true, and a producer <b class="hl">signals</b> when the state it depends on changes. The waiter re-checks on every wake — so a stale or spurious wake just parks it again.</p>
+    <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">consumer waits for items &gt; 0</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">consumer</div><div class="lstep wait seq" style="--i:0">items &gt; 0? no &rarr; park</div>
+        <div class="lanehead seq" style="--i:1">producer</div><div class="lstep seq" style="--i:1">spurious signal (items still 0)</div>
+        <div class="lanehead seq" style="--i:2">consumer</div><div class="lstep wait seq" style="--i:2">wake &rarr; re-check &rarr; still 0 &rarr; park</div>
+        <div class="lanehead seq" style="--i:3">producer</div><div class="lstep seq" style="--i:3">items = 1 &middot; signal</div>
+        <div class="lanehead seq" style="--i:4">consumer</div><div class="lstep good seq pop" style="--i:4">wake &rarr; re-check &rarr; true &rarr; consume</div>
+      </div>
+      <div class="dnote seq" style="--i:5">That re-check is why it's <code>while (!pred()) wait()</code>, never <code>if</code> — spurious wakeups are real.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p><b class="hl">Why it matters:</b> it's the general "wait until a state holds" tool — bounded queues, latches and "wait for ready" are all condition variables underneath.</p>` },
+
+  { eb:"lesson 07 · primitives", title:"Atomic lock (compare-and-swap)", html:`
+    <p class="big">Locks aren't magic — they're built from one <b class="hl">atomic</b> instruction: <b class="hl">compare-and-swap</b>. CAS tests "is this cell 0?" and sets it to 1 in a single indivisible step, and tells you whether you won.</p>
+    <div class="diagram anim" style="--step:.85s">
+      <div class="dlabel">one shared cell &middot; 0 = free, 1 = held</div>
+      <div style="text-align:center;margin:4px 0 10px">lock cell &nbsp;<span class="memcell seq pop" style="--i:2">1</span></div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">Thread 1</div><div class="lstep good seq" style="--i:0">CAS 0&rarr;1 &nbsp;&#10003; won &mdash; holds the lock</div>
+        <div class="lanehead seq" style="--i:1">Thread 2</div><div class="lstep bad seq" style="--i:1">CAS 0&rarr;1 &nbsp;&#10007; cell was 1 &mdash; must wait</div>
+      </div>
+      <div class="dnote seq" style="--i:3">Both ran CAS at once; only one could flip 0&rarr;1. A plain <code>if (cell == 0) cell = 1</code> would let both in — two steps interleave.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p><b class="hl">Why it matters:</b> every mutex and semaphore sits on a CAS like this; <code>Atomics.wait</code>/<code>notify</code> add the "park until free" part. A classic interview probe.</p>` },
+
+  { eb:"lesson 08 · primitives", title:"Read / write lock", html:`
+    <p class="big">When reads vastly outnumber writes, a plain mutex is wasteful — readers don't conflict with each other. A <b class="hl">read/write lock</b> lets <b class="hl">many readers</b> in at once, but a <b class="hl">writer</b> gets it alone.</p>
+    <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">many readers OR one exclusive writer</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">readers</div><div class="lstep good seq pop" style="--i:0">R1 R2 R3 &mdash; all reading together</div>
+        <div class="lanehead seq" style="--i:1">writer</div><div class="lstep wait seq" style="--i:1">waits for readers to drain</div>
+        <div class="lanehead seq" style="--i:2">writer</div><div class="lstep seq pop" style="--i:2">readers = 0 &rarr; writes alone</div>
+        <div class="lanehead seq" style="--i:3">readers</div><div class="lstep wait seq" style="--i:3">new readers wait while writing</div>
+      </div>
+      <div class="dnote seq" style="--i:4">Grant a writer only when no readers hold it; don't let a steady stream of readers starve a waiting writer.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p><b class="hl">Why it matters:</b> read-heavy caches and config stores get big throughput wins from shared reads — as long as writers still get exclusive access.</p>` },
+
+  { eb:"lesson 09 · primitives", title:"Run once (lazy init)", html:`
+    <p class="big">Initialize something <b class="hl">exactly once</b>, even when many callers ask for it at the same time — a lazy singleton (open the DB pool, load config). The trick: cache the in-flight <b class="hl">promise</b>, not the value.</p>
+    <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">4 concurrent callers, one initializer</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">c1</div><div class="lstep good seq" style="--i:0">no promise yet &rarr; start init() &middot; store it</div>
+        <div class="lanehead seq" style="--i:1">c2</div><div class="lstep seq" style="--i:1">promise exists &rarr; await it</div>
+        <div class="lanehead seq" style="--i:2">c3, c4</div><div class="lstep seq" style="--i:2">promise exists &rarr; await it</div>
+        <div class="lanehead seq" style="--i:3">all</div><div class="lstep good seq pop" style="--i:3">init resolves once &rarr; same result to everyone</div>
+      </div>
+      <div class="dnote seq" style="--i:4">Caching the value instead of the promise loses the race: callers that arrive mid-init each start their own.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p><b class="hl">Why it matters:</b> the difference between one DB connection and a thundering herd of them is exactly "cache the promise, not the value."</p>` },
+
+  { eb:"lesson 10 · workers & atomics", title:"Real threads, real races", html:`
     <p class="big">For genuine parallelism — CPU-bound work — JS uses <b class="hl">Workers</b>, separate OS threads. They don't share variables; they message-pass. The one exception is a <code>SharedArrayBuffer</code>, where threads touch the <b class="hl">same memory</b> — and that's where true data races appear.</p>
     <div class="diagram anim" style="--step:.85s">
       <div class="dlabel">two threads, one shared counter (starts at 5), each does counter++</div>
@@ -1341,7 +1596,170 @@ console.log('D');                        <span class="cm">// sync</span></pre>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
     <p><b class="hl">Why it matters:</b> threads pay off only for compute big enough to amortize their cost — and the moment you share memory, you need atomics or a lock, exactly like any other language.</p>` },
 
-  { eb:"lesson 06 · durable execution", title:"Durable workflows & replay", html:`
+  { eb:"lesson 11 · problem patterns", title:"Producer / consumer & backpressure", html:`
+    <p class="big">A queue decouples producers from consumers. But an <b class="hl">unbounded</b> queue hides a danger: a fast producer piles work up faster than the consumer drains it, until memory dies. A <b class="hl">bounded</b> queue blocks the producer when full — that's <b class="hl">backpressure</b>.</p>
+    <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">capacity 2 &middot; fast producer, slow consumer</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">producer</div><div class="lstep seq" style="--i:0">push 1 &middot; push 2 &mdash; buffer [1, 2]</div>
+        <div class="lanehead seq" style="--i:1">producer</div><div class="lstep wait seq pop" style="--i:1">push 3 &rarr; full &rarr; <b>blocks</b></div>
+        <div class="lanehead seq" style="--i:2">consumer</div><div class="lstep good seq" style="--i:2">pull 1 &mdash; a slot frees</div>
+        <div class="lanehead seq" style="--i:3">producer</div><div class="lstep good seq pop" style="--i:3">unblocks &rarr; push 3 lands</div>
+      </div>
+      <div class="dnote seq" style="--i:4">Capacity is flow control: the producer's speed is now bounded by the consumer's.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p><b class="hl">Why it matters:</b> "what if the producer outpaces the consumer?" is a standard follow-up. The answer is a bounded queue (or drop/sample) — never an unbounded backlog.</p>` },
+
+  { eb:"lesson 12 · problem patterns", title:"Process in order (A &rarr; B &rarr; C)", html:`
+    <p class="big">Three subsystems log <b class="hl">concurrently</b>, but must be <b class="hl">processed</b> in a fixed order each cycle. A <b class="hl">sequencer</b> hands out turns: each slot waits for its number, runs, then releases the next.</p>
+    <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">turns passed in order, even when B fails first</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">A</div><div class="lstep good seq" style="--i:0">turn 0 &rarr; log A &rarr; release</div>
+        <div class="lanehead seq" style="--i:1">B</div><div class="lstep bad seq" style="--i:1">turn 1 &rarr; fails &mdash; do NOT release</div>
+        <div class="lanehead seq" style="--i:2">C</div><div class="lstep wait seq" style="--i:2">waits for turn 2 (B holds it)</div>
+        <div class="lanehead seq" style="--i:3">B</div><div class="lstep good seq pop" style="--i:3">retry succeeds &rarr; release</div>
+        <div class="lanehead seq" style="--i:4">C</div><div class="lstep good seq pop" style="--i:4">turn 2 &rarr; log C</div>
+      </div>
+      <div class="dnote seq" style="--i:5">Releasing the turn only <b>after</b> success is what makes the order survive a transient failure.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p><b class="hl">Why it matters:</b> this is the "Concurrent Log Processor" interview question — ordering plus the fault-tolerance bonus, in one pattern.</p>` },
+
+  { eb:"lesson 13 · problem patterns", title:"Bounded concurrency (the pool)", html:`
+    <p class="big">You have 100 jobs but mustn't run them all at once (rate limits, memory, sockets). A <b class="hl">concurrency pool</b> runs at most N at a time: start jobs up to the limit, and each time one finishes, start the next.</p>
+    <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">6 jobs, limit 2</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">slots</div><div class="lstep good seq pop" style="--i:0">[ job1 ] [ job2 ] running &middot; 3-6 queued</div>
+        <div class="lanehead seq" style="--i:1">job1 done</div><div class="lstep seq" style="--i:1">slot frees &rarr; start job3</div>
+        <div class="lanehead seq" style="--i:2">job2 done</div><div class="lstep seq" style="--i:2">slot frees &rarr; start job4</div>
+        <div class="lanehead seq" style="--i:3">&hellip;</div><div class="lstep good seq pop" style="--i:3">always &le; 2 in flight until all done</div>
+      </div>
+      <div class="dnote seq" style="--i:4"><code>await Promise.race(inFlight)</code> waits for the FIRST job to finish, freeing exactly one slot — not <code>Promise.all</code>, which would batch.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p><b class="hl">Why it matters:</b> this is the JS thread-pool/executor — the standard answer to "process this list without overwhelming the dependency."</p>` },
+
+  { eb:"lesson 14 · problem patterns", title:"Deadlock & lock ordering", html:`
+    <p class="big">Five philosophers, five forks; each needs both neighbours' forks to eat. If everyone grabs their <b class="hl">left</b> fork at once, all five then wait forever on a right fork their neighbour holds — a <b class="hl">circular wait</b>. That's deadlock.</p>
+    <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">the circular wait (deadlock)</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">P0</div><div class="lstep bad seq" style="--i:0">holds fork0 &middot; waits fork1</div>
+        <div class="lanehead seq" style="--i:1">P1</div><div class="lstep bad seq" style="--i:1">holds fork1 &middot; waits fork2</div>
+        <div class="lanehead seq" style="--i:2">&hellip; P4</div><div class="lstep bad seq" style="--i:2">holds fork4 &middot; waits fork0 &mdash; cycle closes</div>
+      </div>
+      <div class="flowarrow seq" style="--i:3">&darr; the fix: one global lock order</div>
+      <div class="dnote seq pop" style="--i:4">Always take the <b style="color:var(--ordered)">lower-numbered</b> fork first. The wrap-around philosopher now reaches for fork0 first too, so the cycle can't form.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p><b class="hl">Why it matters:</b> deadlock needs four conditions at once; breaking any one prevents it. A consistent <b class="hl">global lock order</b> is the most practical — it kills the circular wait.</p>` },
+
+  { eb:"lesson 15 · problem patterns", title:"Rate limiting (token bucket)", html:`
+    <p class="big">A <b class="hl">token bucket</b> allows a <b class="hl">burst</b> up to its capacity, then settles to a steady rate. Each call spends a token; tokens refill at a fixed rate, capped at capacity.</p>
+    <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">capacity 3, refill ~1 / 10ms</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">start</div><div class="lstep good seq pop" style="--i:0">bucket full: &#9679;&#9679;&#9679;</div>
+        <div class="lanehead seq" style="--i:1">burst</div><div class="lstep seq" style="--i:1">3 calls fire instantly &mdash; spend all 3</div>
+        <div class="lanehead seq" style="--i:2">empty</div><div class="lstep wait seq" style="--i:2">4th call waits for a drip</div>
+        <div class="lanehead seq" style="--i:3">refill</div><div class="lstep good seq pop" style="--i:3">+1 token / 10ms &rarr; steady rate</div>
+      </div>
+      <div class="dnote seq" style="--i:4">The cap bounds the burst; <code>Math.min(cap, tokens + refilled)</code> stops idle time from banking infinite tokens.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p><b class="hl">Why it matters:</b> it's the rate limiter that <i>allows</i> bursts (unlike a fixed window) — the usual answer for client throttling and API quotas.</p>` },
+
+  { eb:"lesson 16 · problem patterns", title:"Select — first ready wins", html:`
+    <p class="big">Sometimes you want whichever of several async sources is ready <b class="hl">first</b> — fastest replica, first response, value-or-timeout. Tag each source and race them.</p>
+    <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">race three sources, take the winner</div>
+      <div class="histtape">
+        <span class="chip2 seq pop" style="--i:0">A @ 30ms</span>
+        <span class="chip2 seq pop" style="--i:1">B @ 6ms</span>
+        <span class="chip2 seq pop" style="--i:2">C @ 18ms</span>
+      </div>
+      <div class="flowarrow seq" style="--i:3">&darr; Promise.race</div>
+      <div class="dnote seq pop" style="--i:4"><b style="color:var(--ordered)">B wins</b> (6ms) &mdash; and you learn <i>which</i> source it was via its label.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p><b class="hl">Why it matters:</b> it's JS's take on Go's <code>select</code>. (A faithful channel-select also cancels the losers — race alone leaves them running.)</p>` },
+
+  { eb:"lesson 17 · async toolkit", title:"Debounce & throttle", html:`
+    <p class="big">Two ways to tame a flood of events. <b class="hl">Debounce</b> waits for quiet: it fires once, after the calls stop (search-as-you-type). <b class="hl">Throttle</b> fires at most once per interval, however fast the calls come (scroll handlers).</p>
+    <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">calls: | | | | | | &nbsp; (a rapid burst)</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">debounce</div><div class="lstep good seq pop" style="--i:0">&hellip; wait for quiet &hellip; &rarr; ONE call</div>
+        <div class="lanehead seq" style="--i:1">throttle</div><div class="lstep good seq pop" style="--i:1">fire &middot; (skip) &middot; fire &middot; (skip) &middot; fire</div>
+      </div>
+      <div class="dnote seq" style="--i:2">Debounce = collapse a burst to its trailing edge. Throttle = a steady rate cap.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p><b class="hl">Why it matters:</b> the most common front-end async question — and people constantly mix the two up. Know which one collapses and which rate-caps.</p>` },
+
+  { eb:"lesson 18 · async toolkit", title:"Promise.all, from scratch", html:`
+    <p class="big">Run promises concurrently and collect their results <b class="hl">in input order</b>, resolving only when the last one settles (and rejecting on the first failure). The key move: write each result into its own <b class="hl">index</b>, not push.</p>
+    <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">[a@18ms, b@2ms, c@10ms] &rarr; results by index</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">b done</div><div class="lstep seq" style="--i:0">results[1] = b &middot; done 1/3</div>
+        <div class="lanehead seq" style="--i:1">c done</div><div class="lstep seq" style="--i:1">results[2] = c &middot; done 2/3</div>
+        <div class="lanehead seq" style="--i:2">a done</div><div class="lstep good seq pop" style="--i:2">results[0] = a &middot; done 3/3 &rarr; resolve</div>
+      </div>
+      <div class="dnote seq" style="--i:3">Output is <b style="color:var(--ordered)">[a, b, c]</b> — input order — even though b finished first. <code>push</code> would scramble it.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p><b class="hl">Why it matters:</b> a favourite "implement it yourself" question; the index-vs-push detail is exactly what they're checking.</p>` },
+
+  { eb:"lesson 19 · async toolkit", title:"Retry with backoff", html:`
+    <p class="big">Transient failures (a flaky network, a busy service) deserve a retry — but a <b class="hl">bounded</b> one, with <b class="hl">exponential backoff</b> so you don't hammer a struggling dependency.</p>
+    <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">retry until success, growing the delay</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">try 1</div><div class="lstep bad seq" style="--i:0">fail &rarr; wait 1&times;</div>
+        <div class="lanehead seq" style="--i:1">try 2</div><div class="lstep bad seq" style="--i:1">fail &rarr; wait 2&times;</div>
+        <div class="lanehead seq" style="--i:2">try 3</div><div class="lstep good seq pop" style="--i:2">success</div>
+        <div class="lanehead seq" style="--i:3">cap</div><div class="lstep seq" style="--i:3">out of tries &rarr; throw (don't loop forever)</div>
+      </div>
+      <div class="dnote seq" style="--i:4">Delay <code>base &middot; 2**n</code>; cap the attempts. Unbounded retries against a dead dependency are a retry storm.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p><b class="hl">Why it matters:</b> "make it robust" almost always means bounded retries + backoff (ideally with jitter and a circuit breaker).</p>` },
+
+  { eb:"lesson 20 · async toolkit", title:"Memoize & dedupe", html:`
+    <p class="big">When many callers request the same key at once, you want <b class="hl">one</b> computation shared by all — not N identical fetches. Cache the in-flight <b class="hl">promise</b> per key, and evict it if it rejects.</p>
+    <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">5 concurrent calls: x, x, x, y, x</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">x (1st)</div><div class="lstep good seq" style="--i:0">miss &rarr; start fetch(x) &middot; cache promise</div>
+        <div class="lanehead seq" style="--i:1">x (rest)</div><div class="lstep seq" style="--i:1">hit &rarr; share the same promise</div>
+        <div class="lanehead seq" style="--i:2">y</div><div class="lstep good seq" style="--i:2">miss &rarr; start fetch(y)</div>
+        <div class="lanehead seq" style="--i:3">result</div><div class="lstep good seq pop" style="--i:3">fetch ran twice (x, y), not five times</div>
+      </div>
+      <div class="dnote seq" style="--i:4">Caching the resolved value (after <code>await</code>) loses the race — concurrent callers all miss and refetch.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p><b class="hl">Why it matters:</b> request dedup / single-flight is the JS "concurrent map" answer — collapse a stampede into one call.</p>` },
+
+  { eb:"lesson 21 · async toolkit", title:"Cancellation & timeouts", html:`
+    <p class="big">Starting work is easy; <b class="hl">stopping</b> it is the skill. An <code>AbortController</code> gives you a signal you pass into the work and <code>abort()</code> when you no longer want it — so the loser of a timeout, or the siblings of a failure, actually stop.</p>
+    <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">timeout that cancels the loser &middot; errgroup</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">timeout</div><div class="lstep seq" style="--i:0">timer wins &rarr; <b>abort()</b></div>
+        <div class="lanehead seq" style="--i:1">work</div><div class="lstep good seq pop" style="--i:1">sees signal &rarr; stops &amp; cleans up (no leak)</div>
+        <div class="lanehead seq" style="--i:2">errgroup</div><div class="lstep bad seq" style="--i:2">one task fails &rarr; abort the shared signal</div>
+        <div class="lanehead seq" style="--i:3">siblings</div><div class="lstep good seq pop" style="--i:3">cancelled &mdash; no wasted work</div>
+      </div>
+      <div class="dnote seq" style="--i:4">A bare <code>Promise.race</code> reports the timeout but leaves the slow work running. Pass the signal and abort it.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p><b class="hl">Why it matters:</b> "now make it cancelable" is the follow-up that separates people who've shipped concurrent code from people who've only read about it.</p>` },
+
+  { eb:"lesson 22 · durable execution", title:"Durable workflows & replay", html:`
     <p class="big">Some workflows run for days — an order that waits on payment, shipping, then a refund window. They can't just live in memory; a crash would lose them. Engines like <b class="hl">Temporal</b> persist them by recording every step to an <b class="hl">event history</b>, then <b class="hl">replaying</b> that history to rebuild state after any restart.</p>
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">event history &rarr; replay rebuilds state</div>
@@ -1357,7 +1775,7 @@ console.log('D');                        <span class="cm">// sync</span></pre>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
     <p><b class="hl">Why it matters:</b> replay turns ordinary-looking code into a crash-proof process — but it bans nondeterminism, and the in-process hazards (signals interleaving at awaits, lesson 03) still apply. That's the durable-execution module.</p>` },
 
-  { eb:"lesson 07 · interview essentials", title:"Blocking, non-blocking, async", html:`
+  { eb:"lesson 23 · interview essentials", title:"Blocking, non-blocking, async", html:`
     <p class="big">Three ways to deal with work that isn't ready yet — a distinction interviewers love to probe.</p>
     <p><b class="hl">Blocking</b>: the caller stops until the result is ready — <code>Atomics.wait()</code> in a worker, or <code>readFileSync</code>. JS avoids this on the main thread on purpose; a blocked thread does nothing. <b class="hl">Non-blocking</b>: the call returns immediately — success or "not yet" — and you decide whether to retry (a <code>tryAcquire()</code> that returns <code>false</code>, polling <code>Atomics.load</code>). No waiting, but you may busy-poll. <b class="hl">Async</b>: hand the work off and keep going; a promise delivers the result later (<code>await</code>). This is JS's default — one thread serves many in-flight operations.</p>
     <div class="diagram anim" style="--step:.7s">
@@ -1684,6 +2102,77 @@ function renderCards(){
   next.onclick=()=>{ cardIdx=(cardIdx+1)%CARDS.length; cardFlipped=false; renderCards(); };
   row.append(prev,next);
   main.appendChild(row);
+}
+
+/* ---- test mode: randomized, shuffled options, scored, no hints until you answer ---- */
+function testPool(){
+  const out=[];
+  Object.keys(DRILLS).forEach(mod=>DRILLS[mod].forEach(d=>out.push(
+    {title:d.title, context:d.pre, question:d.blank.q, options:d.blank.options, answer:d.blank.answer, whys:d.blank.whys})));
+  QUIZ.forEach(q=>out.push(
+    {title:"Predict the output", context:q.code, question:"What does this print, in order?", options:q.options, answer:q.answer, whys:q.whys}));
+  return out;
+}
+function shuffle(a){ const x=a.slice(); for(let i=x.length-1;i>0;i--){ const j=rnd(i+1); [x[i],x[j]]=[x[j],x[i]]; } return x; }
+function shuffleOptions(q){
+  const order=shuffle(q.options.map((_,i)=>i));
+  return { ...q, options:order.map(i=>q.options[i]), whys:q.whys?order.map(i=>q.whys[i]):null, answer:order.indexOf(q.answer) };
+}
+function startTest(n){
+  let pool=shuffle(testPool());
+  if(n!=="all") pool=pool.slice(0,n);
+  test={ on:true, qs:pool.map(shuffleOptions), idx:0, score:0, answered:false };
+  render(); window.scrollTo({top:0});
+}
+function renderTest(){
+  if(!test.on){
+    main.appendChild(el(`<div>
+      <div class="eyebrow">test yourself</div><h1>Test mode</h1>
+      <p class="lead">No hints. First answer counts, and the options are shuffled — so you can't lean on "it's usually the first one." Random questions, a score at the end: a real check on whether it's stuck.</p>
+      <p class="sub">Prep tip: once you can pass these cold, rebuild each pattern in a blank file while talking it through out loud — that's the skill the interview actually grades.</p>
+    </div>`));
+    const row=el(`<div class="row"></div>`);
+    [["10 questions",10],["20 questions",20],["all "+testPool().length,"all"]].forEach(([label,n])=>{
+      const b=el(`<button class="btn go">${label}</button>`); b.onclick=()=>startTest(n); row.appendChild(b);
+    });
+    main.appendChild(row);
+    return;
+  }
+  if(test.idx>=test.qs.length){
+    const n=test.qs.length, s=test.score, pct=Math.round(100*s/n);
+    const msg = pct>=90?"Sharp — you're ready." : pct>=70?"Solid. Patch the misses and you're close." : "Worth another pass through the drills.";
+    main.appendChild(el(`<div><div class="eyebrow">result</div><h1>${s} / ${n} <span class="sub" style="font-size:17px">· ${pct}%</span></h1><p class="lead">${msg}</p></div>`));
+    const row=el(`<div class="row"></div>`);
+    const again=el(`<button class="btn go">▶ retake</button>`); again.onclick=()=>{ test.on=false; render(); window.scrollTo({top:0}); };
+    row.appendChild(again); main.appendChild(row);
+    return;
+  }
+  const q=test.qs[test.idx];
+  main.appendChild(el(`<div class="eyebrow">question ${test.idx+1} / ${test.qs.length} · ${test.score} correct</div>`));
+  const card=el(`<div class="card"><h2>${esc(q.title)}</h2><pre class="code">${esc(q.context)}</pre></div>`);
+  const blank=el(`<div class="blank"><div class="q">${esc(q.question)}</div></div>`);
+  q.options.forEach((opt,oi)=>{
+    const b=el(`<button class="opt">${esc(opt)}</button>`);
+    b.onclick=()=>{
+      if(test.answered) return;
+      test.answered=true;
+      const correct=oi===q.answer;
+      if(correct) test.score++;
+      blank.querySelectorAll(".opt").forEach((x,xi)=>{
+        if(xi===q.answer) x.classList.add("correct");
+        if(xi===oi && !correct) x.classList.add("wrong");
+        x.style.pointerEvents="none";
+      });
+      if(q.whys) blank.appendChild(el(`<div class="why-line">${esc(q.whys[q.answer])}</div>`));
+      const nrow=el(`<div class="row"></div>`);
+      const nb=el(`<button class="btn go">${test.idx+1<test.qs.length?"next ›":"see score ›"}</button>`);
+      nb.onclick=()=>{ test.idx++; test.answered=false; render(); window.scrollTo({top:0}); };
+      nrow.appendChild(nb); card.appendChild(nrow);
+    };
+    blank.appendChild(b);
+  });
+  card.appendChild(blank);
+  main.appendChild(card);
 }
 
 function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
