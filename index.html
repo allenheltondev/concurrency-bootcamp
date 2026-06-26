@@ -1,6 +1,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Concurrency Bootcamp</title>
+<meta name="description" content="A mobile-first, offline-capable bootcamp for JavaScript concurrency — lessons, drills, and a scored test.">
+<!-- PWA: installable + works offline -->
+<meta name="theme-color" content="#14161f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Concurrency">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
 <style>
   :root{
     --bg:#14161f; --surface:#1b1f2e; --surface2:#232940; --line:#2c3350;
@@ -133,6 +143,13 @@
   .result.exact{border-color:var(--ordered);background:var(--ok-bg);color:var(--ordered)}
 
   footer{color:var(--faint);font-size:12px;text-align:center;padding:30px 0 40px;font-family:var(--mono)}
+  footer .credit{display:block;margin-bottom:14px}
+  .resetbtn{
+    font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--faint);
+    background:transparent;border:1px solid var(--line);border-radius:8px;
+    padding:8px 13px;cursor:pointer;min-height:36px;
+  }
+  .resetbtn:hover,.resetbtn:active{color:var(--race);border-color:var(--race)}
   a{color:var(--accent)}
 
   /* lessons */
@@ -194,7 +211,10 @@
 </header>
 
 <main class="wrap" id="main"></main>
-<footer>built for thumb-driving on a phone · every drill runs real JS in your browser</footer>
+<footer>
+  <span class="credit">built for thumb-driving on a phone · every drill runs real JS in your browser</span>
+  <button class="resetbtn" id="resetbtn" type="button">reset progress</button>
+</footer>
 
 <script>
 "use strict";
@@ -1382,6 +1402,17 @@ function savePosition(){
     module: state.module, learnIdx, modelIdx, drillIdx, quizDone
   })); }catch(e){}
 }
+// wipe everything: solved drills, quiz answers, and where the user left off
+function resetProgress(){
+  if(!confirm("Reset all progress? This clears solved drills, quiz answers, and your place in every module.")) return;
+  try{ localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(POSITION_KEY); }catch(e){}
+  state.solved={}; quizDone={};
+  learnIdx=0; modelIdx=0;
+  drillIdx={ primitives:0, bank:0, toolkit:0, durable:0 };
+  test={ on:false, qs:[], idx:0, score:0, answered:false };
+  state.module="learn";
+  renderProgress(); render(); window.scrollTo({top:0});
+}
 function renderProgress(){
   const n=Object.keys(state.solved).length;
   document.getElementById("pn").textContent=n;
@@ -2201,4 +2232,10 @@ function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").rep
 /* ---- go ---- */
 loadProgress();
 render();
+document.getElementById("resetbtn").onclick=resetProgress;
+
+/* ---- offline support: install + work with no network ---- */
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+}
 </script>

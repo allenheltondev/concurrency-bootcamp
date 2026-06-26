@@ -38,9 +38,26 @@ backend, no third-party scripts, no tracking.
 | --------------- | ------------------------------------------------------------------------- |
 | `index.html`        | The whole app — inline CSS + JS, no build step.                        |
 | `worker.js`         | Same-origin Web Worker for the real SharedArrayBuffer data race.       |
+| `sw.js`             | Service worker — precaches the app shell so it runs fully offline.     |
+| `manifest.webmanifest`| Web app manifest — makes the site installable to a home screen.      |
+| `icon.svg`          | App / home-screen icon (the event loop, with ordered + racing tasks). |
 | `workers-atomics.js`| Node (`worker_threads`) logic reference — run it to see the race.      |
 | `template.yaml`     | SAM/CloudFormation: S3 + CloudFront + OAC + COOP/COEP + ACM + Route53. |
-| `deploy.sh`         | One-shot: `sam deploy`, upload the site, invalidate the CDN cache.     |
+
+## Progress & offline
+
+Progress is saved to `localStorage` — solved drills, answered quiz questions, and
+your place in every module (lessons, quizzes, drills) — so you resume exactly where
+you left off. **Reset progress** in the footer clears it all. No accounts, no sync.
+
+The app is an installable PWA. A service worker (`sw.js`) precaches the app shell on
+first visit, so after that it loads instantly and works with **no network** — open
+it on a flight or a subway. It uses stale-while-revalidate, so it's offline-first but
+still pulls the latest build in the background when you're online; caching the real
+CDN responses preserves the COOP/COEP headers, so the workers/atomics module keeps
+its cross-origin isolation even offline. The service worker needs a secure context
+(HTTPS or `localhost`); opening `index.html` from `file://` skips it (the app still
+runs, just without offline caching).
 
 ## The cross-origin-isolation unlock
 
@@ -68,15 +85,13 @@ console on the deployed origin.
 
 ## Deploy
 
-Requires AWS credentials and the SAM CLI. **Must deploy in `us-east-1`** —
-CloudFront's ACM certificate must live there.
+Deployment is fully automated by GitHub Actions (`.github/workflows/deploy.yml`):
+every push to `main` (or a manual **Run workflow**) runs `sam deploy`, uploads the
+site, and invalidates `/*`. It authenticates to AWS via OIDC (`AWS_DEPLOY_ROLE_ARN`)
+and deploys in `us-east-1` — where CloudFront's ACM certificate must live.
 
-```bash
-./deploy.sh
-```
-
-That provisions/updates the stack, uploads `index.html` + `worker.js`, and
-invalidates `/*`. Re-run it any time you change the site.
+To add or rename a deployed file, update the **Upload site to S3** step in that
+workflow — it's the single source of truth for what ships.
 
 ### Architecture
 
