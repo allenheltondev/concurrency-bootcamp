@@ -43,7 +43,6 @@ backend, no third-party scripts, no tracking.
 | `icon.svg`          | App / home-screen icon (the event loop, with ordered + racing tasks). |
 | `workers-atomics.js`| Node (`worker_threads`) logic reference — run it to see the race.      |
 | `template.yaml`     | SAM/CloudFormation: S3 + CloudFront + OAC + COOP/COEP + ACM + Route53. |
-| `deploy.sh`         | One-shot: `sam deploy`, upload the site, invalidate the CDN cache.     |
 
 ## Progress & offline
 
@@ -86,15 +85,13 @@ console on the deployed origin.
 
 ## Deploy
 
-Requires AWS credentials and the SAM CLI. **Must deploy in `us-east-1`** —
-CloudFront's ACM certificate must live there.
+Deployment is fully automated by GitHub Actions (`.github/workflows/deploy.yml`):
+every push to `main` (or a manual **Run workflow**) runs `sam deploy`, uploads the
+site, and invalidates `/*`. It authenticates to AWS via OIDC (`AWS_DEPLOY_ROLE_ARN`)
+and deploys in `us-east-1` — where CloudFront's ACM certificate must live.
 
-```bash
-./deploy.sh
-```
-
-That provisions/updates the stack, uploads `index.html` + `worker.js`, and
-invalidates `/*`. Re-run it any time you change the site.
+To add or rename a deployed file, update the **Upload site to S3** step in that
+workflow — it's the single source of truth for what ships.
 
 ### Architecture
 
