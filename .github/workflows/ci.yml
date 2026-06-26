@@ -38,11 +38,13 @@ jobs:
         run: sam validate --lint --region us-east-1
 
       - name: Check JavaScript syntax
-        # The app is a single inline <script> plus two standalone JS files.
-        # Parse all three so a typo can't ship a broken page or worker.
+        # The app is a single inline <script> plus standalone JS files
+        # (worker, Node reference, service worker). Parse them all so a
+        # typo can't ship a broken page, worker, or offline cache.
         run: |
           node --check worker.js
           node --check workers-atomics.js
+          node --check sw.js
           node -e '
             const fs = require("fs");
             const vm = require("vm");
