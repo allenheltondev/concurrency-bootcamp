@@ -38,9 +38,27 @@ backend, no third-party scripts, no tracking.
 | --------------- | ------------------------------------------------------------------------- |
 | `index.html`        | The whole app — inline CSS + JS, no build step.                        |
 | `worker.js`         | Same-origin Web Worker for the real SharedArrayBuffer data race.       |
+| `sw.js`             | Service worker — precaches the app shell so it runs fully offline.     |
+| `manifest.webmanifest`| Web app manifest — makes the site installable to a home screen.      |
+| `icon.svg`          | App / home-screen icon (the event loop, with ordered + racing tasks). |
 | `workers-atomics.js`| Node (`worker_threads`) logic reference — run it to see the race.      |
 | `template.yaml`     | SAM/CloudFormation: S3 + CloudFront + OAC + COOP/COEP + ACM + Route53. |
 | `deploy.sh`         | One-shot: `sam deploy`, upload the site, invalidate the CDN cache.     |
+
+## Progress & offline
+
+Progress is saved to `localStorage` — solved drills, answered quiz questions, and
+your place in every module (lessons, quizzes, drills) — so you resume exactly where
+you left off. **Reset progress** in the footer clears it all. No accounts, no sync.
+
+The app is an installable PWA. A service worker (`sw.js`) precaches the app shell on
+first visit, so after that it loads instantly and works with **no network** — open
+it on a flight or a subway. It uses stale-while-revalidate, so it's offline-first but
+still pulls the latest build in the background when you're online; caching the real
+CDN responses preserves the COOP/COEP headers, so the workers/atomics module keeps
+its cross-origin isolation even offline. The service worker needs a secure context
+(HTTPS or `localhost`); opening `index.html` from `file://` skips it (the app still
+runs, just without offline caching).
 
 ## The cross-origin-isolation unlock
 

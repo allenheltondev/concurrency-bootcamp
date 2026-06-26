@@ -25,6 +25,13 @@ aws s3 cp index.html "s3://$BUCKET/index.html" \
   --content-type "text/html; charset=utf-8" --cache-control "public, max-age=300" --region "$REGION"
 aws s3 cp worker.js "s3://$BUCKET/worker.js" \
   --content-type "text/javascript; charset=utf-8" --cache-control "public, max-age=300" --region "$REGION"
+# PWA assets. The service worker must not be cached long, or clients stay on stale builds.
+aws s3 cp sw.js "s3://$BUCKET/sw.js" \
+  --content-type "text/javascript; charset=utf-8" --cache-control "public, max-age=0, must-revalidate" --region "$REGION"
+aws s3 cp manifest.webmanifest "s3://$BUCKET/manifest.webmanifest" \
+  --content-type "application/manifest+json; charset=utf-8" --cache-control "public, max-age=300" --region "$REGION"
+aws s3 cp icon.svg "s3://$BUCKET/icon.svg" \
+  --content-type "image/svg+xml" --cache-control "public, max-age=300" --region "$REGION"
 
 echo "==> invalidate /*"
 aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*" \
