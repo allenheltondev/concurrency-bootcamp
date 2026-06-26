@@ -152,6 +152,14 @@
   .resetbtn:hover,.resetbtn:active{color:var(--race);border-color:var(--race)}
   a{color:var(--accent)}
 
+  /* lesson <-> skill cross-links */
+  .xlinkrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .xlink{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12px;color:var(--accent);background:var(--surface2);border:1px solid var(--line);border-radius:999px;padding:8px 14px;cursor:pointer;min-height:34px;line-height:1.35;text-align:left}
+  .xlink:hover,.xlink:active{border-color:var(--accent);background:#171a27}
+  .xlink b{color:var(--text);font-weight:600}
+  .xlink .dot{color:var(--ordered)}
+  .xlink small{color:var(--faint);font-size:11px}
+
   /* lessons */
   .lesson p{color:var(--muted);font-size:14.5px;margin:11px 0}
   .lesson p.big{font-size:15.5px;color:var(--text);margin-top:2px}
@@ -618,15 +626,15 @@ const MODULES = [
 
 /* ---- model module: predict-output quiz ---- */
 const QUIZ = [
-  { code:`console.log('A');
-setTimeout(() => console.log('B'), 0);
-Promise.resolve().then(() => console.log('C'));
-console.log('D');`,
-    options:["A B C D","A D C B","A D B C"], answer:1,
+  { code:`queueMicrotask(() => console.log('M'));
+setTimeout(() => console.log('T'), 0);
+console.log('S');
+Promise.resolve().then(() => console.log('P'));`,
+    options:["S M P T","S T M P","M S P T"], answer:0,
     whys:[
-      "Top-to-bottom as if it were all synchronous — but setTimeout and .then DEFER their callbacks. Only A and D run synchronously, so B can't be second.",
-      "Right. Sync code first (A, D). Then the microtask queue (.then → C) drains completely before any macrotask. setTimeout (B) is a macrotask, so it runs last.",
-      "Right that A and D are synchronous — but you put the timer (B) before the promise (C). Microtasks (.then → C) drain before any macrotask (setTimeout → B), so C beats B."] },
+      "Right. Sync runs first (S). Then the microtask queue drains in FIFO order — queueMicrotask's M was enqueued before the .then's P — so M, then P. setTimeout (T) is a macrotask and waits until the queue is empty.",
+      "Microtasks beat macrotasks. M and P are microtasks (queueMicrotask, .then); T is a setTimeout macrotask, so it can't slip into second place — the timer runs last, after both.",
+      "S is synchronous, so it logs before any deferred callback — M can't precede it. The order is sync (S), then microtasks (M, P), then the timer (T)."] },
   { code:`async function f(){ console.log(1); await null; console.log(3); }
 console.log(0);
 f();
@@ -662,7 +670,7 @@ const DRILLS = {
     await d.promise;          // park until someone hands me the lock
   }
   release() {`,
-      blank:{ q:"how should release() pass the lock on?",
+      blank:{ q:"A waiter is queued when release() runs. Which body stops a brand-new acquire() from barging in and giving you two holders?",
         options:[
 `    const next = this.#queue.shift();
     if (next) next.resolve();   // hand lock straight to next waiter
@@ -688,7 +696,7 @@ const DRILLS = {
     const d = deferred(); this.#queue.push(d); await d.promise;
   }
   release() {`,
-      blank:{ q:"how should release() return a permit?",
+      blank:{ q:"Run this under load for a while and one version slowly lets more than N run at once. Which release() keeps the permit count from drifting?",
         options:[
 `    const next = this.#queue.shift();
     if (next) next.resolve();   // permit goes straight to a waiter
@@ -709,7 +717,7 @@ const DRILLS = {
   #d = deferred();
   wait() { return this.#d.promise; }   // everyone awaits the same promise
   open() {`,
-      blank:{ q:"what does open() do?",
+      blank:{ q:"Two tasks are already parked in wait(). Which open() actually releases them — and keeps the latch one-shot, so it never re-closes on a later waiter?",
         options:[
 `    this.#d.resolve();   // resolve the shared promise -> all waiters proceed`,
 `    this.#d = deferred();   // replace the promise`,
@@ -726,7 +734,7 @@ const DRILLS = {
   #parties; #count = 0; #d = deferred();
   constructor(p) { this.#parties = p; }
   async arrive() {`,
-      blank:{ q:"how does arrive() hold everyone until the last one?",
+      blank:{ q:"All N parties call arrive() concurrently. Which body releases them together — instead of leaving everyone, or all but the last, blocked forever?",
         options:[
 `    if (++this.#count === this.#parties) this.#d.resolve();
     await this.#d.promise;   // park on the SHARED promise`,
@@ -746,7 +754,7 @@ const DRILLS = {
       pre:`class AsyncQueue {
   #values = []; #waiters = [];
   push(v) {`,
-      blank:{ q:"what should push() do with a new value?",
+      blank:{ q:"A consumer already called pull() and is parked when a value arrives. Which push() delivers it exactly once — never zero times, never twice?",
         options:[
 `    const w = this.#waiters.shift();
     if (w) w.resolve(v);     // a consumer is parked -> hand it over
@@ -774,7 +782,7 @@ const DRILLS = {
     return new Promise(res => this.#gates.set(seq, res));
   }
   release(seq) {`,
-      blank:{ q:"how does release() pass the turn forward?",
+      blank:{ q:"Turn 0 just finished. Which release() wakes only the one waiter whose turn is now current — without stalling the chain or releasing everyone at once?",
         options:[
 `    this.#next = seq + 1;
     const n = this.#gates.get(this.#next);
@@ -803,7 +811,7 @@ class CondVar {
     }
   }
   signalAll() {                       // state changed: wake the waiters to re-check`,
-      blank:{ q:"wake the waiters so each can re-check its predicate:",
+      blank:{ q:"State changed, and several tasks wait on different predicates. Which signalAll() wakes them to re-check without a lost wakeup or leaving stale entries behind?",
         options:[
 `    const ws = this.#waiters;
     this.#waiters = [];
@@ -824,7 +832,7 @@ class CondVar {
 // cell lives in a SharedArrayBuffer.)
 const cell = new Int32Array(1);
 function tryAcquire() {`,
-      blank:{ q:"atomically take the lock only if it's currently free:",
+      blank:{ q:"Two threads run tryAcquire() at the very same instant. Which version guarantees only one of them walks away holding the lock?",
         options:[
 `  return Atomics.compareExchange(cell, 0, 0, 1) === 0;   // 0 -> 1 iff it was 0`,
 `  if (cell[0] === 0) { cell[0] = 1; return true; }
@@ -851,7 +859,7 @@ class RWLock {
   async acquireWrite() { if (this.#writing || this.#readers > 0 || this.#wq.length) { const d = deferred(); this.#wq.push(d); await d.promise; } else this.#writing = true; }
   releaseWrite() { this.#writing = false; this.#dispatch(); }
   #dispatch() {`,
-      blank:{ q:"when the lock frees, who gets woken — staying exclusive for writers?",
+      blank:{ q:"A writer is queued behind three active readers while more readers keep arriving. Which dispatch() gives the writer exclusivity AND keeps it from starving?",
         options:[
 `    if (this.#writing) return;
     if (this.#readers === 0 && this.#wq.length) {     // no readers -> grant ONE writer
@@ -875,7 +883,7 @@ class RWLock {
 function once(fn) {
   let p;                       // the single in-flight / settled promise
   return () => {`,
-      blank:{ q:"start fn at most once and hand every caller the same result:",
+      blank:{ q:"Four callers hit this in the same tick, before init resolves. Which body runs the initializer exactly once and hands all four the same in-flight result?",
         options:[
 `    return (p ??= fn());     // call + store only the first time`,
 `    return fn();             // just call it`,
@@ -897,7 +905,7 @@ function once(fn) {
   #seq = new Sequencer();
   async #run(slot, action) {
     const cycle = this.#cycle[slot]++;`,
-      blank:{ q:"what global sequence number does this print get?",
+      blank:{ q:"Cycle 2 must come strictly after cycle 1 for every slot. Which seq formula gives a flat, collision-free order across cycles — so later cycles can advance?",
         options:[
 `    const seq = cycle * 3 + this.#pos[slot];   // 3 slots per cycle`,
 `    const seq = this.#pos[slot];`,
@@ -923,7 +931,7 @@ function once(fn) {
     results.push(p);
     executing.add(p);
     p.finally(() => executing.delete(p));`,
-      blank:{ q:"how do you cap concurrency at `limit`?",
+      blank:{ q:"You raise `limit` from 2 to 10 but throughput barely moves — one option secretly runs jobs in lock-step batches. Which line keeps the pool steadily full?",
         options:[
 `    if (executing.size >= limit) await Promise.race(executing);`,
 `    if (executing.size >= limit) await Promise.all(executing);`,
@@ -943,7 +951,7 @@ function once(fn) {
   const seat = async (i) => {
     const left = i, right = (i + 1) % n;
     for (let r = 0; r < rounds; r++) {`,
-      blank:{ q:"to avoid deadlock, which fork does philosopher i lock first?",
+      blank:{ q:"All five philosophers grab for forks at the same instant. Which acquisition order makes the circular wait impossible — not merely rarer?",
         options:[
 `      // global order: always the lower-numbered fork first
       const [a, b] = left < right ? [left, right] : [right, left];`,
@@ -977,7 +985,7 @@ function once(fn) {
     const now = Date.now();
     const gained = (now - this.#last) * this.#ratePerMs;
     this.#last = now;`,
-      blank:{ q:"add the refilled tokens — but how do you respect the cap?",
+      blank:{ q:"The bucket sits idle a full minute, then a caller bursts. Which refill stops idle time from banking an unbounded burst — yet still lets a steady caller through?",
         options:[
 `    this.#tokens = Math.min(this.#capacity, this.#tokens + gained);`,
 `    this.#tokens = this.#tokens + gained;`,
@@ -1005,7 +1013,7 @@ class BoundedQueue {
   #cap; #buf = []; #pushW = []; #pullW = [];
   constructor(cap) { this.#cap = cap; }
   async push(v) {`,
-      blank:{ q:"make push() block while the queue is at capacity:",
+      blank:{ q:"The queue is full with two producers blocked; one slot frees and they race for it. Which push() keeps the capacity bound from being overshot?",
         options:[
 `    while (this.#buf.length >= this.#cap) {
       const d = deferred(); this.#pushW.push(d); await d.promise;
@@ -1042,7 +1050,7 @@ class BoundedQueue {
 async function process(slot, action) {
   const seq = cycle[slot]++ * 3 + pos[slot];
   await sequencer.acquire(seq);        // wait for this slot's turn`,
-      blank:{ q:"process the log — stay ordered AND survive a transient failure:",
+      blank:{ q:"B fails on its turn, then succeeds on retry. Which version keeps C from printing before B — while still recovering from the blip?",
         options:[
 `  await retry(action, { tries: 5 });   // keep trying until it succeeds
   sequencer.release(seq);              // release the turn ONLY after success`,
@@ -1060,7 +1068,7 @@ async function process(slot, action) {
       pre:`// Proceed with whichever of several async sources is ready first —
 // first response wins, racing replicas, value-or-timeout, and so on.
 function select(sources) {           // sources: [{ label, promise }]`,
-      blank:{ q:"resolve with the first source that's ready, tagged by which one:",
+      blank:{ q:"You race three replicas and want the fastest reply plus which one it was. Which version settles on the first to finish — not the first in the list, not the slowest?",
         options:[
 `  return Promise.race(
     sources.map(s => s.promise.then(v => ({ label: s.label, value: v })))
@@ -1083,7 +1091,7 @@ function select(sources) {           // sources: [{ label, promise }]`,
       pre:`function debounce(fn, wait) {
   let t;                       // the pending timer
   return function (...args) {`,
-      blank:{ q:"a burst of calls should fire fn ONCE, after it goes quiet. What goes here?",
+      blank:{ q:"A user types 8 keystrokes fast, then pauses. Which body fires fn exactly once, after the typing stops — not once per keystroke?",
         options:[
 `    clearTimeout(t);          // cancel the prior pending call
     t = setTimeout(() => fn.apply(this, args), wait);`,
@@ -1101,7 +1109,7 @@ function select(sources) {           // sources: [{ label, promise }]`,
       pre:`function throttle(fn, interval) {
   let last = 0;                // when fn last ran
   return function (...args) {`,
-      blank:{ q:"throttle runs fn at most once per `interval`. What gates the call?",
+      blank:{ q:"Calls pour in continuously. Which version truly caps fn to one call per `interval` — rather than never firing, or firing on every call?",
         options:[
 `    const now = Date.now();
     if (now - last >= interval) {
@@ -1127,7 +1135,7 @@ function select(sources) {           // sources: [{ label, promise }]`,
     if (promises.length === 0) resolve(results);
     promises.forEach((p, i) => {
       Promise.resolve(p).then((v) => {`,
-      blank:{ q:"each promise settles whenever it wants. Keep results in order and finish at the right time:",
+      blank:{ q:"Input is [slow, fast, medium] and they settle out of order. Which body returns results in INPUT order and resolves exactly once, after the last settles?",
         options:[
 `        results[i] = v;        // slot by index, not push
         if (++done === promises.length) resolve(results);`,
@@ -1151,7 +1159,7 @@ function select(sources) {           // sources: [{ label, promise }]`,
     try {
       return await fn();
     } catch (err) {`,
-      blank:{ q:"on failure, when do you give up vs wait and retry?",
+      blank:{ q:"The dependency is down hard. Which version backs off AND eventually gives up — instead of hammering it forever at a fixed rate?",
         options:[
 `      if (++attempt >= tries) throw err;       // out of tries -> surface it
       await sleep(base * 2 ** (attempt - 1));  // else back off, then loop`,
@@ -1175,7 +1183,7 @@ function memoizeAsync(fn) {
   const cache = new Map();        // key -> in-flight or settled promise
   return (key) => {
     if (cache.has(key)) return cache.get(key);`,
-      blank:{ q:"start the work, dedupe concurrent callers, and don't cache failures:",
+      blank:{ q:"Five callers ask for the same key in one tick, and the fetch can fail. Which body collapses them to one call yet still lets a later caller retry after a failure?",
         options:[
 `    const p = fn(key).catch(e => { cache.delete(key); throw e; });
     cache.set(key, p);            // store the PROMISE immediately
@@ -1201,7 +1209,7 @@ function withTimeout(workFn, ms) {
   const ctrl = new AbortController();
   const work = workFn(ctrl.signal).then(v => ({ ok: v }), () => ({ aborted: true }));
   const timer = sleep(ms).then(() => {`,
-      blank:{ q:"the timer fired first — stop the work and report the timeout:",
+      blank:{ q:"The timer wins the race. Which body actually stops the losing work — no leaked background fetch — AND tells the caller it timed out?",
         options:[
 `    ctrl.abort();               // cancel the still-running work
     return { timedOut: true };`,
@@ -1222,7 +1230,7 @@ function withTimeout(workFn, ms) {
 async function errgroup(taskFns) {
   const ctrl = new AbortController();
   const tasks = taskFns.map(fn =>`,
-      blank:{ q:"on the first failure, cancel the siblings and propagate the error:",
+      blank:{ q:"One of five concurrent tasks fails early. Which body cancels the other four AND surfaces the real error — rather than letting them finish or swallowing it?",
         options:[
 `    fn(ctrl.signal).catch(err => { ctrl.abort(); throw err; })`,
 `    fn(ctrl.signal)`,
@@ -1245,7 +1253,7 @@ async function errgroup(taskFns) {
 // replayed verbatim.
 function sideEffect(fn) {
   if (replaying) {`,
-      blank:{ q:"on replay, where does the value come from?",
+      blank:{ q:"The worker restarts and re-runs the workflow over its history. Which branch keeps the code matching history — instead of recomputing a value that diverges?",
         options:[
 `    return history[cursor++];     // reuse the value recorded the first time`,
 `    return fn();                  // just run fn again`,
@@ -1265,7 +1273,7 @@ function sideEffect(fn) {
 // and take whichever finishes first. (In Temporal both survive a worker
 // crash; here we model the race itself.)
 function withTimeout(work, ms) {`,
-      blank:{ q:"race the work against a timer so a hung activity can't block forever:",
+      blank:{ q:"The activity hangs indefinitely. Which version lets the timer cut it off — instead of waiting for both to settle, or never starting the timer?",
         options:[
 `  return Promise.race([
     work,
@@ -1291,7 +1299,7 @@ function withTimeout(work, ms) {`,
 // loses updates without a lock.
 const mutex = new Mutex();
 async function onWithdraw(amount) {`,
-      blank:{ q:"keep two concurrent withdraw signals from losing updates:",
+      blank:{ q:"Two withdraw signals interleave at the await between read and write. Which body stops the second from reading a stale balance — without committing before checkLimits can reject it?",
         options:[
 `  await mutex.runExclusive(async () => {
     const bal = balance;          // read
@@ -1315,7 +1323,7 @@ async function onWithdraw(amount) {`,
 // true. Re-check on every wake — a still-false predicate (another
 // signal, a spurious wake) has to keep waiting.
 async function wait(pred) {`,
-      blank:{ q:"block until pred() holds, re-checking on each notify:",
+      blank:{ q:"A different signal notifies while your predicate is still false. Which body keeps waiting until it is genuinely true — without busy-polling the loop?",
         options:[
 `  while (!pred()) {                // re-check after every wake
     const d = deferred();
@@ -1844,12 +1852,57 @@ console.log('D');                        <span class="cm">// sync</span></pre>
     <p class="sub" style="margin-top:14px">That's the map. Now work through the modules &mdash; tap a chip above to start drilling.</p>` },
 ];
 
+/* ---- lesson <-> skill cross-links ----
+   Lessons teach a concept; the matching skill checks comprehension from a
+   different angle (diagnose the symptom / pick for a new requirement), so the
+   two never just mirror each other. These maps wire the two directions. */
+// skill (drill) id -> the lesson whose concept it tests (0-based index)
+const DRILL_LESSON = {
+  mutex:3, semaphore:3, latch:4, barrier:4, queue:3, sequencer:11, condvar:5, atomiclock:6, rwlock:7, once:8,
+  printorder:11, pool:12, dining:13, tokenbucket:14, boundedqueue:10, logproc:11, select:15,
+  debounce:16, throttle:16, promiseall:17, retry:18, memoize:19, canceltimeout:20, errgroup:20,
+  replay:21, durabletimeout:21, signalmutex:2, condition:5,
+};
+// lesson index -> where to go practice it { mod, drill? }
+const LESSON_PRACTICE = {
+  0:{mod:"model"}, 1:{mod:"model"}, 2:{mod:"primitives",drill:"mutex"},
+  3:{mod:"primitives",drill:"mutex"}, 4:{mod:"primitives",drill:"latch"}, 5:{mod:"primitives",drill:"condvar"},
+  6:{mod:"primitives",drill:"atomiclock"}, 7:{mod:"primitives",drill:"rwlock"}, 8:{mod:"primitives",drill:"once"},
+  9:{mod:"race"}, 10:{mod:"bank",drill:"boundedqueue"}, 11:{mod:"bank",drill:"printorder"},
+  12:{mod:"bank",drill:"pool"}, 13:{mod:"bank",drill:"dining"}, 14:{mod:"bank",drill:"tokenbucket"},
+  15:{mod:"bank",drill:"select"}, 16:{mod:"toolkit",drill:"debounce"}, 17:{mod:"toolkit",drill:"promiseall"},
+  18:{mod:"toolkit",drill:"retry"}, 19:{mod:"toolkit",drill:"memoize"}, 20:{mod:"toolkit",drill:"canceltimeout"},
+  21:{mod:"durable",drill:"replay"}, 22:{mod:"tradeoffs"},
+};
+const MODULE_LABEL = Object.fromEntries(MODULES.map(m=>[m.id,m.label]));
+function drillIndexOf(mod,id){ const list=DRILLS[mod]; if(!list) return 0; const i=list.findIndex(d=>d.id===id); return i<0?0:i; }
+function drillTitle(mod,id){ const list=DRILLS[mod]; const d=list&&list.find(x=>x.id===id); return d?d.title:""; }
+function goLesson(i){ state.module="learn"; learnIdx=Math.max(0,Math.min(i,LESSONS.length-1)); render(); window.scrollTo({top:0}); }
+function goModule(mod,drill){ state.module=mod; if(drill && DRILLS[mod]) drillIdx[mod]=drillIndexOf(mod,drill); render(); window.scrollTo({top:0}); }
+function crossLink(html,onclick){ const b=el(`<button class="xlink">${html}</button>`); b.onclick=onclick; return b; }
+// a "go practice the concept you just learned" link for a lesson
+function practiceLinkRow(lessonIdx){
+  const prac=LESSON_PRACTICE[lessonIdx]; if(!prac) return null;
+  const label=prac.drill ? `${MODULE_LABEL[prac.mod]} · ${drillTitle(prac.mod,prac.drill)}` : MODULE_LABEL[prac.mod];
+  const row=el(`<div class="xlinkrow"></div>`);
+  row.appendChild(crossLink(`<span class="dot">▶</span> Check yourself: <b>${esc(label)}</b> <small>— a different question</small>`, ()=>goModule(prac.mod, prac.drill)));
+  return row;
+}
+// a "back to the concept this skill tests" link for a drill/quiz/sim
+function conceptLinkRow(lessonIdx){
+  const l=LESSONS[lessonIdx]; if(!l) return null;
+  const row=el(`<div class="xlinkrow" style="margin:0 0 12px"></div>`);
+  row.appendChild(crossLink(`<span class="dot">●</span> Concept: <b>${esc(l.eb)}</b> <small>${esc(l.title)}</small>`, ()=>goLesson(lessonIdx)));
+  return row;
+}
+
 function renderLearn(){
   learnIdx=Math.max(0,Math.min(learnIdx,LESSONS.length-1));
   const ch=LESSONS[learnIdx];
   main.appendChild(el(`<div><div class="eyebrow">${ch.eb}</div><h1>${ch.title}</h1></div>`));
   const card=el(`<div class="card lesson">${ch.html}</div>`);
   main.appendChild(card);
+  const prac=practiceLinkRow(learnIdx); if(prac) main.appendChild(prac);
   main.appendChild(stepperRow(learnIdx, LESSONS.length, (i)=>{ learnIdx=i; render(); window.scrollTo({top:0}); }));
 
   // animate the diagram: replay restarts the staggered reveal; auto-play on view
@@ -1896,6 +1949,7 @@ function renderModel(){
     <p class="lead">One thread. One stack. A synchronous block runs start to finish before anything else gets a turn — that's why there's no torn read until you add real threads. Async work waits in two queues: <b style="color:var(--text)">microtasks</b> (promise callbacks) drain completely after each task; <b style="color:var(--text)">macrotasks</b> (setTimeout, I/O) get one per loop.</p>
     <p class="sub">Predict each output before you tap. One at a time — answer, read why, then step on.</p>
   </div>`));
+  { const row=conceptLinkRow(1); if(row){ row.style.margin="0 0 16px"; main.appendChild(row); } }
 
   modelIdx=Math.max(0,Math.min(modelIdx,QUIZ.length-1));
   main.appendChild(buildQuizCard(QUIZ[modelIdx], modelIdx));
@@ -1928,6 +1982,10 @@ function buildDrillCard(d){
     <span class="done ${solved?"":"hidden"}" data-done>✓ solved</span>
     <pre class="code">${esc(d.pre)}</pre>
   </div>`);
+
+  // backlink to the lesson this skill checks (the lesson teaches; this probes a different angle)
+  const li=DRILL_LESSON[d.id];
+  if(li!=null){ const row=conceptLinkRow(li); if(row) card.querySelector(".why").after(row); }
 
   // blank chooser
   const blank=el(`<div class="blank ${solved?"solved":""}"><div class="q">${esc(d.blank.q)}</div></div>`);
@@ -2025,6 +2083,7 @@ function renderSim(){
       ? `This page is <b style="color:var(--ordered)">cross-origin isolated</b>, so the run below spins up <b style="color:var(--text)">real Worker threads</b> over a genuine SharedArrayBuffer. With <b style="color:var(--text)">Atomic</b> off the count comes out wrong — and differently wrong each run. Flip it on and it&rsquo;s exact every time.`
       : `Real SharedArrayBuffer needs cross-origin isolation, which isn&rsquo;t available here, so the run below <b style="color:var(--text)">simulates</b> the interleaving step by step. The lost-update behavior is identical. Flip <b style="color:var(--text)">Atomic</b> off and run it a few times.`}</p>
   </div>`));
+  { const row=conceptLinkRow(9); if(row){ row.style.margin="0 0 16px"; main.appendChild(row); } }
 
   const card=el(`<div class="card"><h2>${real?"Live data race":"Interleaving simulator"}</h2><div class="why">// each thread increments a shared counter</div></div>`);
 
@@ -2140,6 +2199,7 @@ let cardIdx=0, cardFlipped=false;
 function renderCards(){
   main.appendChild(el(`<div><div class="eyebrow">module 03</div><h1>Trade-offs</h1>
     <p class="lead">No code here — just the judgment calls that separate using concurrency from understanding it. Tap to flip, then advance. Rehearse until they're reflexive.</p></div>`));
+  { const row=conceptLinkRow(22); if(row){ row.style.margin="0 0 16px"; main.appendChild(row); } }
   const [front,back]=CARDS[cardIdx];
   const fc=el(`<div class="flash ${cardFlipped?"back":""}">
     <div class="face">${cardFlipped?"the answer":"prompt "+(cardIdx+1)+" / "+CARDS.length}</div>
