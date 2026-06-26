@@ -1353,14 +1353,34 @@ let drillIdx = { primitives:0, bank:0, toolkit:0, durable:0 };  // current drill
 let quizDone = {};                                         // qi -> answered correctly (in-memory)
 
 const STORAGE_KEY="cbootcamp:solved";
+const POSITION_KEY="cbootcamp:position";   // where the user left off (lessons + skills)
 function loadProgress(){
+  // skills pieces: which drills are solved
   try{ const raw=localStorage.getItem(STORAGE_KEY); if(raw) state.solved=JSON.parse(raw); }
   catch(e){ /* private mode / blocked storage -> stay in-memory */ }
+  // lessons + skills progress: resume where the user left off
+  try{
+    const raw=localStorage.getItem(POSITION_KEY);
+    if(raw){
+      const p=JSON.parse(raw);
+      if(typeof p.module==="string" && MODULES.some(m=>m.id===p.module)) state.module=p.module;
+      if(Number.isInteger(p.learnIdx)) learnIdx=p.learnIdx;
+      if(Number.isInteger(p.modelIdx)) modelIdx=p.modelIdx;
+      if(p.drillIdx && typeof p.drillIdx==="object") Object.assign(drillIdx, p.drillIdx);
+      if(p.quizDone && typeof p.quizDone==="object") quizDone=p.quizDone;
+    }
+  }catch(e){ /* blocked storage -> stay in-memory */ }
   renderProgress();
 }
 function saveProgress(){
   renderProgress();
   try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(state.solved)); }catch(e){}
+}
+// persist the user's place across lessons + skills so they resume on return
+function savePosition(){
+  try{ localStorage.setItem(POSITION_KEY,JSON.stringify({
+    module: state.module, learnIdx, modelIdx, drillIdx, quizDone
+  })); }catch(e){}
 }
 function renderProgress(){
   const n=Object.keys(state.solved).length;
@@ -1389,6 +1409,7 @@ function renderNav(){
 function el(html){ const d=document.createElement("div"); d.innerHTML=html.trim(); return d.firstElementChild; }
 
 function render(){
+  savePosition();
   renderNav();
   main.innerHTML="";
   const m=MODULES.find(x=>x.id===state.module);
@@ -1823,7 +1844,7 @@ function buildQuizCard(q, qi){
     b.onclick=()=>{
       if(card.dataset.done) return;
       if(oi===q.answer){
-        b.classList.add("correct"); card.dataset.done="1"; quizDone[qi]=true;
+        b.classList.add("correct"); card.dataset.done="1"; quizDone[qi]=true; savePosition();
         card.appendChild(el(`<div class="why-line">${esc(q.whys[oi])}</div>`));
       } else {
         if(b.dataset.tried) return;            // explain once, then let them try again
