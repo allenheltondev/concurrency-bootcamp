@@ -673,6 +673,54 @@ setTimeout(() => console.log('T2'));`,
       "Timers don't go first. The whole microtask chain (P1 then P2) drains before the event loop services the timer queue, so both promises print before either timeout.",
       "Right. The promise chain (P1 then P2) is all microtasks and drains before the event loop ever reaches the timer queue (T1, T2).",
       "Microtasks don't yield to timers between steps. After P1 runs it queues P2 as another microtask; the loop drains microtasks to exhaustion (P1, P2) before touching T1."] },
+  { code:`async function a(){ console.log(1); await null; console.log(4); }
+async function b(){ console.log(2); await null; console.log(5); }
+a();
+b();
+console.log(3);`,
+    options:["1 2 3 4 5","1 4 2 5 3","1 2 3 5 4"], answer:0,
+    whys:[
+      "Right. Each function runs synchronously up to its first await, so 1 then 2 print; then the trailing sync line, 3. The two suspended functions resume in the order they parked — 4, then 5 — as the microtask queue drains.",
+      "await doesn't run the rest of the function inline — it suspends. After 1, a() yields instead of printing 4, so the sync work (2, then 3) happens before either function resumes.",
+      "The microtask queue is FIFO: a() parked before b(), so it resumes first and prints 4 before 5 — not after."] },
+  { code:`console.log('A');
+setTimeout(() => console.log('B'));
+Promise.resolve().then(() => {
+  console.log('C');
+  setTimeout(() => console.log('D'));
+});
+console.log('E');`,
+    options:["A E C B D","A E C D B","A B C E D"], answer:0,
+    whys:[
+      "Right. Sync prints A and E. The microtask runs next — C — which schedules D's timer. But B's timer was queued earlier (before C ran), and timers fire in registration order, so B precedes D.",
+      "D is registered from inside the microtask, after B's timer is already queued. Timers fire in the order they were set, so B comes before D, not after.",
+      "The .then microtask drains before any timer, so C can't wait behind B; and E is synchronous, so it prints before every callback."] },
+  { code:`Promise.resolve()
+  .then(() => console.log(1))
+  .then(() => console.log(3));
+Promise.resolve()
+  .then(() => console.log(2))
+  .then(() => console.log(4));`,
+    options:["1 2 3 4","1 3 2 4","1 2 4 3"], answer:0,
+    whys:[
+      "Right. Both chains' first .then are queued before either runs, so 1 then 2. Each then queues its successor — 3 behind 1, 4 behind 2 — so the second layer drains 3, then 4.",
+      "Chained .then callbacks don't run back-to-back: after 1 runs, 3 is only just queued, behind 2 which was already waiting. The two chains interleave a layer at a time.",
+      "The chains are enqueued in source order, so the second trails the first at every step: 1,2 then 3,4 — 4 never jumps ahead of 3."] },
+  { code:`async function run(){
+  for (const n of [1, 2]) {
+    await Promise.resolve();
+    console.log(n);
+  }
+  console.log('done');
+}
+console.log('start');
+run();
+console.log('end');`,
+    options:["start end 1 2 done","start 1 2 done end","start end 1 done 2"], answer:0,
+    whys:[
+      "Right. run() executes to its first await and suspends, so both sync lines — start, end — print first. Then each loop iteration resumes from a microtask: 1, then 2, then done.",
+      "Calling run() doesn't block: its first await suspends it and control returns to the sync code, so end prints before any loop body. It isn't run-to-completion here.",
+      "await inside the loop serializes the iterations — 1 fully precedes 2 — and done prints only after the loop finishes, so 2 comes before done."] },
 ];
 
 /* ---- drill definitions (fill the blank) ---- */
@@ -692,8 +740,8 @@ const DRILLS = {
       blank:{ q:"A waiter is queued when release() runs. Which body stops a brand-new acquire() from barging in and giving you two holders?",
         options:[
 `    const next = this.#queue.shift();
-    if (next) next.resolve();   // hand lock straight to next waiter
-    else this.#locked = false;  // nobody waiting -> truly unlock`,
+    if (next) next.resolve();
+    else this.#locked = false;`,
 `    this.#locked = false;
     const next = this.#queue.shift();
     if (next) next.resolve();`,
@@ -718,13 +766,13 @@ const DRILLS = {
       blank:{ q:"Run this under load for a while and one version slowly lets more than N run at once. Which release() keeps the permit count from drifting?",
         options:[
 `    const next = this.#queue.shift();
-    if (next) next.resolve();   // permit goes straight to a waiter
-    else this.#permits++;       // no waiter -> back to the pool`,
+    if (next) next.resolve();
+    else this.#permits++;`,
 `    this.#permits++;
     const next = this.#queue.shift();
     if (next) next.resolve();`,
 `    const next = this.#queue.shift();
-    if (next) next.resolve();   // hand it straight to a waiter`],
+    if (next) next.resolve();`],
         answer:0,
         whys:["Right. Either a waiter inherits the permit directly, or it returns to the pool — never both.",
               "Incrementing AND waking a waiter leaks a permit: capacity drifts above N over time.",
@@ -739,10 +787,10 @@ const DRILLS = {
   open() {`,
       blank:{ q:"Two tasks are already parked in wait(). Which open() actually releases them — and keeps the latch one-shot, so it never re-closes on a later waiter?",
         options:[
-`    this.#d.resolve();   // resolve the shared promise -> all waiters proceed`,
-`    this.#d = deferred();   // replace the promise`,
+`    this.#d.resolve();`,
+`    this.#d = deferred();`,
 `    this.#d.resolve();
-    this.#d = deferred();   // reset so the latch can reopen later`],
+    this.#d = deferred();`],
         answer:0,
         whys:["Right. One shared promise, resolved once. A latch is one-shot — it never re-closes (that's what makes it a latch, not a gate).",
               "Replacing the promise leaves every existing waiter parked on the OLD one forever.",
@@ -758,7 +806,7 @@ const DRILLS = {
       blank:{ q:"All N parties call arrive() concurrently. Which body releases them together — instead of leaving everyone, or all but the last, blocked forever?",
         options:[
 `    if (++this.#count === this.#parties) this.#d.resolve();
-    await this.#d.promise;   // park on the SHARED promise`,
+    await this.#d.promise;`,
 `    const d = deferred();
     if (++this.#count === this.#parties) d.resolve();
     await d.promise;`,
@@ -778,8 +826,8 @@ const DRILLS = {
       blank:{ q:"A consumer already called pull() and is parked when a value arrives. Which push() delivers it exactly once — never zero times, never twice?",
         options:[
 `    const w = this.#waiters.shift();
-    if (w) w.resolve(v);     // a consumer is parked -> hand it over
-    else this.#values.push(v); // nobody waiting -> buffer it`,
+    if (w) w.resolve(v);
+    else this.#values.push(v);`,
 `    this.#values.push(v);`,
 `    this.#values.push(v);
     const w = this.#waiters.shift();
@@ -836,10 +884,10 @@ class CondVar {
         options:[
 `    const ws = this.#waiters;
     this.#waiters = [];
-    ws.forEach(resolve => resolve());   // wake ALL, then clear; each re-tests`,
+    ws.forEach(resolve => resolve());`,
 `    const w = this.#waiters.shift();
-    if (w) w();                         // wake just one`,
-`    this.#waiters.forEach(resolve => resolve());  // wake all, keep the list`],
+    if (w) w();`,
+`    this.#waiters.forEach(resolve => resolve());`],
         answer:0,
         whys:["Right. Wake every waiter and clear the list. Each re-tests its own predicate in the while-loop, so only those whose condition now holds proceed.",
               "Waking only one waiter risks a lost wakeup: if that waiter's predicate is still false it parks again, while another waiter whose condition IS true was never woken.",
@@ -855,10 +903,10 @@ const cell = new Int32Array(1);
 function tryAcquire() {`,
       blank:{ q:"Two threads run tryAcquire() at the very same instant. Which version guarantees only one of them walks away holding the lock?",
         options:[
-`  return Atomics.compareExchange(cell, 0, 0, 1) === 0;   // 0 -> 1 iff it was 0`,
+`  return Atomics.compareExchange(cell, 0, 0, 1) === 0;`,
 `  if (cell[0] === 0) { cell[0] = 1; return true; }
   return false;`,
-`  if (Atomics.load(cell, 0) === 0) {   // looks atomic...
+`  if (Atomics.load(cell, 0) === 0) {
     Atomics.store(cell, 0, 1);
     return true;
   }
@@ -886,9 +934,9 @@ class RWLock {
       blank:{ q:"A writer is queued behind three active readers while more readers keep arriving. Which dispatch() gives the writer exclusivity AND keeps it from starving?",
         options:[
 `    if (this.#writing) return;
-    if (this.#readers === 0 && this.#wq.length) {     // no readers -> grant ONE writer
+    if (this.#readers === 0 && this.#wq.length) {
       this.#writing = true; this.#wq.shift().resolve();
-    } else if (!this.#wq.length) {                     // no writer waiting -> wake ALL readers
+    } else if (!this.#wq.length) {
       while (this.#rq.length) { this.#readers++; this.#rq.shift().resolve(); }
     }`,
 `    while (this.#rq.length) { this.#readers++; this.#rq.shift().resolve(); }
@@ -909,8 +957,8 @@ function once(fn) {
   return () => {`,
       blank:{ q:"Four callers hit this in the same tick, before init resolves. Which body runs the initializer exactly once and hands all four the same in-flight result?",
         options:[
-`    return (p ??= fn());     // call + store only the first time`,
-`    p = fn();                // remember the in-flight promise
+`    return (p ??= fn());`,
+`    p = fn();
     return p;`,
 `    if (!p) p = fn();
     return fn();`],
@@ -932,7 +980,7 @@ function once(fn) {
     const cycle = this.#cycle[slot]++;`,
       blank:{ q:"Cycle 2 must come strictly after cycle 1 for every slot. Which seq formula gives a flat, collision-free order across cycles — so later cycles can advance?",
         options:[
-`    const seq = cycle * 3 + this.#pos[slot];   // 3 slots per cycle`,
+`    const seq = cycle * 3 + this.#pos[slot];`,
 `    const seq = this.#pos[slot];`,
 `    const seq = cycle + this.#pos[slot];`],
         answer:0,
@@ -978,12 +1026,9 @@ function once(fn) {
     for (let r = 0; r < rounds; r++) {`,
       blank:{ q:"All five philosophers grab for forks at the same instant. Which acquisition order makes the circular wait impossible — not merely rarer?",
         options:[
-`      // global order: always the lower-numbered fork first
-      const [a, b] = left < right ? [left, right] : [right, left];`,
-`      // left fork first, then the right
-      const [a, b] = [left, right];`,
-`      // right fork first, then the left
-      const [a, b] = [right, left];`],
+`      const [a, b] = left < right ? [left, right] : [right, left];`,
+`      const [a, b] = [left, right];`,
+`      const [a, b] = [right, left];`],
         answer:0,
         whys:["Right. One global lock order (lowest index first) makes a circular wait impossible — the wrap-around philosopher reaches for fork 0 first, so the five can't each hold a left fork and block on the right.",
               "The classic deadlock: every philosopher grabs their left fork at the same await point, then all block forever on a right fork their neighbor is holding.",
@@ -1045,7 +1090,7 @@ class BoundedQueue {
     }
     this.#buf.push(v);
     const w = this.#pullW.shift(); if (w) w.resolve();`,
-`    this.#buf.push(v);                       // just append
+`    this.#buf.push(v);
     const w = this.#pullW.shift(); if (w) w.resolve();`,
 `    if (this.#buf.length >= this.#cap) {
       const d = deferred(); this.#pushW.push(d); await d.promise;
@@ -1077,11 +1122,11 @@ async function process(slot, action) {
   await sequencer.acquire(seq);        // wait for this slot's turn`,
       blank:{ q:"B fails on its turn, then succeeds on retry. Which version keeps C from printing before B — while still recovering from the blip?",
         options:[
-`  await retry(action, { tries: 5 });   // keep trying until it succeeds
-  sequencer.release(seq);              // release the turn ONLY after success`,
+`  await retry(action, { tries: 5 });
+  sequencer.release(seq);`,
 `  try { await action(); }
-  finally { sequencer.release(seq); }  // always release, even on failure`,
-`  sequencer.release(seq);             // release first
+  finally { sequencer.release(seq); }`,
+`  sequencer.release(seq);
   await retry(action, { tries: 5 });`],
         answer:0,
         whys:["Right. Retry the action while still holding the turn, and release only once it has actually succeeded — a transient failure pauses the pipeline instead of corrupting the order. Bonus solved.",
@@ -1118,11 +1163,11 @@ function select(sources) {           // sources: [{ label, promise }]`,
   return function (...args) {`,
       blank:{ q:"A user types 8 keystrokes fast, then pauses. Which body fires fn exactly once, after the typing stops — not once per keystroke?",
         options:[
-`    clearTimeout(t);          // cancel the prior pending call
+`    clearTimeout(t);
     t = setTimeout(() => fn.apply(this, args), wait);`,
 `    t = setTimeout(() => fn.apply(this, args), wait);`,
 `    t = setTimeout(() => fn.apply(this, args), wait);
-    clearTimeout(t);          // cancel the prior pending call`],
+    clearTimeout(t);`],
         answer:0,
         whys:["Right. Each call cancels the previous pending timer and starts a fresh one, so fn runs only after calls stop for `wait` ms — trailing-edge debounce.",
               "Without clearing, every call schedules its own timer — fn fires once per call, not once per burst. That isn't debouncing at all.",
@@ -1162,12 +1207,12 @@ function select(sources) {           // sources: [{ label, promise }]`,
       Promise.resolve(p).then((v) => {`,
       blank:{ q:"Input is [slow, fast, medium] and they settle out of order. Which body returns results in INPUT order and resolves exactly once, after the last settles?",
         options:[
-`        results[i] = v;        // slot by index, not push
+`        results[i] = v;
         if (++done === promises.length) resolve(results);`,
 `        results.push(v);
         if (results.length === promises.length) resolve(results);`,
 `        results[i] = v;
-        resolve(results);      // resolve as each one settles`],
+        resolve(results);`],
         answer:0,
         whys:["Right. Index assignment preserves input order no matter who finishes first, and the counter resolves exactly once — after the last one settles.",
               "push records results in completion order, not input order: a fast promise at index 3 lands in slot 0 and the output is scrambled.",
@@ -1186,12 +1231,12 @@ function select(sources) {           // sources: [{ label, promise }]`,
     } catch (err) {`,
       blank:{ q:"The dependency is down hard. Which version backs off AND eventually gives up — instead of hammering it forever at a fixed rate?",
         options:[
-`      if (++attempt >= tries) throw err;       // out of tries -> surface it
-      await sleep(base * 2 ** (attempt - 1));  // else back off, then loop`,
-`      await sleep(base * 2 ** attempt);
-      attempt++;                               // try again, forever`,
 `      if (++attempt >= tries) throw err;
-      await sleep(base);                       // same delay every time`],
+      await sleep(base * 2 ** (attempt - 1));`,
+`      await sleep(base * 2 ** attempt);
+      attempt++;`,
+`      if (++attempt >= tries) throw err;
+      await sleep(base);`],
         answer:0,
         whys:["Right. Re-throw once attempts are exhausted; otherwise wait an exponentially growing delay before looping. Bounded and backed off.",
               "No tries cap means a permanently-failing dependency loops forever — an unbounded retry storm. Always bound the attempts.",
@@ -1211,13 +1256,13 @@ function memoizeAsync(fn) {
       blank:{ q:"Five callers ask for the same key in one tick, and the fetch can fail. Which body collapses them to one call yet still lets a later caller retry after a failure?",
         options:[
 `    const p = fn(key).catch(e => { cache.delete(key); throw e; });
-    cache.set(key, p);            // store the PROMISE immediately
+    cache.set(key, p);
     return p;`,
-`    const v = await fn(key);      // await before storing
+`    const v = await fn(key);
     cache.set(key, v);
     return v;`,
 `    const p = fn(key);
-    cache.set(key, p);            // store the promise, keep it forever
+    cache.set(key, p);
     return p;`],
         answer:0,
         whys:["Right. Store the in-flight promise immediately so concurrent callers share it; on failure, evict the key so a later call can retry.",
@@ -1236,10 +1281,10 @@ function withTimeout(workFn, ms) {
   const timer = sleep(ms).then(() => {`,
       blank:{ q:"The timer wins the race. Which body actually stops the losing work — no leaked background fetch — AND tells the caller it timed out?",
         options:[
-`    ctrl.abort();               // cancel the still-running work
+`    ctrl.abort();
     return { timedOut: true };`,
-`    return { timedOut: true };  // just report it`,
-`    ctrl.abort();               // abort, but return nothing`],
+`    return { timedOut: true };`,
+`    ctrl.abort();`],
         answer:0,
         whys:["Right. Abort the signal so the losing work stops and cleans up, and return a marker so the caller knows it was a timeout — no leaked background work.",
               "Returning the marker without aborting leaves the slow work running to completion in the background — the resource leak the timeout was meant to prevent.",
@@ -1280,8 +1325,8 @@ function sideEffect(fn) {
   if (replaying) {`,
       blank:{ q:"The worker restarts and re-runs the workflow over its history. Which branch keeps the code matching history — instead of recomputing a value that diverges?",
         options:[
-`    return history[cursor++];     // reuse the value recorded the first time`,
-`    return fn();                  // just run fn again`,
+`    return history[cursor++];`,
+`    return fn();`,
 `    const v = fn(); history.push(v); return v;`],
         answer:0,
         whys:["Right. On replay you return the exact value recorded on the first run, so every branch lands the same way and the code still matches history.",
@@ -1308,8 +1353,8 @@ function withTimeout(work, ms) {`,
     work,
     sleep(ms).then(() => ({ timedOut: true })),
   ]).then(([w]) => w);`,
-`  const w = await work;           // wait for the activity first
-  await sleep(ms);                // then start the timer
+`  const w = await work;
+  await sleep(ms);
   return w;`],
         answer:0,
         whys:["Right. race settles the moment either the activity finishes or the timer fires — the durable timeout. The loser keeps running unless you cancel it (Temporal uses a CancellationScope).",
@@ -1327,15 +1372,15 @@ async function onWithdraw(amount) {`,
       blank:{ q:"Two withdraw signals interleave at the await between read and write. Which body stops the second from reading a stale balance — without committing before checkLimits can reject it?",
         options:[
 `  await mutex.runExclusive(async () => {
-    const bal = balance;          // read
-    await checkLimits(amount);    // await — others would interleave here
-    balance = bal - amount;       // write
+    const bal = balance;
+    await checkLimits(amount);
+    balance = bal - amount;
   });`,
-`  const bal = balance;            // read
-  await checkLimits(amount);      // await
-  balance = bal - amount;         // write`,
 `  const bal = balance;
-  balance = bal - amount;         // write before awaiting
+  await checkLimits(amount);
+  balance = bal - amount;`,
+`  const bal = balance;
+  balance = bal - amount;
   await checkLimits(amount);`],
         answer:0,
         whys:["Right. The mutex serializes the whole read-await-write, so a second signal can't read `balance` until the first has written it back — no lost updates.",
@@ -1350,18 +1395,18 @@ async function onWithdraw(amount) {`,
 async function wait(pred) {`,
       blank:{ q:"A different signal notifies while your predicate is still false. Which body keeps waiting until it is genuinely true — without busy-polling the loop?",
         options:[
-`  while (!pred()) {                // re-check after every wake
+`  while (!pred()) {
     const d = deferred();
     waiters.push(d.resolve);
     await d.promise;
   }`,
-`  if (!pred()) {                   // check once
+`  if (!pred()) {
     const d = deferred();
     waiters.push(d.resolve);
     await d.promise;
   }`,
 `  while (!pred()) {
-    await sleep(0);                // poll the predicate
+    await sleep(0);
   }`],
         answer:0,
         whys:["Right. Park on a deferred, and on every notify re-check the predicate in a loop — you only proceed once it's genuinely true.",
@@ -1516,6 +1561,79 @@ const BUGHUNT = [
     ],
     bug:[1],
     explain:"Line 2 calls Date.now() directly. On replay the wall clock reads a different value than the first run, so the recorded history no longer matches and the run is rejected. Route time through the runtime (workflow time, or a recorded side effect) so the value replays verbatim." },
+
+  { id:"bug_retry", title:"Retry with backoff", why:"bounded, then give up", lesson:18,
+    scenario:"The dependency is down hard, and this retry never stops — it hammers the service forever instead of giving up. Which line lets it loop without bound?",
+    lines:[
+      "async function retry(fn, { tries = 3, base = 10 } = {}) {",
+      "  let attempt = 0;",
+      "  for (;;) {",
+      "    try {",
+      "      return await fn();",
+      "    } catch (err) {",
+      "      if (attempt > tries) throw err;",
+      "      await sleep(base * 2 ** attempt);",
+      "    }",
+      "  }",
+      "}",
+    ],
+    bug:[6],
+    explain:"Line 7 guards on `attempt`, but nothing ever increments it — so the guard never trips and the loop retries forever. Bump the counter and surface the error once it's spent: if (++attempt >= tries) throw err." },
+
+  { id:"bug_condvar", title:"Condition variable", why:"re-check the predicate on every wake", lesson:5,
+    scenario:"A different signal wakes this waiter while its own predicate is still false, and it charges ahead anyway. Which line lets a false predicate slip through?",
+    lines:[
+      "async function wait(pred) {",
+      "  if (!pred()) {",
+      "    const d = deferred();",
+      "    waiters.push(d.resolve);",
+      "    await d.promise;",
+      "  }",
+      "}",
+    ],
+    bug:[1],
+    explain:"Line 2 checks the predicate once with `if`, so a single wake lets the code proceed even when the predicate is still false — another signal, or a spurious wake. Use `while (!pred())` to re-test on every wake and continue only when it's genuinely true." },
+
+  { id:"bug_rwlock", title:"Read/write lock", why:"a writer needs the lock alone", lesson:7,
+    scenario:"A writer is supposed to run only when no readers hold the lock, but it sometimes runs while readers are still active. Which line grants it too eagerly?",
+    lines:[
+      "#dispatch() {",
+      "  if (this.#writing) return;",
+      "  if (this.#wq.length) {",
+      "    this.#writing = true;",
+      "    this.#wq.shift().resolve();",
+      "  } else {",
+      "    while (this.#rq.length) { this.#readers++; this.#rq.shift().resolve(); }",
+      "  }",
+      "}",
+    ],
+    bug:[2],
+    explain:"Line 3 grants a waiting writer without checking #readers, so it runs while readers still hold the lock — exactly the overlap a read/write lock must prevent. Grant a writer only when this.#readers === 0." },
+
+  { id:"bug_promiseall", title:"Promise.all order", why:"results follow input order", lesson:17,
+    scenario:"You pass [slow, fast, medium]; they settle out of order and the results come back scrambled. Which line loses the input order?",
+    lines:[
+      "promises.forEach((p, i) => {",
+      "  Promise.resolve(p).then((v) => {",
+      "    results.push(v);",
+      "    if (results.length === promises.length) resolve(results);",
+      "  }, reject);",
+      "});",
+    ],
+    bug:[2],
+    explain:"Line 3 pushes results in completion order, not input order — a fast promise at index 2 lands in slot 0. Assign by index instead: results[i] = v, and count settlements separately to know when every promise is done." },
+
+  { id:"bug_errgroup", title:"Cancel on first error", why:"the first failure must surface", lesson:20,
+    scenario:"One of five concurrent tasks fails, but Promise.all never rejects and the caller thinks everything succeeded. Which line hides the failure?",
+    lines:[
+      "const ctrl = new AbortController();",
+      "const tasks = taskFns.map(fn =>",
+      "  fn(ctrl.signal).catch(() => { ctrl.abort(); })",
+      ");",
+      "return Promise.all(tasks);",
+    ],
+    bug:[2],
+    explain:"Line 3 catches the error and returns undefined, so the failed task resolves successfully — Promise.all never rejects and the real error is swallowed. Re-throw after aborting: .catch(err => { ctrl.abort(); throw err; })." },
 ];
 
 /* ===========================================================
@@ -2440,6 +2558,7 @@ function simulate({threads,iters,atomic}){
 /* ---- flashcards ---- */
 let cardIdx=0, cardFlipped=false;
 function renderCards(){
+  main.innerHTML="";   // flip/prev/next call this directly — clear so we replace, not stack
   main.appendChild(el(`<div><div class="eyebrow">module 03</div><h1>Trade-offs</h1>
     <p class="lead">No code here — just the judgment calls that separate using concurrency from understanding it. Tap to flip, then advance. Rehearse until they're reflexive.</p></div>`));
   { const row=conceptLinkRow(22); if(row){ row.style.margin="0 0 16px"; main.appendChild(row); } }

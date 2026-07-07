@@ -10,7 +10,7 @@ run-once), workers/atomics, the problem patterns (producer-consumer &
 backpressure, ordering, bounded concurrency, deadlock & lock ordering, rate
 limiting, select), the async toolkit (debounce/throttle, Promise.all, retry,
 memoize, cancellation), durable replay, and blocking vs non-blocking vs async),
-then seven hands-on modules: the event-loop model
+then eight hands-on modules: the event-loop model
 (predict-output quiz), building
 synchronization primitives — mutex, semaphore, latch, barrier, async queue,
 sequencer, condition variable, atomic lock (CAS), read/write lock, run-once
