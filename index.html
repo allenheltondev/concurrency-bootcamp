@@ -211,6 +211,13 @@
   .permit{width:22px;height:22px;border-radius:6px;border:1px solid var(--ordered);background:var(--ok-bg)}
   .permit.used{border-color:var(--line);background:#11131c}
   .histtape{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  /* paired reference implementation inside a lesson */
+  .impl{border-left:2px solid var(--accent);padding-left:12px;margin:16px 0 6px}
+  .impl .dlabel{color:var(--accent);margin-bottom:6px}
+  .impl pre.code{margin:0}
+  /* entity stage: producer / queue / consumer boxes with flowing items */
+  .estage{display:block;margin:4px auto 2px}
+  .ecap{fill:none}
   .pulse{animation:pulse 2.2s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
   /* lesson animations: .seq items reveal in --i order once .anim gets .playing */
@@ -2039,19 +2046,70 @@ console.log('D');                        <span class="cm">// sync</span></pre>
     <p><b class="hl">Why it matters:</b> threads pay off only for compute big enough to amortize their cost — and the moment you share memory, you need atomics or a lock, exactly like any other language.</p>` },
 
   { eb:"lesson 11 · problem patterns", title:"Producer / consumer & backpressure", html:`
-    <p class="big">A queue decouples producers from consumers. But an <b class="hl">unbounded</b> queue hides a danger: a fast producer piles work up faster than the consumer drains it, until memory dies. A <b class="hl">bounded</b> queue blocks the producer when full — that's <b class="hl">backpressure</b>.</p>
-    <div class="diagram anim" style="--step:.8s">
-      <div class="dlabel">capacity 2 &middot; fast producer, slow consumer</div>
-      <div class="lanes">
-        <div class="lanehead seq" style="--i:0">producer</div><div class="lstep seq" style="--i:0">push 1 &middot; push 2 &mdash; buffer [1, 2]</div>
-        <div class="lanehead seq" style="--i:1">producer</div><div class="lstep wait seq pop" style="--i:1">push 3 &rarr; full &rarr; <b>blocks</b></div>
-        <div class="lanehead seq" style="--i:2">consumer</div><div class="lstep good seq" style="--i:2">pull 1 &mdash; a slot frees</div>
-        <div class="lanehead seq" style="--i:3">producer</div><div class="lstep good seq pop" style="--i:3">unblocks &rarr; push 3 lands</div>
+    <p class="big">A <b class="hl">queue</b> sits between two roles that run at their own pace: <b class="hl">producers</b> that create work and <b class="hl">consumers</b> that handle it. Neither waits on the other directly — the producer drops an item in the queue and moves on; the consumer takes the next item whenever it's free. That decoupling is the whole point.</p>
+    <p>The catch is speed mismatch. If producers are faster than consumers and the queue is <b class="hl">unbounded</b>, the backlog grows without limit — latency climbs, memory balloons, and eventually the process dies. The fix is a <b class="hl">bounded</b> queue: give it a fixed capacity, and when it's full, <code>push</code> itself blocks until a slot frees. That blocking is <b class="hl">backpressure</b> — the queue reaching back to slow the producer down to the consumer's rate.</p>
+    <div class="diagram anim" style="--step:.72s">
+      <div class="dlabel">an item's journey &middot; capacity 2, fast producer, slow consumer</div>
+      <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
+        <line x1="80" y1="77" x2="262" y2="77" stroke="#2c3350" stroke-width="1.5" stroke-dasharray="3 5"/>
+        <rect x="6" y="49" width="70" height="56" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
+        <text x="41" y="73" fill="#8e86f0" font-size="9" text-anchor="middle">PRODUCER</text>
+        <text x="41" y="89" fill="#8b90ab" font-size="8.5" text-anchor="middle">push()</text>
+        <text x="170" y="33" fill="#57e0b0" font-size="9" text-anchor="middle">QUEUE &middot; cap 2</text>
+        <rect x="112" y="41" width="116" height="70" rx="9" class="ecap" stroke="#57e0b0" stroke-width="1.5"/>
+        <rect x="126" y="61" width="40" height="34" rx="6" fill="#11131c" stroke="#2c3350"/>
+        <rect x="174" y="61" width="40" height="34" rx="6" fill="#11131c" stroke="#2c3350"/>
+        <rect x="264" y="49" width="70" height="56" rx="9" fill="#11131c" stroke="#ff9a6b" stroke-width="1.5"/>
+        <text x="299" y="73" fill="#ff9a6b" font-size="9" text-anchor="middle">CONSUMER</text>
+        <text x="299" y="89" fill="#8b90ab" font-size="8.5" text-anchor="middle">pull()</text>
+        <circle r="7" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="4.4s" repeatCount="indefinite" calcMode="linear"
+            keyTimes="0;0.20;0.56;0.86;1" keyPoints="0;0.36;0.36;1;1"
+            path="M 80 77 L 146 77 L 262 77"/>
+        </circle>
+        <circle r="7" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="4.4s" begin="-2.2s" repeatCount="indefinite" calcMode="linear"
+            keyTimes="0;0.20;0.56;0.86;1" keyPoints="0;0.62;0.62;1;1"
+            path="M 80 77 L 194 77 L 262 77"/>
+        </circle>
+      </svg>
+      <div class="lanes" style="margin-top:6px">
+        <div class="lanehead seq" style="--i:0">producer</div><div class="lstep seq" style="--i:0">push 1 &middot; push 2 &mdash; buffer is now [1, 2], full</div>
+        <div class="lanehead seq" style="--i:1">producer</div><div class="lstep wait seq pop" style="--i:1">push 3 &rarr; no slot &rarr; <b>blocks inside push()</b></div>
+        <div class="lanehead seq" style="--i:2">consumer</div><div class="lstep good seq" style="--i:2">pull 1 &mdash; a slot frees, wakes the producer</div>
+        <div class="lanehead seq" style="--i:3">producer</div><div class="lstep good seq pop" style="--i:3">unblocks &rarr; 3 lands &mdash; paced to the consumer</div>
       </div>
-      <div class="dnote seq" style="--i:4">Capacity is flow control: the producer's speed is now bounded by the consumer's.</div>
+      <div class="dnote seq" style="--i:4">Capacity <i>is</i> the flow control: the producer can never run more than <b>cap</b> items ahead of the consumer.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p><b class="hl">Why it matters:</b> "what if the producer outpaces the consumer?" is a standard follow-up. The answer is a bounded queue (or drop/sample) — never an unbounded backlog.</p>` },
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; the mechanism behind the animation</div>
+      <pre class="code">class BoundedQueue {
+  constructor(cap) {
+    this.cap = cap; this.buf = [];
+    this.notFull = []; this.notEmpty = [];   <span class="cm">// parked producers / consumers</span>
+  }
+  async push(item) {                         <span class="cm">// producer side</span>
+    while (this.buf.length &gt;= this.cap)       <span class="cm">// full? wait for a slot</span>
+      await new Promise(r =&gt; this.notFull.push(r));
+    this.buf.push(item);
+    this.notEmpty.shift()?.();               <span class="cm">// wake one waiting consumer</span>
+  }
+  async pull() {                             <span class="cm">// consumer side</span>
+    while (this.buf.length === 0)             <span class="cm">// empty? wait for an item</span>
+      await new Promise(r =&gt; this.notEmpty.push(r));
+    const item = this.buf.shift();
+    this.notFull.shift()?.();                <span class="cm">// wake one blocked producer</span>
+    return item;
+  }
+}
+
+const q = new BoundedQueue(2);
+produce(item =&gt; q.push(item));   <span class="cm">// fast: push() blocks it when full — backpressure</span>
+consume(()   =&gt; q.pull());       <span class="cm">// slow: pull() blocks it when empty</span></pre>
+    </div>
+    <p>The two waiter lists are the entire trick: a blocked <code>push</code> parks a resolver in <code>notFull</code>, and the next <code>pull</code> pops it to wake exactly one producer (and vice-versa). No polling, no busy-waiting — just a promise per parked task. The <code>while</code> loops (not <code>if</code>) matter: a woken task must re-check, because another task may have raced in and taken the slot first.</p>
+    <p><b class="hl">Why it matters:</b> "what if the producer outpaces the consumer?" is a standard interview follow-up, and the same shape is everywhere in production — Node streams' <code>highWaterMark</code>, Go channels, Kafka consumer lag, a thread pool's task queue. The answer is always bounded buffering (or explicit drop/sample) — never an unbounded backlog.</p>` },
 
   { eb:"lesson 12 · problem patterns", title:"Process in order (A → B → C)", html:`
     <p class="big">Three subsystems log <b class="hl">concurrently</b>, but must be <b class="hl">processed</b> in a fixed order each cycle. A <b class="hl">sequencer</b> hands out turns: each slot waits for its number, runs, then releases the next.</p>
