@@ -95,6 +95,24 @@
   @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
   .why-line{font-size:12.5px;color:var(--muted);margin:6px 0 2px;padding-left:10px;border-left:2px solid var(--line)}
 
+  /* spot-the-bug: tappable code lines */
+  .scen{font-size:13.5px;color:var(--text);margin:10px 0 2px;padding-left:10px;border-left:2px solid var(--race)}
+  .card.solved .scen{border-color:var(--ordered)}
+  .bughunt{background:#11131c;border:1px solid var(--line);border-radius:10px;padding:6px;margin:10px 0;overflow-x:auto}
+  .bughunt.shake{animation:shake .3s}
+  .codeline{
+    display:flex;gap:10px;width:100%;text-align:left;font-family:var(--mono);font-size:12.5px;line-height:1.7;
+    background:transparent;border:1px solid transparent;border-radius:6px;color:#cdd2e6;padding:1px 8px;margin:0;cursor:pointer;
+  }
+  .codeline:active{transform:scale(.997)}
+  .codeline .ln{color:var(--faint);user-select:none;min-width:1.6em;text-align:right;flex:0 0 auto}
+  .codeline .src{white-space:pre;flex:1 1 auto}
+  .codeline.sel{background:rgba(142,134,240,.16);border-color:var(--accent)}
+  .codeline.buggy{background:var(--bad-bg);border-color:var(--race);color:var(--race)}
+  .codeline.buggy .ln{color:var(--race)}
+  .codeline.miss{border:1px dashed var(--race);opacity:.7}
+  .codeline:disabled{cursor:default}
+
   /* buttons */
   .btn{
     font-family:var(--mono);font-size:13px;letter-spacing:.02em;
@@ -621,6 +639,7 @@ const MODULES = [
   { id:"bank", label:"problem bank", type:"drills" },
   { id:"toolkit", label:"interview kit", type:"drills" },
   { id:"durable", label:"durable execution", type:"drills" },
+  { id:"bughunt", label:"spot the bug", type:"bugs" },
   { id:"test", label:"test yourself", type:"test" },
 ];
 
@@ -704,11 +723,12 @@ const DRILLS = {
 `    this.#permits++;
     const next = this.#queue.shift();
     if (next) next.resolve();`,
-`    this.#permits++;`],
+`    const next = this.#queue.shift();
+    if (next) next.resolve();   // hand it straight to a waiter`],
         answer:0,
         whys:["Right. Either a waiter inherits the permit directly, or it returns to the pool — never both.",
               "Incrementing AND waking a waiter leaks a permit: capacity drifts above N over time.",
-              "Bumping the count without waking waiters means parked callers never resume — deadlock."] },
+              "When no one is waiting the permit just vanishes instead of going back to the pool, so capacity drifts DOWN over time and eventually deadlocks. It needs the else branch that does #permits++."] },
       post:`  }
 }` },
 
@@ -721,11 +741,12 @@ const DRILLS = {
         options:[
 `    this.#d.resolve();   // resolve the shared promise -> all waiters proceed`,
 `    this.#d = deferred();   // replace the promise`,
-`    return this.#d.promise;`],
+`    this.#d.resolve();
+    this.#d = deferred();   // reset so the latch can reopen later`],
         answer:0,
         whys:["Right. One shared promise, resolved once. A latch is one-shot — it never re-closes (that's what makes it a latch, not a gate).",
               "Replacing the promise leaves every existing waiter parked on the OLD one forever.",
-              "open() should release waiters, not return a promise. Nothing would ever resolve."] },
+              "This wakes the parked waiters, but replacing the promise re-closes the latch: anyone who calls wait() after this gets a fresh, unresolved promise and blocks forever. A latch is one-shot — it stays open."] },
       post:`  }
 }` },
 
@@ -837,12 +858,15 @@ function tryAcquire() {`,
 `  return Atomics.compareExchange(cell, 0, 0, 1) === 0;   // 0 -> 1 iff it was 0`,
 `  if (cell[0] === 0) { cell[0] = 1; return true; }
   return false;`,
-`  Atomics.store(cell, 0, 1);
-  return true;`],
+`  if (Atomics.load(cell, 0) === 0) {   // looks atomic...
+    Atomics.store(cell, 0, 1);
+    return true;
+  }
+  return false;`],
         answer:0,
         whys:["Right. compareExchange sets 0→1 only if it's currently 0, in one indivisible step, and tells you whether you won. That test-and-set is the heart of every lock.",
               "Read-then-write is two steps — two threads can both read 0 and both 'acquire'. The whole point of CAS is to test and set atomically.",
-              "Storing 1 unconditionally 'acquires' even when another thread already holds it — that's not a lock, it's a clobber."] },
+              "Atomics.load then Atomics.store are two separate atomic steps with a gap between them — two threads can both load 0 and both store 1. Each op is atomic; the pair isn't. Closing that gap is exactly what compare-and-swap is for."] },
       post:`}
 function release() {
   Atomics.store(cell, 0, 0);            // free it
@@ -886,12 +910,13 @@ function once(fn) {
       blank:{ q:"Four callers hit this in the same tick, before init resolves. Which body runs the initializer exactly once and hands all four the same in-flight result?",
         options:[
 `    return (p ??= fn());     // call + store only the first time`,
-`    return fn();             // just call it`,
+`    p = fn();                // remember the in-flight promise
+    return p;`,
 `    if (!p) p = fn();
     return fn();`],
         answer:0,
         whys:["Right. ??= calls fn() and stores its promise only the first time; every later call returns that same promise — one initialization, shared by all.",
-              "Calling fn() unconditionally runs the initializer on every call — there's no 'once' at all.",
+              "Reassigning p on every call re-runs fn each time — p is overwritten before it can ever guard anything. Assign only when p is still empty, which is exactly what ??= does.",
               "Storing p but then returning a fresh fn() still runs the initializer every call — the guard does nothing."] },
       post:`  };
 }` },
@@ -1076,11 +1101,11 @@ function select(sources) {           // sources: [{ label, promise }]`,
 `  return Promise.all(
     sources.map(s => s.promise.then(v => ({ label: s.label, value: v })))
   );`,
-`  return sources[0].promise;`],
+`  return Promise.race(sources.map(s => s.promise));`],
         answer:0,
         whys:["Right. Tag each source with its label, then race — the first to settle wins and you know which one it was.",
               "Promise.all waits for EVERY source, so you lose the first-ready behaviour entirely — you block on the slowest.",
-              "Returning the first source ignores the others; you wanted whichever is ready FIRST, not the first in the list."] },
+              "Racing the bare promises does settle on the first ready — but you've thrown away which source won, and the scenario needs the label too. Tag each promise with its label before racing."] },
       post:`}
 // A faithful channel-select also avoids consuming the losers;
 // Promise.race settles first but the other promises still run.` },
@@ -1096,12 +1121,12 @@ function select(sources) {           // sources: [{ label, promise }]`,
 `    clearTimeout(t);          // cancel the prior pending call
     t = setTimeout(() => fn.apply(this, args), wait);`,
 `    t = setTimeout(() => fn.apply(this, args), wait);`,
-`    clearTimeout(t);
-    fn.apply(this, args);      // call it right away`],
+`    t = setTimeout(() => fn.apply(this, args), wait);
+    clearTimeout(t);          // cancel the prior pending call`],
         answer:0,
         whys:["Right. Each call cancels the previous pending timer and starts a fresh one, so fn runs only after calls stop for `wait` ms — trailing-edge debounce.",
               "Without clearing, every call schedules its own timer — fn fires once per call, not once per burst. That isn't debouncing at all.",
-              "Calling fn synchronously on every invocation ignores `wait` and fires on every keystroke — the exact thing debounce exists to stop."] },
+              "The clear runs after the schedule, so it cancels the very timer just set — fn never fires at all. Clear the PREVIOUS timer first, then schedule the new one."] },
       post:`  };
 }` },
 
@@ -1367,15 +1392,142 @@ const CARDS = [
   ["Wait on whichever of several async sources is ready first?","Tag each source, then `Promise.race` them — the first to settle wins and you know which. (A true channel-select also avoids consuming the losers; race alone doesn't.)"],
 ];
 
+/* ---- spot-the-bug: real code, one broken scenario, tap the faulty line(s) ---- */
+const BUGHUNT = [
+  { id:"bug_ordered", title:"Ordered logger", why:"A → B → C must hold every cycle", lesson:11,
+    scenario:"Every slot logs A → B → C, but under load C sometimes prints before B in the same cycle. The Sequencer itself is correct. Which line(s) break the ordering?",
+    lines:[
+      "async #run(slot, action) {",
+      "  const cycle = this.#cycle[slot]++;",
+      "  const seq = cycle * 3 + this.#pos[slot];",
+      "  this.#seq.release(seq);",
+      "  await this.#seq.acquire(seq);",
+      "  await action();",
+      "}",
+    ],
+    bug:[3,4],
+    explain:"Lines 4 and 5 are swapped: the slot releases its turn before it ever waits for it, so nothing is serialized. Acquire the turn first, run the action, then release only after it has succeeded." },
+
+  { id:"bug_mutex", title:"Mutex release", why:"exactly one holder at a time", lesson:3,
+    scenario:"A waiter is queued when release() runs. Every so often two tasks end up inside the critical section at once. Which line lets a newcomer barge in?",
+    lines:[
+      "release() {",
+      "  this.#locked = false;",
+      "  const next = this.#queue.shift();",
+      "  if (next) next.resolve();",
+      "}",
+    ],
+    bug:[1],
+    explain:"Line 2 clears #locked while a waiter still exists, so the lock is briefly free — a brand-new acquire() grabs it at the same instant the woken waiter does, and you have two holders. Hand the lock straight to the next waiter, and set #locked = false only when the queue is empty." },
+
+  { id:"bug_tokenbucket", title:"Token bucket refill", why:"idle time must not bank an unbounded burst", lesson:14,
+    scenario:"The bucket sits idle for a full minute, then one caller fires a huge burst that sails past the rate limit. Which line lets idle time bank tokens without bound?",
+    lines:[
+      "#refill() {",
+      "  const now = Date.now();",
+      "  const gained = (now - this.#last) * this.#ratePerMs;",
+      "  this.#last = now;",
+      "  this.#tokens = this.#tokens + gained;",
+      "}",
+    ],
+    bug:[4],
+    explain:"Line 5 adds tokens with no ceiling, so a long idle stretch accrues unlimited tokens and the next caller can burst without bound. Clamp to capacity: Math.min(this.#capacity, this.#tokens + gained)." },
+
+  { id:"bug_boundedqueue", title:"Bounded queue push", why:"capacity is the backpressure", lesson:10,
+    scenario:"The queue is full with two producers blocked. One slot frees, both wake, and the buffer ends up one item over capacity. Which line lets the bound be overshot?",
+    lines:[
+      "async push(v) {",
+      "  if (this.#buf.length >= this.#cap) {",
+      "    const d = deferred(); this.#pushW.push(d);",
+      "    await d.promise;",
+      "  }",
+      "  this.#buf.push(v);",
+      "  const w = this.#pullW.shift(); if (w) w.resolve();",
+      "}",
+    ],
+    bug:[1],
+    explain:"Line 2 checks capacity with `if`, so it runs only once. After a producer wakes, another may have already taken the freed slot — but the `if` doesn't re-check, so this push proceeds and overflows the bound. Use `while` to re-test capacity on every wake." },
+
+  { id:"bug_pool", title:"Concurrency pool", why:"keep N running, no more, no batching", lesson:12,
+    scenario:"You raise `limit` from 2 to 10 but throughput barely moves — jobs run in lock-step batches instead of a steady stream. Which line stalls the pool?",
+    lines:[
+      "for (const [i, item] of items.entries()) {",
+      "  const p = Promise.resolve().then(() => worker(item, i));",
+      "  results.push(p);",
+      "  executing.add(p);",
+      "  p.finally(() => executing.delete(p));",
+      "  if (executing.size >= limit)",
+      "    await Promise.all(executing);",
+      "}",
+    ],
+    bug:[6],
+    explain:"Line 7 waits for the WHOLE in-flight set to drain before continuing, so work runs in batches of `limit` and the slowest job in each batch gates the next. Wait for just the first to finish — Promise.race(executing) — to free one slot and keep the pool full." },
+
+  { id:"bug_debounce", title:"Debounce timer", why:"a burst fires fn once, after it goes quiet", lesson:16,
+    scenario:"A user types 8 fast keystrokes, then pauses — and fn fires 8 times instead of once. clearTimeout is right there. Which line defeats it?",
+    lines:[
+      "function debounce(fn, wait) {",
+      "  let t;",
+      "  return function (...args) {",
+      "    let t;",
+      "    clearTimeout(t);",
+      "    t = setTimeout(() => fn.apply(this, args), wait);",
+      "  };",
+      "}",
+    ],
+    bug:[3],
+    explain:"Line 4 redeclares `t` inside the returned function, shadowing the outer timer. Each call gets its own fresh `t`, so clearTimeout never sees the previous call's timer and every keystroke fires. Declare `t` once, in the outer closure." },
+
+  { id:"bug_dining", title:"Dining philosophers", why:"break the circular wait with a lock order", lesson:13,
+    scenario:"All five philosophers sit down at once and the program hangs — nobody ever eats. Which line(s) create the circular wait?",
+    lines:[
+      "for (let r = 0; r < rounds; r++) {",
+      "  const left = i, right = (i + 1) % n;",
+      "  await fork[left].acquire();",
+      "  await fork[right].acquire();",
+      "  try { meals++; await eat(); }",
+      "  finally { fork[right].release(); fork[left].release(); }",
+      "}",
+    ],
+    bug:[2,3],
+    explain:"Lines 3 and 4 always take the left fork then the right, in seat order. When all five grab their left fork at once, each then blocks on a right fork its neighbour holds — a circular wait. Impose one global order instead: always acquire the lower-numbered fork first." },
+
+  { id:"bug_memoize", title:"Async dedup", why:"concurrent callers share one computation", lesson:19,
+    scenario:"Five callers ask for the same key in the same tick, but fn still runs five times — no dedup at all. Which line defeats the cache?",
+    lines:[
+      "return async (key) => {",
+      "  if (cache.has(key)) return cache.get(key);",
+      "  const v = await fn(key);",
+      "  cache.set(key, v);",
+      "  return v;",
+      "};",
+    ],
+    bug:[2],
+    explain:"Line 3 awaits fn(key) before anything is stored, so all five concurrent callers miss the cache and each launches its own fn. Cache the in-flight PROMISE synchronously — cache.set(key, fn(key)) — so callers in the same tick share it." },
+
+  { id:"bug_replay", title:"Durable replay", why:"replay must match history, not recompute", lesson:21,
+    scenario:"This workflow runs fine, but after a worker restart replays it from history, Temporal rejects the run as nondeterministic. Which line diverges on replay?",
+    lines:[
+      "async function chargeCard(order) {",
+      "  const chargedAt = Date.now();",
+      "  await activities.charge(order, chargedAt);",
+      "  return chargedAt;",
+      "}",
+    ],
+    bug:[1],
+    explain:"Line 2 calls Date.now() directly. On replay the wall clock reads a different value than the first run, so the recorded history no longer matches and the run is rejected. Route time through the runtime (workflow time, or a recorded side effect) so the value replays verbatim." },
+];
+
 /* ===========================================================
    STATE + PERSISTENCE
    =========================================================== */
-const TOTAL = DRILLS.primitives.length + DRILLS.bank.length + DRILLS.toolkit.length + DRILLS.durable.length;
+const TOTAL = DRILLS.primitives.length + DRILLS.bank.length + DRILLS.toolkit.length + DRILLS.durable.length + BUGHUNT.length;
 let state = { module:"learn", solved:{} };
 
 /* one-at-a-time stepping: where we are inside each stepped module */
 let learnIdx = 0;                                          // current lesson chapter
 let modelIdx = 0;                                          // current quiz question
+let bugIdx = 0;                                            // current spot-the-bug card
 let test = { on:false, qs:[], idx:0, score:0, answered:false };  // scored test mode
 let drillIdx = { primitives:0, bank:0, toolkit:0, durable:0 };  // current drill per module
 let quizDone = {};                                         // qi -> answered correctly (in-memory)
@@ -1394,6 +1546,7 @@ function loadProgress(){
       if(typeof p.module==="string" && MODULES.some(m=>m.id===p.module)) state.module=p.module;
       if(Number.isInteger(p.learnIdx)) learnIdx=p.learnIdx;
       if(Number.isInteger(p.modelIdx)) modelIdx=p.modelIdx;
+      if(Number.isInteger(p.bugIdx)) bugIdx=p.bugIdx;
       if(p.drillIdx && typeof p.drillIdx==="object") Object.assign(drillIdx, p.drillIdx);
       if(p.quizDone && typeof p.quizDone==="object") quizDone=p.quizDone;
     }
@@ -1407,7 +1560,7 @@ function saveProgress(){
 // persist the user's place across lessons + skills so they resume on return
 function savePosition(){
   try{ localStorage.setItem(POSITION_KEY,JSON.stringify({
-    module: state.module, learnIdx, modelIdx, drillIdx, quizDone
+    module: state.module, learnIdx, modelIdx, bugIdx, drillIdx, quizDone
   })); }catch(e){}
 }
 // wipe everything: solved drills, quiz answers, and where the user left off
@@ -1415,7 +1568,7 @@ function resetProgress(){
   if(!confirm("Reset all progress? This clears solved drills, quiz answers, and your place in every module.")) return;
   try{ localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(POSITION_KEY); }catch(e){}
   state.solved={}; quizDone={};
-  learnIdx=0; modelIdx=0;
+  learnIdx=0; modelIdx=0; bugIdx=0;
   drillIdx={ primitives:0, bank:0, toolkit:0, durable:0 };
   test={ on:false, qs:[], idx:0, score:0, answered:false };
   state.module="learn";
@@ -1457,6 +1610,7 @@ function render(){
   else if(m.type==="drills") renderDrills(state.module);
   else if(m.type==="sim") renderSim();
   else if(m.type==="cards") renderCards();
+  else if(m.type==="bugs") renderBugHunt();
   else if(m.type==="test") renderTest();
 }
 
@@ -1671,7 +1825,7 @@ console.log('D');                        <span class="cm">// sync</span></pre>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
     <p><b class="hl">Why it matters:</b> "what if the producer outpaces the consumer?" is a standard follow-up. The answer is a bounded queue (or drop/sample) — never an unbounded backlog.</p>` },
 
-  { eb:"lesson 12 · problem patterns", title:"Process in order (A &rarr; B &rarr; C)", html:`
+  { eb:"lesson 12 · problem patterns", title:"Process in order (A → B → C)", html:`
     <p class="big">Three subsystems log <b class="hl">concurrently</b>, but must be <b class="hl">processed</b> in a fixed order each cycle. A <b class="hl">sequencer</b> hands out turns: each slot waits for its number, runs, then releases the next.</p>
     <div class="diagram anim" style="--step:.8s">
       <div class="dlabel">turns passed in order, even when B fails first</div>
@@ -2036,6 +2190,95 @@ function buildDrillCard(d){
   return card;
 }
 
+/* ---- spot the bug (pick the faulty line) ---- */
+function renderBugHunt(){
+  main.appendChild(el(`<div>
+    <div class="eyebrow">module 07</div><h1>Spot the bug</h1>
+    <p class="lead">Real code, one scenario, one or more broken lines. Tap the line(s) you think are wrong, then check. Same concrete patterns you drilled — the ordered logger, the mutex, the token bucket — but now you find the fault instead of filling the blank.</p>
+    <p class="sub">Reading broken concurrency code is the actual job. One at a time — read the scenario, pick the line(s), then check.</p>
+  </div>`));
+  bugIdx=Math.max(0,Math.min(bugIdx,BUGHUNT.length-1));
+  main.appendChild(buildBugCard(BUGHUNT[bugIdx]));
+  main.appendChild(stepperRow(bugIdx, BUGHUNT.length, (i)=>{ bugIdx=i; render(); window.scrollTo({top:0}); }));
+}
+
+function buildBugCard(b){
+  const solved=!!state.solved[b.id];
+  const bugSet=new Set(b.bug);
+  const card=el(`<div class="card ${solved?"solved":""}">
+    <h2>${esc(b.title)}</h2>
+    <div class="why">// ${esc(b.why)}</div>
+    <span class="done ${solved?"":"hidden"}" data-done>✓ solved</span>
+    <div class="scen">${esc(b.scenario)}</div>
+  </div>`);
+  if(b.lesson!=null){ const row=conceptLinkRow(b.lesson); if(row) card.querySelector(".why").after(row); }
+
+  const wrap=el(`<div class="bughunt"></div>`);
+  const feedback=el(`<div class="why-line" style="display:none"></div>`);
+  const lineEls=[];
+  b.lines.forEach((src,i)=>{
+    const row=el(`<button class="codeline" type="button"><span class="ln">${i+1}</span><span class="src"></span></button>`);
+    row.querySelector(".src").textContent=src;   // exact text, indentation preserved
+    lineEls.push(row);
+    if(solved){
+      if(bugSet.has(i)) row.classList.add("buggy");
+      row.disabled=true;
+    } else {
+      row.onclick=()=>{
+        if(wrap.dataset.done) return;
+        lineEls.forEach(r=>r.classList.remove("miss"));   // clear stale feedback marks
+        feedback.style.display="none";
+        row.classList.toggle("sel");
+      };
+    }
+    wrap.appendChild(row);
+  });
+  card.appendChild(wrap);
+  card.appendChild(feedback);
+
+  if(solved){
+    feedback.style.display="block";
+    feedback.textContent=b.explain;
+    return card;
+  }
+
+  const finish=(win)=>{
+    wrap.dataset.done="1";
+    lineEls.forEach((r,i)=>{ r.disabled=true; r.classList.remove("sel","miss"); if(bugSet.has(i)) r.classList.add("buggy"); });
+    feedback.style.display="block"; feedback.textContent=b.explain;
+    if(win){ card.classList.add("solved"); card.querySelector("[data-done]").classList.remove("hidden"); state.solved[b.id]=true; saveProgress(); }
+  };
+
+  const row=el(`<div class="row"></div>`);
+  const check=el(`<button class="btn go">check</button>`);
+  const reveal=el(`<button class="btn">reveal answer</button>`);
+  check.onclick=()=>{
+    const sel=lineEls.map((r,i)=>r.classList.contains("sel")?i:-1).filter(i=>i>=0);
+    if(!sel.length){ feedback.style.display="block"; feedback.textContent="Tap the line(s) you think are wrong, then check."; return; }
+    const exact = sel.length===bugSet.size && sel.every(i=>bugSet.has(i));
+    if(exact){ finish(true); return; }
+    // wrong: drop the clean lines they picked (mark them), keep any real bugs selected, don't reveal the rest
+    let found=0, wrong=0;
+    lineEls.forEach((r,i)=>{
+      if(r.classList.contains("sel")){
+        if(bugSet.has(i)) found++;
+        else { r.classList.remove("sel"); r.classList.add("miss"); wrong++; }
+      }
+    });
+    const need=bugSet.size;
+    feedback.style.display="block";
+    feedback.textContent = `Not quite — ${need} line${need>1?"s are":" is"} buggy. `
+      + (wrong?`${wrong} of your picks ${wrong>1?"aren't":"isn't"} the problem (marked). `:"")
+      + (found?`${found} correct so far. `:"")
+      + "Adjust and check again.";
+    wrap.classList.add("shake"); setTimeout(()=>wrap.classList.remove("shake"),320);
+  };
+  reveal.onclick=()=>finish(false);
+  row.append(check,reveal);
+  card.appendChild(row);
+  return card;
+}
+
 /* ---- workers & atomics simulator ---- */
 let sim={threads:3,iters:3,atomic:false};
 const ITER_SCALE=1_000_000;                 // each "increment" notch = 1,000,000 real ops
@@ -2288,6 +2531,19 @@ function renderTest(){
 }
 
 function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+/* ---- distribute answer positions ----
+   The authored data lists the correct choice first for readability. Permute each
+   question once per load (options + parallel whys, tracking the answer) so no
+   module leans on "it's usually the first one" — the same guard test mode applies. */
+function permuteChoices(q){
+  const order=shuffle(q.options.map((_,i)=>i));
+  q.options=order.map(i=>q.options[i]);
+  if(q.whys) q.whys=order.map(i=>q.whys[i]);
+  q.answer=order.indexOf(q.answer);
+}
+Object.keys(DRILLS).forEach(mod=>DRILLS[mod].forEach(d=>permuteChoices(d.blank)));
+QUIZ.forEach(permuteChoices);
 
 /* ---- go ---- */
 loadProgress();
