@@ -2225,6 +2225,23 @@ getPool(); getPool(); getPool();               <span class="cm">// 3 callers -> 
       <div class="dnote seq" style="--i:7"><code style="color:var(--ordered)">Atomics.add(counter, 0, 1)</code> is one <b class="hl">indivisible</b> step — no thread can slip between read and write. <code>Atomics.wait</code> / <code>notify</code> build real cross-thread locks.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>Workers normally have <b class="hl">separate</b> heaps — they communicate by copying messages, so there's nothing to race on. A <code>SharedArrayBuffer</code> is the deliberate exception: its bytes live in memory every worker can read and write directly. That's real parallelism on shared state, so <code>counter++</code> (read, add, write) can interleave and lose updates — the same torn read C or Java would give you.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; shared memory across real threads</div>
+      <pre class="code"><span class="cm">// main thread — hand every worker the SAME buffer</span>
+const sab = new SharedArrayBuffer(4);
+const counter = new Int32Array(sab);
+for (const w of workers) w.postMessage(sab);
+
+<span class="cm">// inside each worker (worker.js)</span>
+onmessage = ({ data: sab }) =&gt; {
+  const counter = new Int32Array(sab);
+  for (let i = 0; i &lt; 1e6; i++) {
+    counter[0]++;                  <span class="cm">// UNSAFE: read-modify-write, updates lost</span>
+    <span class="cm">// Atomics.add(counter, 0, 1); // SAFE: one indivisible step</span>
+  }
+};</pre>
+    </div>
     <p><b class="hl">Why it matters:</b> threads pay off only for compute big enough to amortize their cost — and the moment you share memory, you need atomics or a lock, exactly like any other language.</p>` },
 
   { eb:"lesson 11 · problem patterns", title:"Producer / consumer & backpressure", html:`
@@ -2307,6 +2324,27 @@ consume(()   =&gt; q.pull());       <span class="cm">// slow: pull() blocks it w
       <div class="dnote seq" style="--i:5">Releasing the turn only <b>after</b> success is what makes the order survive a transient failure.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>A <b class="hl">sequencer</b> hands out numbered turns. Each task waits for its number, does its work, then advances the counter and wakes whoever holds the next number — the chain self-propagates. The fault-tolerance trick is <i>when</i> you release: only <b class="hl">after</b> the work succeeds. Retry while still holding the turn, and a transient failure pauses the pipeline instead of letting the next slot jump ahead.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; numbered turns, released on success</div>
+      <pre class="code">class Sequencer {
+  #next = 0; #gates = new Map();
+  acquire(n) {                          <span class="cm">// wait for turn n</span>
+    if (n &lt;= this.#next) return Promise.resolve();
+    return new Promise(res =&gt; this.#gates.set(n, res));
+  }
+  release(n) {                          <span class="cm">// turn done -> wake the next one</span>
+    this.#next = n + 1;
+    this.#gates.get(this.#next)?.();
+    this.#gates.delete(this.#next);
+  }
+}
+
+<span class="cm">// ordering survives a blip: hold the turn until the work actually succeeds</span>
+await seq.acquire(turn);
+await retry(() =&gt; process(item));
+seq.release(turn);</pre>
+    </div>
     <p><b class="hl">Why it matters:</b> this is the "Concurrent Log Processor" interview question — ordering plus the fault-tolerance bonus, in one pattern.</p>` },
 
   { eb:"lesson 13 · problem patterns", title:"Bounded concurrency (the pool)", html:`
@@ -2322,6 +2360,22 @@ consume(()   =&gt; q.pull());       <span class="cm">// slow: pull() blocks it w
       <div class="dnote seq" style="--i:4"><code>await Promise.race(inFlight)</code> waits for the FIRST job to finish, freeing exactly one slot — not <code>Promise.all</code>, which would batch.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>The key line is <code>await Promise.race(inFlight)</code>. When the pool is full, race resolves the instant the <b class="hl">first</b> job finishes — freeing exactly one slot — and the loop starts the next. Use <code>Promise.all</code> here instead and you'd drain the whole batch before starting any more: lock-step batching, not a steady stream, and the slowest job in each batch gates the rest.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; at most N in flight</div>
+      <pre class="code">async function pool(items, limit, worker) {
+  const results = [], inFlight = new Set();
+  for (const [i, item] of items.entries()) {
+    const p = Promise.resolve().then(() =&gt; worker(item, i));
+    results.push(p);
+    inFlight.add(p);
+    p.finally(() =&gt; inFlight.delete(p));
+    if (inFlight.size &gt;= limit)
+      await Promise.race(inFlight);      <span class="cm">// free ONE slot, then continue</span>
+  }
+  return Promise.all(results);
+}</pre>
+    </div>
     <p><b class="hl">Why it matters:</b> this is the JS thread-pool/executor — the standard answer to "process this list without overwhelming the dependency."</p>` },
 
   { eb:"lesson 14 · problem patterns", title:"Deadlock & lock ordering", html:`
@@ -2337,7 +2391,26 @@ consume(()   =&gt; q.pull());       <span class="cm">// slow: pull() blocks it w
       <div class="dnote seq pop" style="--i:4">Always take the <b style="color:var(--ordered)">lower-numbered</b> fork first. The wrap-around philosopher now reaches for fork0 first too, so the cycle can't form.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p><b class="hl">Why it matters:</b> deadlock needs four conditions at once; breaking any one prevents it. A consistent <b class="hl">global lock order</b> is the most practical — it kills the circular wait.</p>` },
+    <p>Deadlock needs four conditions at once: mutual exclusion, hold-and-wait, no preemption, and a <b class="hl">circular wait</b>. Break any one and it can't happen. The most practical to break is the cycle: impose a <b class="hl">global order</b> on the locks and always acquire them low-to-high. The wrap-around philosopher then reaches for fork 0 before fork 4, so no cycle can close.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; lock ordering kills the cycle</div>
+      <pre class="code">async function dine(n, rounds) {
+  const fork = Array.from({ length: n }, () =&gt; new Mutex());
+  const seat = async (i) =&gt; {
+    const left = i, right = (i + 1) % n;
+    <span class="cm">// GLOBAL ORDER: always take the lower-numbered fork first</span>
+    const [a, b] = left &lt; right ? [left, right] : [right, left];
+    for (let r = 0; r &lt; rounds; r++) {
+      await fork[a].acquire();
+      await fork[b].acquire();
+      try { await eat(); }
+      finally { fork[b].release(); fork[a].release(); }
+    }
+  };
+  await Promise.all(Array.from({ length: n }, (_, i) =&gt; seat(i)));
+}</pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> "everyone grabs their left fork" is the textbook deadlock, and a consistent global lock order is the fix you reach for in real systems — nested DB row locks, multiple mutexes, distributed resources.</p>` },
 
   { eb:"lesson 15 · problem patterns", title:"Rate limiting (token bucket)", html:`
     <p class="big">A <b class="hl">token bucket</b> allows a <b class="hl">burst</b> up to its capacity, then settles to a steady rate. Each call spends a token; tokens refill at a fixed rate, capped at capacity.</p>
@@ -2352,6 +2425,31 @@ consume(()   =&gt; q.pull());       <span class="cm">// slow: pull() blocks it w
       <div class="dnote seq" style="--i:4">The cap bounds the burst; <code>Math.min(cap, tokens + refilled)</code> stops idle time from banking infinite tokens.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>Two details make it work. Refill is <b class="hl">lazy</b>: instead of a timer dripping tokens, you compute how many <i>would</i> have accrued since the last call from elapsed time. And the refill is <b class="hl">capped</b> at capacity with <code>Math.min</code> — without that ceiling, a long idle period banks unlimited tokens and the next caller bursts straight through the limit.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; lazy refill, capped burst</div>
+      <pre class="code">class TokenBucket {
+  #cap; #tokens; #ratePerMs; #last = Date.now();
+  constructor(cap, ratePerSec) {
+    this.#cap = cap; this.#tokens = cap;          <span class="cm">// start full: one burst allowed</span>
+    this.#ratePerMs = ratePerSec / 1000;
+  }
+  #refill() {
+    const now = Date.now();
+    const gained = (now - this.#last) * this.#ratePerMs;
+    this.#tokens = Math.min(this.#cap, this.#tokens + gained);  <span class="cm">// cap bounds the burst</span>
+    this.#last = now;
+  }
+  async take() {
+    this.#refill();
+    while (this.#tokens &lt; 1) {                     <span class="cm">// empty: wait for a drip</span>
+      await sleep((1 - this.#tokens) / this.#ratePerMs);
+      this.#refill();
+    }
+    this.#tokens -= 1;
+  }
+}</pre>
+    </div>
     <p><b class="hl">Why it matters:</b> it's the rate limiter that <i>allows</i> bursts (unlike a fixed window) — the usual answer for client throttling and API quotas.</p>` },
 
   { eb:"lesson 16 · problem patterns", title:"Select — first ready wins", html:`
@@ -2367,7 +2465,23 @@ consume(()   =&gt; q.pull());       <span class="cm">// slow: pull() blocks it w
       <div class="dnote seq pop" style="--i:4"><b style="color:var(--ordered)">B wins</b> (6ms) &mdash; and you learn <i>which</i> source it was via its label.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p><b class="hl">Why it matters:</b> it's JS's take on Go's <code>select</code>. (A faithful channel-select also cancels the losers — race alone leaves them running.)</p>` },
+    <p>The mechanism is just <code>Promise.race</code>, with one addition: tag each source so the winner tells you <i>which</i> one it was. Attach the label inside the <code>.then</code> before racing, and the resolved value carries both the payload and its origin — the difference between "a reply came back" and "replica&nbsp;B replied."</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; race, but keep the label</div>
+      <pre class="code">function select(sources) {              <span class="cm">// [{ label, promise }]</span>
+  return Promise.race(
+    sources.map(s =&gt; s.promise.then(value =&gt; ({ label: s.label, value })))
+  );
+}
+
+const winner = await select([
+  { label: 'replica-A', promise: fetchA() },
+  { label: 'replica-B', promise: fetchB() },
+  { label: 'timeout',   promise: sleep(200).then(() =&gt; 'timed out') },
+]);
+<span class="cm">// winner.label says who won; the losers keep running unless you cancel them</span></pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> it's JS's take on Go's <code>select</code> — fastest-replica, first-response, and value-or-timeout are all this shape. (A faithful channel-select also cancels the losers; race alone leaves them running.)</p>` },
 
   { eb:"lesson 17 · async toolkit", title:"Debounce & throttle", html:`
     <p class="big">Two ways to tame a flood of events. <b class="hl">Debounce</b> waits for quiet: it fires once, after the calls stop (search-as-you-type). <b class="hl">Throttle</b> fires at most once per interval, however fast the calls come (scroll handlers).</p>
@@ -2380,7 +2494,29 @@ consume(()   =&gt; q.pull());       <span class="cm">// slow: pull() blocks it w
       <div class="dnote seq" style="--i:2">Debounce = collapse a burst to its trailing edge. Throttle = a steady rate cap.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p><b class="hl">Why it matters:</b> the most common front-end async question — and people constantly mix the two up. Know which one collapses and which rate-caps.</p>` },
+    <p>The implementations are almost twins, but the timer logic is opposite. Debounce keeps <b class="hl">resetting</b> a timer on every call, so it only fires once the calls stop. Throttle records <i>when it last fired</i> and refuses until an interval has passed — so it fires on a steady cadence no matter how fast the calls arrive.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; collapse vs. rate-cap</div>
+      <pre class="code">function debounce(fn, wait) {
+  let t;
+  return (...args) =&gt; {
+    clearTimeout(t);                    <span class="cm">// cancel the previous pending call</span>
+    t = setTimeout(() =&gt; fn(...args), wait);   <span class="cm">// fires only after quiet</span>
+  };
+}
+
+function throttle(fn, interval) {
+  let last = 0;
+  return (...args) =&gt; {
+    const now = Date.now();
+    if (now - last &gt;= interval) {        <span class="cm">// enough time passed? fire + stamp</span>
+      last = now;
+      fn(...args);
+    }
+  };
+}</pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> the most common front-end async question — and people constantly mix the two up. Know which one collapses a burst and which rate-caps.</p>` },
 
   { eb:"lesson 18 · async toolkit", title:"Promise.all, from scratch", html:`
     <p class="big">Run promises concurrently and collect their results <b class="hl">in input order</b>, resolving only when the last one settles (and rejecting on the first failure). The key move: write each result into its own <b class="hl">index</b>, not push.</p>
@@ -2394,7 +2530,24 @@ consume(()   =&gt; q.pull());       <span class="cm">// slow: pull() blocks it w
       <div class="dnote seq" style="--i:3">Output is <b style="color:var(--ordered)">[a, b, c]</b> — input order — even though b finished first. <code>push</code> would scramble it.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p><b class="hl">Why it matters:</b> a favourite "implement it yourself" question; the index-vs-push detail is exactly what they're checking.</p>` },
+    <p>Two things are easy to get wrong. Results must land by <b class="hl">index</b>, not <code>push</code> — otherwise a fast promise's value lands in an early slot and the output is scrambled. And "done" is a <b class="hl">counter</b>, not <code>results.length</code>: with index assignment the array can have its final length long before every slot is filled.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; concurrent, ordered, fail-fast</div>
+      <pre class="code">function promiseAll(promises) {
+  return new Promise((resolve, reject) =&gt; {
+    const results = [];
+    let done = 0;
+    if (promises.length === 0) return resolve(results);
+    promises.forEach((p, i) =&gt; {
+      Promise.resolve(p).then(value =&gt; {
+        results[i] = value;             <span class="cm">// slot by INDEX -> input order preserved</span>
+        if (++done === promises.length) resolve(results);
+      }, reject);                       <span class="cm">// first rejection rejects the whole thing</span>
+    });
+  });
+}</pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> a favourite "implement it yourself" question; the index-vs-push detail is exactly what they're checking. (<code>allSettled</code> swaps the fail-fast <code>reject</code> for recording each outcome.)</p>` },
 
   { eb:"lesson 19 · async toolkit", title:"Retry with backoff", html:`
     <p class="big">Transient failures (a flaky network, a busy service) deserve a retry — but a <b class="hl">bounded</b> one, with <b class="hl">exponential backoff</b> so you don't hammer a struggling dependency.</p>
@@ -2409,7 +2562,22 @@ consume(()   =&gt; q.pull());       <span class="cm">// slow: pull() blocks it w
       <div class="dnote seq" style="--i:4">Delay <code>base &middot; 2**n</code>; cap the attempts. Unbounded retries against a dead dependency are a retry storm.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p><b class="hl">Why it matters:</b> "make it robust" almost always means bounded retries + backoff (ideally with jitter and a circuit breaker).</p>` },
+    <p>Three ingredients. <b class="hl">Bounded</b> attempts so a permanently-dead dependency doesn't loop forever. <b class="hl">Exponential</b> backoff (<code>base · 2ⁿ</code>) so each retry waits longer, giving the service room to recover. And <b class="hl">jitter</b> — a random nudge — so a thousand clients that failed together don't all retry in lock-step and hammer it again.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; bounded, backed off, jittered</div>
+      <pre class="code">async function retry(fn, { tries = 3, base = 100 } = {}) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt &gt;= tries) throw err;              <span class="cm">// out of tries -> surface it</span>
+      const backoff = base * 2 ** (attempt - 1);     <span class="cm">// 100, 200, 400, ...</span>
+      await sleep(backoff + Math.random() * base);   <span class="cm">// + jitter</span>
+    }
+  }
+}</pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> "make it robust" almost always means bounded retries + backoff — ideally with jitter and, past a threshold, a circuit breaker that stops trying entirely.</p>` },
 
   { eb:"lesson 20 · async toolkit", title:"Memoize & dedupe", html:`
     <p class="big">When many callers request the same key at once, you want <b class="hl">one</b> computation shared by all — not N identical fetches. Cache the in-flight <b class="hl">promise</b> per key, and evict it if it rejects.</p>
@@ -2424,6 +2592,22 @@ consume(()   =&gt; q.pull());       <span class="cm">// slow: pull() blocks it w
       <div class="dnote seq" style="--i:4">Caching the resolved value (after <code>await</code>) loses the race — concurrent callers all miss and refetch.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>The whole trick is caching the <b class="hl">promise</b>, synchronously, before it settles — so callers arriving mid-flight get the same pending promise instead of missing the cache and starting their own. Then evict on failure, or a single transient error stays cached forever and every future caller inherits it.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; single-flight per key</div>
+      <pre class="code">function memoizeAsync(fn) {
+  const cache = new Map();               <span class="cm">// key -> in-flight or settled promise</span>
+  return (key) =&gt; {
+    if (cache.has(key)) return cache.get(key);       <span class="cm">// share the in-flight one</span>
+    const promise = fn(key).catch(err =&gt; {
+      cache.delete(key);                 <span class="cm">// evict on failure -> a later call can retry</span>
+      throw err;
+    });
+    cache.set(key, promise);             <span class="cm">// cache the PROMISE immediately</span>
+    return promise;
+  };
+}</pre>
+    </div>
     <p><b class="hl">Why it matters:</b> request dedup / single-flight is the JS "concurrent map" answer — collapse a stampede into one call.</p>` },
 
   { eb:"lesson 21 · async toolkit", title:"Cancellation & timeouts", html:`
@@ -2439,6 +2623,22 @@ consume(()   =&gt; q.pull());       <span class="cm">// slow: pull() blocks it w
       <div class="dnote seq" style="--i:4">A bare <code>Promise.race</code> reports the timeout but leaves the slow work running. Pass the signal and abort it.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>A bare <code>Promise.race([work, timer])</code> tells you the timer won — but <code>work</code> keeps running in the background, holding its socket and memory. The fix is a shared <code>AbortSignal</code>: pass it into the work, and <code>abort()</code> it when the timer wins so the work actually stops and cleans up. The same one signal, shared across siblings, is all an errgroup needs.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; a timeout that really cancels</div>
+      <pre class="code">function withTimeout(workFn, ms) {
+  const ctrl = new AbortController();
+  const work  = workFn(ctrl.signal).then(v =&gt; ({ ok: v }));   <span class="cm">// work honours the signal</span>
+  const timer = sleep(ms).then(() =&gt; {
+    ctrl.abort();                        <span class="cm">// timer wins -> stop the work</span>
+    return { timedOut: true };
+  });
+  return Promise.race([work, timer]);
+}
+
+<span class="cm">// errgroup is the same idea: one shared signal; the first task to fail</span>
+<span class="cm">// abort()s it, cancelling every sibling — no wasted work.</span></pre>
+    </div>
     <p><b class="hl">Why it matters:</b> "now make it cancelable" is the follow-up that separates people who've shipped concurrent code from people who've only read about it.</p>` },
 
   { eb:"lesson 22 · durable execution", title:"Durable workflows & replay", html:`
@@ -2455,6 +2655,21 @@ consume(()   =&gt; q.pull());       <span class="cm">// slow: pull() blocks it w
       <div class="dnote seq" style="--i:5">The same history must produce the <b style="color:var(--ordered)">same decisions</b> every time. So workflow code must be <b class="hl">deterministic</b>: no <code>Date.now()</code>, no <code>Math.random()</code>, no direct I/O — those are recorded once, then replayed.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>Determinism is enforced by routing every nondeterministic value through the runtime. A <b class="hl">side effect</b> wrapper runs the risky function once on the first execution and <i>records</i> its result; on replay it skips the function and returns the recorded value, so the code takes the exact same branches. Wall-clock time and sleeps go through the engine the same way — as durable, recorded facts.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; make nondeterminism replay-safe</div>
+      <pre class="code"><span class="cm">// wrap anything nondeterministic so replay returns the RECORDED value</span>
+function sideEffect(fn) {
+  if (replaying) return history[cursor++];   <span class="cm">// replay: reuse the first run's value</span>
+  const value = fn();                         <span class="cm">// first run: execute...</span>
+  history.push(value); cursor++;              <span class="cm">// ...and record it</span>
+  return value;
+}
+
+const id  = sideEffect(() =&gt; crypto.randomUUID());  <span class="cm">// stable across replays</span>
+const now = ctx.currentTime();               <span class="cm">// workflow time, not Date.now()</span>
+await ctx.sleep('15m');                       <span class="cm">// a DURABLE timer — survives a crash</span></pre>
+    </div>
     <p><b class="hl">Why it matters:</b> replay turns ordinary-looking code into a crash-proof process — but it bans nondeterminism, and the in-process hazards (signals interleaving at awaits, lesson 03) still apply. That's the durable-execution module.</p>` },
 
   { eb:"lesson 23 · interview essentials", title:"Blocking, non-blocking, async", html:`
@@ -2470,7 +2685,22 @@ consume(()   =&gt; q.pull());       <span class="cm">// slow: pull() blocks it w
       <div class="dnote seq" style="--i:3">blocking trades a thread for simplicity &middot; non-blocking trades simplicity for control &middot; async trades control for throughput.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p><b class="hl">Why it matters:</b> naming which model you're in — and its trade-off — out loud is half of a concurrency interview.</p>
+    <p>Notice these describe the <i>caller's</i> relationship to the work, not the work itself. The same fetch can be awaited (async), polled (non-blocking), or — in a worker — waited on (blocking). What changes is whether the caller stops, spins, or hands off.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; the same "not ready yet", three ways</div>
+      <pre class="code"><span class="cm">// BLOCKING — the thread stops until the value is ready (worker only)</span>
+Atomics.wait(cell, 0, 0);          <span class="cm">// parks the whole thread; does nothing meanwhile</span>
+const value = cell[1];
+
+<span class="cm">// NON-BLOCKING — returns now; you poll and retry yourself</span>
+while (!tryAcquire()) {            <span class="cm">// got 'not yet' -> spin or go do other work</span>
+  <span class="cm">/* ... */</span>
+}
+
+<span class="cm">// ASYNC — hand off, keep serving other work, resume on a callback</span>
+const value = await fetchValue();  <span class="cm">// one thread, many in-flight operations</span></pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> naming which model you're in — and its trade-off (a thread, or control, or throughput) — out loud is half of a concurrency interview.</p>
     <p class="sub" style="margin-top:14px">That's the map. Now work through the modules &mdash; tap a chip above to start drilling.</p>` },
 ];
 
