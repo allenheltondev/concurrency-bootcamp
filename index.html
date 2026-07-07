@@ -1890,7 +1890,21 @@ const LESSONS = [
       <div class="dnote seq" style="--i:0"><span class="spin" style="color:var(--accent)">&#8635;</span> <b style="color:var(--accent)">event loop:</b> take <b style="color:var(--race)">one</b> macrotask &rarr; run the stack to empty &rarr; drain <b style="color:var(--ordered)">all</b> microtasks &rarr; repeat.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p><b class="hl">Why it matters:</b> because a block can't be interrupted, ordinary code is safe from torn reads. But the instant you <code>await</code>, you hand the thread back — and that gap is where the ordering surprises and the bugs in the next chapters live.</p>` },
+    <p>Two queues feed that loop, and they aren't equal. <b class="hl">Macrotasks</b> — <code>setTimeout</code>, I/O and message callbacks — are taken one per turn. <b class="hl">Microtasks</b> — promise reactions and <code>await</code> continuations — are drained <i>completely</i> after each macrotask, before the next one runs. That's the rule the whole next chapter builds on.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; the loop the runtime runs for you</div>
+      <pre class="code">const macrotasks = [];   <span class="cm">// setTimeout, I/O, message callbacks</span>
+const microtasks = [];   <span class="cm">// .then / await continuations, queueMicrotask</span>
+
+function turn() {
+  const task = macrotasks.shift();   <span class="cm">// 1. take exactly ONE macrotask</span>
+  if (task) task();                  <span class="cm">// 2. run it start-to-finish (never interrupted)</span>
+  while (microtasks.length)          <span class="cm">// 3. then drain EVERY microtask</span>
+    microtasks.shift()();            <span class="cm">//    (new ones enqueued here run too)</span>
+}
+<span class="cm">// the runtime calls turn() forever — that is the event loop</span></pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> because a block can't be interrupted, ordinary synchronous code is safe from torn reads — no lock needed. But the instant you <code>await</code>, step 2 ends and you hand the thread back. That gap is where the ordering surprises and the races in the next chapters live.</p>` },
 
   { eb:"lesson 02 · the model", title:"Microtasks beat macrotasks", html:`
     <p class="big">Deferred work isn't one queue. After each macrotask, the loop drains the <b class="hl">entire</b> microtask queue before it touches the next macrotask.</p>
@@ -1911,7 +1925,21 @@ console.log('D');                        <span class="cm">// sync</span></pre>
       <div class="dnote seq" style="--i:6"><span style="color:var(--accent)">sync first</span> (A, D) &rarr; <span style="color:var(--ordered)">every microtask</span> (C) &rarr; <span style="color:var(--race)">then one macrotask</span> (B).</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p><b class="hl">Why it matters:</b> a busy chain of <code>.then</code>s can starve a <code>setTimeout(fn, 0)</code> indefinitely. Knowing the drain order is how you predict — and debug — async sequencing.</p>` },
+    <p>The reason is step 3 of the loop: it drains microtasks to <b class="hl">exhaustion</b>. If a microtask enqueues another microtask, that one runs in the same drain — the queue only has to be empty <i>once</i> for the loop to move on to the next macrotask. So a chain that keeps re-queuing itself never lets a timer run.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; a microtask chain starves a timer</div>
+      <pre class="code">setTimeout(() =&gt; console.log('timer'));   <span class="cm">// macrotask — waits its turn</span>
+
+let n = 0;
+(function loop() {
+  if (n++ &lt; 1000)
+    Promise.resolve().then(loop);         <span class="cm">// re-queues a MICROtask each time</span>
+})();
+
+<span class="cm">// all 1000 microtasks drain before 'timer' ever runs:</span>
+<span class="cm">// the microtask queue never reaches empty, so step 3 never finishes</span></pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> this is exactly how a runaway promise chain can freeze timers and rendering. Knowing the drain order — sync, then all microtasks, then one macrotask — is how you predict, and debug, any async sequence.</p>` },
 
   { eb:"lesson 03 · primitives", title:"The hidden race across await", html:`
     <p class="big">Here's the twist: single-threaded does <b class="hl">not</b> mean race-free. When a function <code>await</code>s in the middle of a read-modify-write, another task can run in the gap and move the data underneath it.</p>
@@ -1927,7 +1955,29 @@ console.log('D');                        <span class="cm">// sync</span></pre>
       <div class="dnote seq" style="--i:5">Final balance <b style="color:var(--race)">70</b>, but two withdrawals happened — it should be <b style="color:var(--ordered)">40</b>. One update was clobbered across the await.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p><b class="hl">Why it matters:</b> this is why JS still needs locks. A <b class="hl">critical section</b> — code that must run start-to-finish without interleaving — has to be serialized. That's the whole job of the primitives next.</p>` },
+    <p>The bug isn't the <code>await</code> itself — it's that a <b class="hl">read-modify-write</b> spans it. Between reading <code>balance</code> and writing it back, the function yields, another task reads the same old value, and one write clobbers the other. The fix is to make that span a <b class="hl">critical section</b>: serialize it so no second task can enter until the first has written back.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; the race, and the lock that closes it</div>
+      <pre class="code">let balance = 100;
+
+<span class="cm">// UNSAFE — the await splits read from write</span>
+async function withdraw(amount) {
+  const current = balance;              <span class="cm">// read</span>
+  await checkFraud(amount);             <span class="cm">// yields — another withdraw runs here</span>
+  balance = current - amount;           <span class="cm">// write, using a now-stale 'current'</span>
+}
+
+<span class="cm">// SAFE — one mutex serializes the whole read-await-write</span>
+const lock = new Mutex();
+async function withdraw(amount) {
+  await lock.runExclusive(async () =&gt; {
+    const current = balance;
+    await checkFraud(amount);           <span class="cm">// still awaits, but no one else can enter</span>
+    balance = current - amount;
+  });
+}</pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> this is why single-threaded JS still needs locks. Any state that's read and written across an <code>await</code> is a critical section — and serializing it is exactly the job of the primitives in the next chapter.</p>` },
 
   { eb:"lesson 04 · primitives", title:"Primitives: who runs when", html:`
     <p class="big">Synchronization primitives are small tools that control <b class="hl">who runs when</b>. Nearly all of them are the same idea: a queue of parked promises, plus a rule for whose <code>resolve()</code> fires next.</p>
@@ -1950,7 +2000,29 @@ console.log('D');                        <span class="cm">// sync</span></pre>
       </div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p><b class="hl">Why it matters:</b> these turn "it usually works" into guarantees — exclusive access, bounded concurrency, ordered handoff — without ever blocking the thread.</p>` },
+    <p>Every one shares the same skeleton: a private list of <b class="hl">parked resolvers</b> and a rule for whose resolver to call next. To block, a task pushes a resolver and awaits its promise; to release one, you shift a resolver off the list and call it. Here's the canonical example — a mutex — and every other primitive is a variation on it.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; a mutex is the template</div>
+      <pre class="code">class Mutex {
+  #locked = false;
+  #waiters = [];                      <span class="cm">// parked resolvers</span>
+
+  async acquire() {
+    if (!this.#locked) { this.#locked = true; return; }
+    await new Promise(r =&gt; this.#waiters.push(r));   <span class="cm">// park until handed the lock</span>
+  }
+  release() {
+    const next = this.#waiters.shift();
+    if (next) next();                 <span class="cm">// hand the lock straight to a waiter (stays locked)</span>
+    else this.#locked = false;        <span class="cm">// nobody waiting -> actually free it</span>
+  }
+  async runExclusive(fn) {            <span class="cm">// the ergonomic wrapper</span>
+    await this.acquire();
+    try { return await fn(); } finally { this.release(); }
+  }
+}</pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> these turn "it usually works" into guarantees — exclusive access, bounded concurrency, ordered handoff — without ever blocking the thread. Swap the release rule and you get a semaphore (count permits), a latch (fire all), or a queue (deliver a value).</p>` },
 
   { eb:"lesson 05 · primitives", title:"Latch & barrier", html:`
     <p class="big">Two coordination gates. A <b class="hl">latch</b> opens once and lets everyone through (a start signal). A <b class="hl">barrier</b> holds N parties until the last one arrives, then releases them together (a rendezvous).</p>
@@ -1965,7 +2037,34 @@ console.log('D');                        <span class="cm">// sync</span></pre>
       <div class="dnote seq" style="--i:4">A barrier(N) is the mirror image: each party <code>arrive()</code>s and blocks; the <b>last</b> arrival opens the gate for everyone.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p><b class="hl">Why it matters:</b> a latch releases work on a one-time signal (config loaded, race start); a barrier syncs phases (all workers finish step 1 before any starts step 2).</p>` },
+    <p>Both share the parked-resolver skeleton; only the release rule differs. A latch flips a one-way flag and wakes <i>everyone</i> — and because the flag stays set, anyone who waits <i>after</i> it opened returns immediately. A barrier counts arrivals and only the <b class="hl">last</b> one wakes the group.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; one-shot gate vs. rendezvous</div>
+      <pre class="code">class Latch {                          <span class="cm">// opens once, stays open</span>
+  #open = false; #waiters = [];
+  wait() {
+    if (this.#open) return Promise.resolve();      <span class="cm">// late arrivals sail through</span>
+    return new Promise(r =&gt; this.#waiters.push(r));
+  }
+  open() {
+    this.#open = true;
+    this.#waiters.forEach(r =&gt; r());   <span class="cm">// release everyone, once</span>
+    this.#waiters = [];
+  }
+}
+
+class Barrier {                        <span class="cm">// releases N together</span>
+  #parties; #count = 0; #waiters = [];
+  constructor(parties) { this.#parties = parties; }
+  async arrive() {
+    if (++this.#count === this.#parties)
+      this.#waiters.forEach(r =&gt; r());  <span class="cm">// the last arrival opens the gate</span>
+    else
+      await new Promise(r =&gt; this.#waiters.push(r));
+  }
+}</pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> a latch releases work on a one-time signal (config loaded, race start); a barrier syncs phases (all workers finish step 1 before any starts step 2). Note a latch is <i>not</i> a gate you can re-close — that one-shot property is exactly what makes late waiters safe.</p>` },
 
   { eb:"lesson 06 · primitives", title:"Condition variable", html:`
     <p class="big">A <b class="hl">condition variable</b> parks a task until a predicate becomes true, and a producer <b class="hl">signals</b> when the state it depends on changes. The waiter re-checks on every wake — so a stale or spurious wake just parks it again.</p>
@@ -1981,7 +2080,27 @@ console.log('D');                        <span class="cm">// sync</span></pre>
       <div class="dnote seq" style="--i:5">That re-check is why it's <code>while (!pred()) wait()</code>, never <code>if</code> — spurious wakeups are real.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p><b class="hl">Why it matters:</b> it's the general "wait until a state holds" tool — bounded queues, latches and "wait for ready" are all condition variables underneath.</p>` },
+    <p>The <code>while</code> loop is the whole point. A notify doesn't promise the predicate is true — only that the state <i>changed</i>, so it's worth re-checking. Multiple waiters, a signal consumed by someone else, or a bare wake all mean the predicate might still be false. Re-test in a loop and a false wake just parks you again; an <code>if</code> would let you charge ahead on a lie.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; wait-until-predicate</div>
+      <pre class="code">class CondVar {
+  #waiters = [];
+  async wait(pred) {
+    while (!pred()) {                  <span class="cm">// re-check on EVERY wake, never an if</span>
+      await new Promise(r =&gt; this.#waiters.push(r));
+    }
+  }
+  notifyAll() {                        <span class="cm">// state changed: wake all to re-check</span>
+    const woken = this.#waiters;
+    this.#waiters = [];                <span class="cm">// clear first, or a re-park races the wake</span>
+    woken.forEach(r =&gt; r());
+  }
+}
+
+<span class="cm">// usage: park until the buffer has something</span>
+await cv.wait(() =&gt; buffer.length &gt; 0);</pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> it's the general "wait until a state holds" tool — bounded queues, latches, and "wait for ready" are all condition variables underneath.</p>` },
 
   { eb:"lesson 07 · primitives", title:"Atomic lock (compare-and-swap)", html:`
     <p class="big">Locks aren't magic — they're built from one <b class="hl">atomic</b> instruction: <b class="hl">compare-and-swap</b>. CAS tests "is this cell 0?" and sets it to 1 in a single indivisible step, and tells you whether you won.</p>
@@ -1995,7 +2114,23 @@ console.log('D');                        <span class="cm">// sync</span></pre>
       <div class="dnote seq" style="--i:3">Both ran CAS at once; only one could flip 0&rarr;1. A plain <code>if (cell == 0) cell = 1</code> would let both in — two steps interleave.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p><b class="hl">Why it matters:</b> every mutex and semaphore sits on a CAS like this; <code>Atomics.wait</code>/<code>notify</code> add the "park until free" part. A classic interview probe.</p>` },
+    <p>The magic word is <b class="hl">indivisible</b>. <code>compareExchange</code> reads the cell, compares it, and conditionally writes — but the hardware guarantees no other thread observes or touches the cell partway through. That's what a plain <code>if (cell === 0) cell = 1</code> can't promise: two threads can both pass the <code>if</code> before either writes.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; a lock from one shared int</div>
+      <pre class="code">const cell = new Int32Array(new SharedArrayBuffer(4));  <span class="cm">// 0 = free, 1 = held</span>
+
+function tryAcquire() {
+  <span class="cm">// compareExchange(arr, i, expected, next) -> the OLD value, atomically</span>
+  return Atomics.compareExchange(cell, 0, 0, 1) === 0;   <span class="cm">// flip 0->1 iff it was 0</span>
+}
+function release() {
+  Atomics.store(cell, 0, 0);
+}
+
+<span class="cm">// blocking version: spin on tryAcquire(), or park with</span>
+<span class="cm">// Atomics.wait(cell, 0, 1) and wake others with Atomics.notify(cell, 0)</span></pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> every mutex and semaphore sits on a CAS like this; <code>Atomics.wait</code>/<code>notify</code> add the "park until free" part so waiters don't burn CPU spinning. A classic interview probe.</p>` },
 
   { eb:"lesson 08 · primitives", title:"Read / write lock", html:`
     <p class="big">When reads vastly outnumber writes, a plain mutex is wasteful — readers don't conflict with each other. A <b class="hl">read/write lock</b> lets <b class="hl">many readers</b> in at once, but a <b class="hl">writer</b> gets it alone.</p>
@@ -2010,7 +2145,40 @@ console.log('D');                        <span class="cm">// sync</span></pre>
       <div class="dnote seq" style="--i:4">Grant a writer only when no readers hold it; don't let a steady stream of readers starve a waiting writer.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p><b class="hl">Why it matters:</b> read-heavy caches and config stores get big throughput wins from shared reads — as long as writers still get exclusive access.</p>` },
+    <p>The subtlety is the handoff at release time, and fairness. Grant a writer only when <code>readers === 0</code>, or reads and writes overlap. But if new readers can always cut in front of a waiting writer, a steady read stream <b class="hl">starves</b> it forever — so a queued writer makes newly-arriving readers wait too.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; shared reads, exclusive writes</div>
+      <pre class="code">class RWLock {
+  #readers = 0; #writing = false; #readQ = []; #writeQ = [];
+
+  async acquireRead() {
+    if (this.#writing || this.#writeQ.length) {          <span class="cm">// writer active or waiting</span>
+      await new Promise(r =&gt; this.#readQ.push(r));        <span class="cm">// granter counts us in</span>
+      return;
+    }
+    this.#readers++;
+  }
+  releaseRead() { if (--this.#readers === 0) this.#grant(); }
+
+  async acquireWrite() {
+    if (this.#writing || this.#readers &gt; 0) {
+      await new Promise(r =&gt; this.#writeQ.push(r));       <span class="cm">// granter sets #writing</span>
+      return;
+    }
+    this.#writing = true;
+  }
+  releaseWrite() { this.#writing = false; this.#grant(); }
+
+  #grant() {                                             <span class="cm">// hand off at release time</span>
+    if (this.#writeQ.length) {
+      if (this.#readers === 0) { this.#writing = true; this.#writeQ.shift()(); }
+    } else {
+      while (this.#readQ.length) { this.#readers++; this.#readQ.shift()(); }
+    }
+  }
+}</pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> read-heavy caches and config stores get big throughput wins from shared reads — as long as writers still get exclusive access and don't starve.</p>` },
 
   { eb:"lesson 09 · primitives", title:"Run once (lazy init)", html:`
     <p class="big">Initialize something <b class="hl">exactly once</b>, even when many callers ask for it at the same time — a lazy singleton (open the DB pool, load config). The trick: cache the in-flight <b class="hl">promise</b>, not the value.</p>
@@ -2025,6 +2193,20 @@ console.log('D');                        <span class="cm">// sync</span></pre>
       <div class="dnote seq" style="--i:4">Caching the value instead of the promise loses the race: callers that arrive mid-init each start their own.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>Why the <b class="hl">promise</b> and not the value? Because the value doesn't exist yet when the second caller arrives — <code>init()</code> is still running. If you wait to cache the resolved value, every caller that arrives mid-init sees an empty cache and starts its own. Caching the in-flight promise immediately means they all <code>await</code> the same one.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; run once, share the result</div>
+      <pre class="code">function once(fn) {
+  let promise;                          <span class="cm">// the single in-flight / settled promise</span>
+  return () =&gt; (promise ??= fn());       <span class="cm">// call fn only the FIRST time; reuse after</span>
+}
+
+const getPool = once(() =&gt; createDbPool());   <span class="cm">// createDbPool() runs at most once</span>
+getPool(); getPool(); getPool();               <span class="cm">// 3 callers -> one pool, one shared promise</span>
+
+<span class="cm">// want retry-on-failure? evict on reject:</span>
+<span class="cm">//   return () =&gt; (promise ??= fn().catch(e =&gt; { promise = null; throw e; }));</span></pre>
+    </div>
     <p><b class="hl">Why it matters:</b> the difference between one DB connection and a thundering herd of them is exactly "cache the promise, not the value."</p>` },
 
   { eb:"lesson 10 · workers & atomics", title:"Real threads, real races", html:`
