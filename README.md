@@ -23,10 +23,12 @@ retry-with-backoff, async memoize / dedup, cancel-the-loser timeout, and
 cancel-on-first-error / errgroup), and a durable-execution module modeling
 workflow-engine (Temporal-style) concurrency hazards: deterministic replay,
 durable timeouts, serializing concurrent signals, and waiting on a signal
-predicate. A **Spot-the-bug** module then flips the drills around: real code
-from the same concrete patterns (the ordered logger, the mutex, the token
-bucket, the concurrency pool, dining philosophers, durable replay…) with a
-scenario describing how it misbehaves — tap the faulty line(s) and check.
+predicate. A **Spot-the-bug** module then flips the drills around: a full
+concurrency class or function (semaphore, mutex, bounded queue, token bucket,
+read/write lock, concurrency pool, condition variable, async dedup, dining
+philosophers, durable workflow) with a scenario describing how it misbehaves
+and one subtle fault hiding in the implementation — read the whole thing, tap
+the buggy line(s), and check.
 A **Test mode** then quizzes you across everything — shuffled options, first
 answer counts, scored — as a real readiness check. Throughout the drills and
 quiz, the answer choices are permuted on every load, so nothing can be solved
