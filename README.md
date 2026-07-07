@@ -23,8 +23,14 @@ retry-with-backoff, async memoize / dedup, cancel-the-loser timeout, and
 cancel-on-first-error / errgroup), and a durable-execution module modeling
 workflow-engine (Temporal-style) concurrency hazards: deterministic replay,
 durable timeouts, serializing concurrent signals, and waiting on a signal
-predicate. A **Test mode** then quizzes you across everything — shuffled
-options, first answer counts, scored — as a real readiness check.
+predicate. A **Spot-the-bug** module then flips the drills around: real code
+from the same concrete patterns (the ordered logger, the mutex, the token
+bucket, the concurrency pool, dining philosophers, durable replay…) with a
+scenario describing how it misbehaves — tap the faulty line(s) and check.
+A **Test mode** then quizzes you across everything — shuffled options, first
+answer counts, scored — as a real readiness check. Throughout the drills and
+quiz, the answer choices are permuted on every load, so nothing can be solved
+by "it's usually the first option."
 
 Drill and quiz modules step one card at a time (prev · n/total · next) for
 one-handed mobile use; every tapped answer — right or wrong — explains itself.
