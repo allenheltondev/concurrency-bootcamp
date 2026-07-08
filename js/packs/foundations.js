@@ -242,7 +242,7 @@ app.get("/order/:id", async (req, res) =&gt; {
         <line x1="260" y1="104" x2="190" y2="132" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 4"/>
         <rect x="118" y="132" width="104" height="30" rx="8" fill="#11131c" stroke="#8e86f0" stroke-width="1.6"/>
         <text x="170" y="147" fill="#8e86f0" font-size="8.5" text-anchor="middle">SHARED STORE</text>
-        <text x="170" y="158" fill="#6a7090" font-size="7" text-anchor="middle">DB / Redis &mdash; the only common ground</text>
+        <text x="170" y="158" fill="#6a7090" font-size="7" text-anchor="middle">DB / Valkey &mdash; the only common ground</text>
         <circle r="6" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
           <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.3;0.5;0.75;1" keyPoints="0;0.5;0.5;1;1" path="M 80 58 L 80 104 L 168 132"/></circle>
@@ -265,17 +265,17 @@ app.get("/order/:id", async (req, res) =&gt; {
 await mutex.runExclusive(() =&gt; { <span class="cm">/* critical section */</span> });
 
 <span class="cm">// MANY processes: the lock must live where all of them can see it</span>
-<span class="cm"> - distributed lock:   SET lock:orderId me NX PX 5000   (Redis, one winner)</span>
+<span class="cm"> - distributed lock:   SET lock:orderId me NX PX 5000   (Valkey, one winner)</span>
 <span class="cm"> - or push the invariant INTO the store, so no app-side lock is needed:</span>
 UPDATE orders SET stock = stock - 1 WHERE id = ? AND stock &gt; 0;
 <span class="cm">   one atomic statement — the database serializes it for every instance</span>
 
 <span class="cm">// the other primitives move the same way:</span>
-<span class="cm"> counter / rate limit -> INCR in Redis, not a local variable</span>
+<span class="cm"> counter / rate limit -> INCR in Valkey, not a local variable</span>
 <span class="cm"> "run once"           -> a unique row / lease, not a boolean flag</span>
 <span class="cm"> cache               -> shared cache, or accept per-instance copies</span></pre>
     </div>
-    <p><b class="hl">Why it matters:</b> this is the through-line for everything ahead. You will build a mutex, a semaphore, a rate limiter, a "run once" — first the in-memory versions, because the ideas are clearest there and they are what a single process needs. But keep asking <i>where the boundary is</i>: on one thread a variable is enough; across a cluster the very same guarantee has to be rented from a database or a Redis. Same concept, different scope — and knowing which scope you are in is the whole game.</p>` },
+    <p><b class="hl">Why it matters:</b> this is the through-line for everything ahead. You will build a mutex, a semaphore, a rate limiter, a "run once" — first the in-memory versions, because the ideas are clearest there and they are what a single process needs. But keep asking <i>where the boundary is</i>: on one thread a variable is enough; across a cluster the very same guarantee has to be rented from a database or a Valkey. Same concept, different scope — and knowing which scope you are in is the whole game.</p>` },
   ];
 
   /* ---- prepend, then repair numbering + cross-link indices ---- */

@@ -151,11 +151,14 @@ function renderSheet(m){
   }
 }
 
-/* ---- one-at-a-time stepper control (prev · n/total · next) ---- */
-function stepperRow(idx, total, go){
+/* ---- one-at-a-time stepper control (prev · n/total · next) ----
+   Pass `labels` (one name per item) to make the n/total indicator a
+   clickable menu that jumps straight to any item by name. */
+function stepperRow(idx, total, go, labels){
   const row=el(`<div class="row" style="justify-content:space-between;align-items:center;margin-top:14px"></div>`);
   const prev=el(`<button class="btn">‹ prev</button>`);
-  const pos=el(`<span class="ctrl">${idx+1} / ${total}</span>`);
+  const pos=(labels && labels.length===total) ? jumpIndicator(idx, total, go, labels)
+                                              : el(`<span class="ctrl">${idx+1} / ${total}</span>`);
   const next=el(`<button class="btn go">next ›</button>`);
   if(idx===0) prev.disabled=true;
   if(idx===total-1) next.disabled=true;
@@ -163,6 +166,36 @@ function stepperRow(idx, total, go){
   next.onclick=()=>go(idx+1);
   row.append(prev,pos,next);
   return row;
+}
+
+/* the "4 / 26" indicator, upgraded to a jump-to-item menu */
+function jumpIndicator(idx, total, go, labels){
+  const wrap=el(`<div class="stepjump"></div>`);
+  const btn=el(`<button class="ctrl posbtn" aria-haspopup="listbox" aria-expanded="false">${idx+1} / ${total} <span class="caret">▾</span></button>`);
+  const menu=el(`<div class="stepmenu" role="listbox" hidden></div>`);
+  const close=()=>{
+    menu.hidden=true; btn.setAttribute("aria-expanded","false");
+    document.removeEventListener("click",onDoc,true);
+    document.removeEventListener("keydown",onKey,true);
+  };
+  const onDoc=(e)=>{ if(!wrap.contains(e.target)) close(); };
+  const onKey=(e)=>{ if(e.key==="Escape") close(); };
+  labels.forEach((label,i)=>{
+    const item=el(`<button class="stepitem ${i===idx?"cur":""}" role="option" aria-selected="${i===idx}"><span class="num">${i+1}</span><span>${esc(label)}</span></button>`);
+    item.onclick=()=>{ close(); if(i!==idx) go(i); };
+    menu.appendChild(item);
+  });
+  btn.onclick=(e)=>{
+    e.stopPropagation();
+    if(menu.hidden){
+      menu.hidden=false; btn.setAttribute("aria-expanded","true");
+      const cur=menu.querySelector(".stepitem.cur"); if(cur) cur.scrollIntoView({block:"nearest"});
+      document.addEventListener("click",onDoc,true);
+      document.addEventListener("keydown",onKey,true);
+    } else close();
+  };
+  wrap.append(btn,menu);
+  return wrap;
 }
 
 const MODULE_LABEL = Object.fromEntries(MODULES.map(m=>[m.id,m.label]));
@@ -194,7 +227,7 @@ function renderLearn(){
   const card=el(`<div class="card lesson">${ch.html}</div>`);
   main.appendChild(card);
   const prac=practiceLinkRow(learnIdx); if(prac) main.appendChild(prac);
-  main.appendChild(stepperRow(learnIdx, LESSONS.length, (i)=>{ learnIdx=i; render(); window.scrollTo({top:0}); }));
+  main.appendChild(stepperRow(learnIdx, LESSONS.length, (i)=>{ learnIdx=i; render(); window.scrollTo({top:0}); }, LESSONS.map(l=>l.title)));
 
   // animate the diagram: replay restarts the staggered reveal; auto-play on view
   const anim=card.querySelector(".anim");
@@ -233,6 +266,12 @@ function buildQuizCard(q, qi){
   return card;
 }
 
+/* the predict-output questions have no title — name each by its first line */
+function quizLabel(q){
+  const first=(q.code||"").split("\n").map(s=>s.trim()).find(Boolean)||"";
+  return first.length>52 ? first.slice(0,51)+"…" : first;
+}
+
 function renderModel(){
   main.appendChild(el(`<div>
     <div class="eyebrow">module 00</div>
@@ -244,7 +283,7 @@ function renderModel(){
 
   modelIdx=Math.max(0,Math.min(modelIdx,QUIZ.length-1));
   main.appendChild(buildQuizCard(QUIZ[modelIdx], modelIdx));
-  main.appendChild(stepperRow(modelIdx, QUIZ.length, (i)=>{ modelIdx=i; render(); window.scrollTo({top:0}); }));
+  main.appendChild(stepperRow(modelIdx, QUIZ.length, (i)=>{ modelIdx=i; render(); window.scrollTo({top:0}); }, QUIZ.map(quizLabel)));
 }
 
 /* ---- drills (fill the blank) ---- */
@@ -262,7 +301,7 @@ function renderDrills(modId){
   const idx=Math.max(0,Math.min(drillIdx[modId]||0, list.length-1));
   drillIdx[modId]=idx;
   main.appendChild(buildDrillCard(list[idx]));
-  main.appendChild(stepperRow(idx, list.length, (i)=>{ drillIdx[modId]=i; render(); window.scrollTo({top:0}); }));
+  main.appendChild(stepperRow(idx, list.length, (i)=>{ drillIdx[modId]=i; render(); window.scrollTo({top:0}); }, list.map(d=>d.title)));
 }
 
 function buildDrillCard(d){
@@ -336,7 +375,7 @@ function renderBugHunt(){
   </div>`));
   bugIdx=Math.max(0,Math.min(bugIdx,BUGHUNT.length-1));
   main.appendChild(buildBugCard(BUGHUNT[bugIdx]));
-  main.appendChild(stepperRow(bugIdx, BUGHUNT.length, (i)=>{ bugIdx=i; render(); window.scrollTo({top:0}); }));
+  main.appendChild(stepperRow(bugIdx, BUGHUNT.length, (i)=>{ bugIdx=i; render(); window.scrollTo({top:0}); }, BUGHUNT.map(b=>b.title)));
 }
 
 function buildBugCard(b){
@@ -743,7 +782,7 @@ function renderWrite(){
   </div>`));
   writeIdx=Math.max(0,Math.min(writeIdx,WRITE.length-1));
   main.appendChild(buildWriteCard(WRITE[writeIdx]));
-  main.appendChild(stepperRow(writeIdx, WRITE.length, (i)=>{ writeIdx=i; render(); window.scrollTo({top:0}); }));
+  main.appendChild(stepperRow(writeIdx, WRITE.length, (i)=>{ writeIdx=i; render(); window.scrollTo({top:0}); }, WRITE.map(w=>w.title)));
 }
 
 /* ---- test mode: randomized, shuffled options, scored, no hints until you answer ---- */
