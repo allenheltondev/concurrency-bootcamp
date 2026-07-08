@@ -49,7 +49,7 @@ jobs:
           node --check worker.js
           node --check workers-atomics.js
           node --check sw.js
-          for f in js/*.js js/packs/*.js backend/functions/*/*.mjs; do
+          for f in js/*.js js/packs/*.js backend/src/*.mjs backend/src/*/*.mjs; do
             [ -e "$f" ] || continue
             node --check "$f"
           done
@@ -66,6 +66,17 @@ jobs:
         # checks ids/criteria/course references, and computes totalItems from
         # the real app content — a bad catalog entry cannot merge.
         run: node backend/tools/seed-catalog.mjs ci-dry-run > /dev/null
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Test the backend API
+        # Drives the exported lambdalith handler with synthetic API Gateway
+        # events — the full middy -> Powertools -> router -> handler chain —
+        # against an in-memory DynamoDB fake (see backend/test/).
+        run: npm test
+        working-directory: backend
 
       - name: Run practice pack tests against reference solutions
         # Stages practice/solutions/*.mjs over the skeleton slots and runs

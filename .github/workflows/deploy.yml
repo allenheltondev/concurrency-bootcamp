@@ -57,9 +57,19 @@ jobs:
           role-session-name: GitHubActions-ConcurrencyBootcamp-Deploy
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install backend dependencies
+        # Powertools (bundled into the lambdalith) + esbuild (used by sam build).
+        run: npm ci
+        working-directory: backend
+
       - name: SAM build
-        # Packages the backend Lambda code. The functions are dependency-free
-        # (no package.json), so this is a copy+zip — no Node toolchain needed.
+        # esbuild-bundles the lambdalith (backend/src/api.mjs); the AWS SDK
+        # stays external because the Lambda runtime ships it.
         run: sam build
 
       - name: SAM deploy

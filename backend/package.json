@@ -1,0 +1,24 @@
+{
+  "name": "concurrency-bootcamp-backend",
+  "version": "1.0.0",
+  "description": "Lambdalith API for the Concurrency Bootcamp backend",
+  "scripts": {
+    "test": "node --import ./test/register.mjs test/run.mjs"
+  },
+  "dependencies": {
+    "@aws-lambda-powertools/event-handler": "^2.33.1",
+    "@aws-lambda-powertools/jmespath": "^2.33.1",
+    "@aws-lambda-powertools/logger": "^2.33.1",
+    "@aws-lambda-powertools/metrics": "^2.33.1",
+    "@aws-lambda-powertools/tracer": "^2.33.1",
+    "@middy/core": "^7.7.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1082.0",
+    "@aws-sdk/lib-dynamodb": "^3.1082.0",
+    "esbuild": "^0.28.1"
+  },
+  "private": true,
+  "type": "module"
+}

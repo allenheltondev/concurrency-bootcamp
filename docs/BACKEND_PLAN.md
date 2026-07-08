@@ -23,9 +23,9 @@ a deliberately separate, final phase.
 ```
                     shared Ready Set Cloud user pool (external, referenced by id)
                                         │ JWT (issuer/audience)
-Browser ──(later)──► CloudFront ──► API Gateway HTTP API ──► Lambda (Node 22, esbuild) ──► DynamoDB
-   bootcamp.readysetcloud.io/api/*      routes /api/*          one function per route      single table
-   (existing distribution, new behavior)
+Browser ──(later)──► CloudFront ──► API Gateway HTTP API ──► Lambda (Node 22 lambdalith) ──► DynamoDB
+   bootcamp.readysetcloud.io/api/*      ANY /api/{proxy+}        Powertools Router             single table
+   (existing distribution, new behavior)                         resolves paths internally
 ```
 
 - **Auth**: the existing shared Cognito user pool is *not* created by this
@@ -46,11 +46,27 @@ Browser ──(later)──► CloudFront ──► API Gateway HTTP API ──�
   COOP/COEP headers policy. The API is same-origin with the site, so the UI
   phase needs **no CORS at all**; the execute-api URL stays reachable as a
   debugging back door but isn't part of the contract.
-- **Compute**: Node.js 22 Lambda functions in `backend/functions/`, one
-  handler per resource. Dependency-free on purpose: the runtime ships AWS
-  SDK v3, so there's no package.json, no bundler, and `sam build` is a plain
-  copy+zip. If a real dependency ever appears, that function grows esbuild
-  `Metadata` then — not before.
+- **Compute**: a single **lambdalith** (`backend/src/api.mjs`) behind
+  `ANY /api/{proxy+}` — the Powertools event-handler `Router` resolves paths
+  internally (prefix `/api`, path params, per-route zod validation). One
+  function means one cold-start profile, one set of alarms, and adding a
+  route is code, not infrastructure. esbuild-bundled by `sam build`; the AWS
+  SDK stays external because the runtime ships it.
+- **Powertools for AWS Lambda** everywhere it earns its keep:
+  - **Event Handler (http)**: routing, validation middleware, structured
+    4xx/5xx error bodies, body-size-limit middleware (`413`)
+  - **Logger**: structured JSON logs, Lambda context + API Gateway request id
+    as correlation id (via middy)
+  - **Tracer**: X-Ray handler segment (middy) + per-route subsegments and
+    ColdStart annotation (router middleware) + captured DynamoDB client
+  - **Metrics** (EMF): per-request latency/error/fault dimensioned by matched
+    route (router middleware), plus business metrics on the write path:
+    `ProgressSynced`, `VersionConflict`, `BadgeAwarded`, `CourseCompleted`,
+    `CourseReset`
+  - Deliberately skipped: **Idempotency** (optimistic locking already makes
+    retries safe, and it would add a second table), **Parameters** (no
+    SSM/secrets — config is env vars), **Batch** (no queues yet), **Parser**
+    (the router's zod validation covers request parsing).
 - **Data**: one DynamoDB table (`PAY_PER_REQUEST`, PITR on), single-table
   design below.
 - **Same stack** (`template.yaml`), new resources. One stack, one deploy
@@ -216,7 +232,12 @@ merge. Editing the JSON and merging is how a new course or badge appears.
 ## Work breakdown (each phase = one PR, independently mergeable, site untouched)
 
 Status: phases 1–4 are implemented (dark — nothing deploys until
-`COGNITO_USER_POOL_ID` is set); phase 5 is next, phase 6 stays parked.
+`COGNITO_USER_POOL_ID` is set), and phase 5's unit-test layer is in place:
+`backend/test/` drives the exported handler with synthetic API Gateway
+events through the full middy → Powertools → router chain against an
+in-memory DynamoDB fake, wired into CI. Remaining in phase 5: an integration
+smoke script against the deployed API with a real test-user token, and
+CloudWatch alarms. Phase 6 stays parked.
 
 **Phase 1 — Infra skeleton. ✅** Template additions: DynamoDB table, user-pool
 client against the shared pool, HTTP API + JWT authorizer, the CloudFront
@@ -268,3 +289,8 @@ Signed-out users keep today's experience forever — accounts stay optional.
 4. Gamification (badges, XP, streaks) is in scope for the data model and API
    from day one: server-computed on the progress write path, catalogs seeded
    from JSON, awards permanent. Leaderboards deferred. ✅
+5. The API is a **lambdalith**: one function resolves and routes every
+   `/api/*` path internally via the Powertools event-handler Router. ✅
+6. **Powertools** is the observability and routing backbone (Logger, Tracer,
+   Metrics, Event Handler); utilities that don't fit yet (Idempotency,
+   Parameters, Batch, Parser) are consciously skipped, not forgotten. ✅
