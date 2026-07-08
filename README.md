@@ -1,9 +1,17 @@
 # Concurrency Bootcamp
 
 A mobile-first, dependency-free web app for learning and practicing JavaScript
-concurrency. It opens with an illustrated **Lessons** primer (32 stepped
+concurrency. It opens with an illustrated **Lessons** primer (36 stepped
 chapters with animated HTML/CSS diagrams — tap ▶ replay to watch each sequence
-step through — one animated lesson for **every** concept the drills test: the
+step through — one animated lesson for **every** concept the drills test),
+starting with a four-lesson **foundations** prerequisite that answers the
+questions everything else builds on — how concurrency happens on a single
+thread (concurrency vs. parallelism), what is actually being competed for if
+only one line runs at a time (shared state across an `await`, and finite
+external resources — not the CPU), how the same one-thread model serves
+thousands of requests in a server, and how horizontal scaling moves the
+coordination boundary from the thread to the process to the cluster — then
+one animated lesson for the
 event loop and task ordering, the await-race hazard, each primitive (mutex,
 semaphore, latch/barrier, condition variable, atomic/CAS lock, read-write lock,
 run-once), workers/atomics, the problem patterns (producer-consumer &

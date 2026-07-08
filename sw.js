@@ -1,9 +1,10 @@
 /* Concurrency Bootcamp service worker — offline-first app shell.
    Bump CACHE on every content change so clients pick up the new build. */
-const CACHE = "cbootcamp-v4";
+const CACHE = "cbootcamp-v5";
 const SHELL = [
   "./", "./index.html", "./worker.js", "./manifest.webmanifest", "./icon.svg",
   "./js/core.js", "./js/content.js", "./js/app.js",
+  "./js/packs/foundations.js",
   "./js/packs/ordered-merge.js",
   "./js/packs/async-iterators.js",
   "./js/packs/cancellation.js",

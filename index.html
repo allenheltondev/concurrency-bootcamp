@@ -270,6 +270,8 @@
 <script src="js/core.js"></script>
 <script src="js/content.js"></script>
 <!-- content packs: each pushes its lessons/drills/exercises before the app boots -->
+<!-- foundations MUST load first: it PREPENDS the prerequisite lessons and renumbers -->
+<script src="js/packs/foundations.js"></script>
 <script src="js/packs/ordered-merge.js"></script>
 <script src="js/packs/async-iterators.js"></script>
 <script src="js/packs/cancellation.js"></script>
