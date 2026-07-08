@@ -40,7 +40,10 @@ behaves correctly passes, every failing run explains itself (trap lines
 included), and a deadlock or infinite loop just times out — it can never
 freeze the page.
 A **Test mode** then quizzes you across everything — shuffled options, first
-answer counts, scored — as a real readiness check. Throughout the drills and
+answer counts, scored — as a real readiness check, and every test finishes
+with a **build round**: one write-it exercise assembled from its line bank
+and graded by actually running it, where the first run is the one that
+counts. Throughout the drills and
 quiz, the answer choices are permuted on every load, so nothing can be solved
 by "it's usually the first option."
 

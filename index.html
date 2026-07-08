@@ -2139,7 +2139,7 @@ let learnIdx = 0;                                          // current lesson cha
 let modelIdx = 0;                                          // current quiz question
 let bugIdx = 0;                                            // current spot-the-bug card
 let writeIdx = 0;                                          // current write-it exercise
-let test = { on:false, qs:[], idx:0, score:0, answered:false };  // scored test mode
+let test = { on:false, qs:[], idx:0, score:0, answered:false, build:null };  // scored test mode
 let drillIdx = { primitives:0, bank:0, toolkit:0, durable:0 };  // current drill per module
 let quizDone = {};                                         // qi -> answered correctly (in-memory)
 
@@ -2182,7 +2182,8 @@ function resetProgress(){
   state.solved={}; quizDone={};
   learnIdx=0; modelIdx=0; bugIdx=0; writeIdx=0;
   drillIdx={ primitives:0, bank:0, toolkit:0, durable:0 };
-  test={ on:false, qs:[], idx:0, score:0, answered:false };
+  test={ on:false, qs:[], idx:0, score:0, answered:false, build:null };
+  for(const k in writeMem) delete writeMem[k];
   state.module="learn";
   renderProgress(); render(); window.scrollTo({top:0});
 }
@@ -4000,14 +4001,19 @@ ${testSrc}
   });
 }
 
-function buildWriteCard(w){
+/* in-memory build state per exercise, so stepping prev/next (or hopping to a
+   lesson and back) doesn't throw away a half-assembled body. Cleared on reset. */
+const writeMem = {};
+
+function buildWriteCard(w, opts={}){
+  const exam=!!opts.exam;                  // test-mode build round: first run counts
   const card=el(`<div class="card">
     <h2>${esc(w.title)}</h2>
     <div class="why">// ${esc(w.why)}</div>
-    <span class="done ${state.solved[w.id]?"":"hidden"}" data-done>✓ solved</span>
+    <span class="done ${!exam&&state.solved[w.id]?"":"hidden"}" data-done>✓ solved</span>
     <p class="scen">${esc(w.spec)}</p>
   </div>`);
-  if(w.lesson!=null){ const row=conceptLinkRow(w.lesson); if(row) card.querySelector(".why").after(row); }
+  if(!exam && w.lesson!=null){ const row=conceptLinkRow(w.lesson); if(row) card.querySelector(".why").after(row); }
 
   card.appendChild(el(`<pre class="code" style="margin:12px 0 4px">${esc(w.pre)}</pre>`));
   const built=el(`<div class="built"></div>`);
@@ -4027,58 +4033,70 @@ function buildWriteCard(w){
   const notes=el(`<div></div>`);
   card.append(cons, notes);
 
-  // chips: reference lines + distractor traps, shuffled once per card build
+  // chips are indices into `items` (reference lines, then traps) so duplicate
+  // lines stay distinct and an in-progress build can be restored from memory
   const items = w.lines.map((code)=>({code, why:null}))
     .concat(w.distractors.map((d)=>({code:d.code, why:d.why})));
-  const bankSeq = shuffle(items);
-  let done = !!state.solved[w.id];
+  const fresh=()=>({ seq:shuffle(items.map((_,i)=>i)), chosen:[], fails:0 });
+  const mem = exam ? fresh() : (writeMem[w.id] = writeMem[w.id] || fresh());
+  let done = !exam && !!state.solved[w.id];
+  let scored = false;                      // exam mode: score exactly once
   // revisiting a solved exercise shows the reference body, still runnable
-  let chosen = done ? items.filter(it=>!it.why) : [];
-  let fails = 0;
+  let chosen = done ? items.map((_,i)=>i).filter(i=>!items[i].why) : mem.chosen;
 
   function paint(){
-    if(done){ card.querySelector(".scen").style.borderColor="var(--ordered)"; }
+    if(done && !exam) card.querySelector(".scen").style.borderColor="var(--ordered)";
     built.innerHTML="";
     if(!chosen.length) built.appendChild(el(`<div class="ghost">tap lines from the bank below to build the body — tap a built line to take it back out</div>`));
-    chosen.forEach((it,ci)=>{
-      const b=el(`<button class="wline ${done?"locked":""}"><span class="ln">${ci+1}</span><span class="src">${esc(it.code)}</span></button>`);
+    chosen.forEach((ii,ci)=>{
+      const b=el(`<button class="wline ${done?"locked":""}"><span class="ln">${ci+1}</span><span class="src">${esc(items[ii].code)}</span></button>`);
       if(!done) b.onclick=()=>{ chosen.splice(ci,1); paint(); };
       built.appendChild(b);
     });
     bankBox.innerHTML="";
-    bankSeq.filter(it=>!chosen.includes(it)).forEach(it=>{
-      const b=el(`<button class="bankline">${esc(it.code)}</button>`);
-      b.onclick=()=>{ chosen.push(it); paint(); };
+    mem.seq.filter(ii=>!chosen.includes(ii)).forEach(ii=>{
+      const b=el(`<button class="bankline">${esc(items[ii].code)}</button>`);
+      b.onclick=()=>{ chosen.push(ii); paint(); };
       bankBox.appendChild(b);
     });
     bankLabel.style.display = bankBox.style.display = done ? "none" : "";
     clearBtn.style.display = done ? "none" : "";
-    runBtn.disabled = !done && chosen.length===0;
+    // solved drills stay re-runnable; a scored exam run is final
+    runBtn.disabled = done ? exam : chosen.length===0;
   }
+
+  // any trap lines sitting in the build explain themselves, like every wrong tap in the app
+  const trapNotes=()=>{
+    chosen.filter(ii=>items[ii].why).forEach(ii=>{
+      notes.appendChild(el(`<div class="why-line" style="border-color:var(--race)"><b style="color:var(--race)">trap — ${esc(items[ii].code.trim())}</b><br>${esc(items[ii].why)}</div>`));
+    });
+  };
 
   runBtn.onclick=async()=>{
     runBtn.disabled=true; notes.innerHTML="";
     cons.style.display="block"; cons.textContent="running your code in a sandbox…";
-    const src=[w.pre, ...chosen.map(it=>it.code), w.post].join("\n");
+    const src=[w.pre, ...chosen.map(ii=>items[ii].code), w.post].join("\n");
     const r=await sandboxRun(src, w.test, w.pass);
     cons.innerHTML=r.lines.map(l=>esc(l)).join("\n")+(r.lines.length?"\n":"")
       +`<span class="${r.pass?"pass":"fail"}">${r.pass?"✓ PASS":"✗ FAIL"} — ${esc(r.verdict)}</span>`;
-    if(r.pass){
+    if(exam){
+      done=true;                           // first run counts, pass or fail
+      if(r.pass) notes.appendChild(el(`<div class="why-line">${esc(w.takeaway)}</div>`));
+      else trapNotes();
+      if(!scored){ scored=true; if(opts.onScored) opts.onScored(r.pass); }
+    } else if(r.pass){
       done=true;
       card.querySelector("[data-done]").classList.remove("hidden");
       notes.appendChild(el(`<div class="why-line">${esc(w.takeaway)}</div>`));
       if(!state.solved[w.id]){ state.solved[w.id]=true; saveProgress(); }
     } else {
-      fails++;
-      // any trap lines sitting in the build explain themselves, like every wrong tap in the app
-      chosen.filter(it=>it.why).forEach(it=>{
-        notes.appendChild(el(`<div class="why-line" style="border-color:var(--race)"><b style="color:var(--race)">trap — ${esc(it.code.trim())}</b><br>${esc(it.why)}</div>`));
-      });
-      if(fails>=2 && w.hint) notes.appendChild(el(`<div class="why-line"><b>hint:</b> ${esc(w.hint)}</div>`));
+      mem.fails++;
+      trapNotes();
+      if(mem.fails>=2 && w.hint) notes.appendChild(el(`<div class="why-line"><b>hint:</b> ${esc(w.hint)}</div>`));
     }
     paint();
   };
-  clearBtn.onclick=()=>{ if(done) return; chosen=[]; fails=0; cons.style.display="none"; notes.innerHTML=""; paint(); };
+  clearBtn.onclick=()=>{ if(done) return; chosen.length=0; mem.fails=0; cons.style.display="none"; notes.innerHTML=""; paint(); };
 
   paint();
   return card;
@@ -4112,27 +4130,48 @@ function shuffleOptions(q){
 function startTest(n){
   let pool=shuffle(testPool());
   if(n!=="all") pool=pool.slice(0,n);
-  test={ on:true, qs:pool.map(shuffleOptions), idx:0, score:0, answered:false };
+  // every test ends with a build round: one write-it exercise, first run counts
+  test={ on:true, qs:pool.map(shuffleOptions), idx:0, score:0, answered:false,
+         build:{ ex:WRITE[rnd(WRITE.length)], done:false, pass:false } };
   render(); window.scrollTo({top:0});
 }
 function renderTest(){
   if(!test.on){
     main.appendChild(el(`<div>
       <div class="eyebrow">test yourself</div><h1>Test mode</h1>
-      <p class="lead">No hints. First answer counts, and the options are shuffled — so you can't lean on "it's usually the first one." Random questions, a score at the end: a real check on whether it's stuck.</p>
+      <p class="lead">No hints. First answer counts, and the options are shuffled — so you can't lean on "it's usually the first one." Random questions, then a <b style="color:var(--text)">build round</b> to finish: assemble one implementation from its line bank and run it — the first run is the one that counts.</p>
       <p class="sub">Prep tip: once you can pass these cold, rebuild each pattern in a blank file while talking it through out loud — that's the skill the interview actually grades.</p>
     </div>`));
     const row=el(`<div class="row"></div>`);
-    [["10 questions",10],["20 questions",20],["all "+testPool().length,"all"]].forEach(([label,n])=>{
+    [["10 + build",10],["20 + build",20],["all "+testPool().length+" + build","all"]].forEach(([label,n])=>{
       const b=el(`<button class="btn go">${label}</button>`); b.onclick=()=>startTest(n); row.appendChild(b);
     });
     main.appendChild(row);
     return;
   }
   if(test.idx>=test.qs.length){
-    const n=test.qs.length, s=test.score, pct=Math.round(100*s/n);
+    // build round: multiple choice is done — now write one, first run counts
+    if(test.build && !test.build.done){
+      main.appendChild(el(`<div class="eyebrow">build round · ${test.score} correct so far</div>`));
+      main.appendChild(el(`<div><h1>Now write one</h1><p class="lead">Multiple choice is over. Assemble this implementation from its line bank, then run it — <b style="color:var(--text)">your first run is the one that counts</b>, pass or fail.</p></div>`));
+      const card=buildWriteCard(test.build.ex,{ exam:true, onScored:(pass)=>{
+        test.build.done=true; test.build.pass=pass;
+        if(pass) test.score++;
+        const nrow=el(`<div class="row"></div>`);
+        const nb=el(`<button class="btn go">see score ›</button>`);
+        nb.onclick=()=>{ render(); window.scrollTo({top:0}); };
+        nrow.appendChild(nb); card.appendChild(nrow);
+      }});
+      main.appendChild(card);
+      return;
+    }
+    const n=test.qs.length+(test.build?1:0), s=test.score, pct=Math.round(100*s/n);
     const msg = pct>=90?"Sharp — you're ready." : pct>=70?"Solid. Patch the misses and you're close." : "Worth another pass through the drills.";
-    main.appendChild(el(`<div><div class="eyebrow">result</div><h1>${s} / ${n} <span class="sub" style="font-size:17px">· ${pct}%</span></h1><p class="lead">${msg}</p></div>`));
+    const mc = s-(test.build&&test.build.pass?1:0);
+    const buildLine = test.build
+      ? `<p class="sub">${mc} / ${test.qs.length} multiple choice · build round (${esc(test.build.ex.title.replace(/ — write it$/,""))}): ${test.build.pass?'<span style="color:var(--ordered)">✓ passed</span>':'<span style="color:var(--race)">✗ failed</span>'}</p>`
+      : "";
+    main.appendChild(el(`<div><div class="eyebrow">result</div><h1>${s} / ${n} <span class="sub" style="font-size:17px">· ${pct}%</span></h1><p class="lead">${msg}</p>${buildLine}</div>`));
     const row=el(`<div class="row"></div>`);
     const again=el(`<button class="btn go">▶ retake</button>`); again.onclick=()=>{ test.on=false; render(); window.scrollTo({top:0}); };
     row.appendChild(again); main.appendChild(row);
@@ -4156,7 +4195,7 @@ function renderTest(){
       });
       if(q.whys) blank.appendChild(el(`<div class="why-line">${esc(q.whys[q.answer])}</div>`));
       const nrow=el(`<div class="row"></div>`);
-      const nb=el(`<button class="btn go">${test.idx+1<test.qs.length?"next ›":"see score ›"}</button>`);
+      const nb=el(`<button class="btn go">${test.idx+1<test.qs.length?"next ›":(test.build&&!test.build.done?"build round ›":"see score ›")}</button>`);
       nb.onclick=()=>{ test.idx++; test.answered=false; render(); window.scrollTo({top:0}); };
       nrow.appendChild(nb); card.appendChild(nrow);
     };
