@@ -52,7 +52,7 @@
 
     <div class="impl">
       <div class="dlabel">errgroup / structured concurrency &rarr; child workflows + Promise.all</div>
-      <p>Fan out, wait for all, cancel the rest on first failure — that's errgroup. Inside a workflow I write <code>await Promise.all([executeChild(a), executeChild(b)])</code> and it just works, because the SDK's scheduler is deterministic: <code>Promise.all</code> and <code>Promise.race</code> are replay-safe inside workflow code, so the combinators I already know carry straight over.</p>
+      <p>Fan out and fail fast: inside a workflow I write <code>await Promise.all([executeChild(a), executeChild(b)])</code> and it just works, because the SDK's scheduler is deterministic — <code>Promise.all</code> and <code>Promise.race</code> are replay-safe inside workflow code. One honest caveat: <code>Promise.all</code> rejects fast but does <b class="hl">not</b> cancel the surviving children — for full errgroup semantics ("first failure cancels the rest") I wrap them in a <code>CancellationScope</code> and cancel it on the way out.</p>
     </div>
 
     <div class="impl">
@@ -160,7 +160,8 @@ assert(launches.a === 2);   <span class="cm">// the ORDER is the test, not luck<
 
     <p><b class="hl">The ecosystem version:</b> fake timers (Jest/Sinon <code>useFakeTimers</code>) are technique 1 applied to the clock — you advance time by hand, so a "wait 15 minutes" path tests in microseconds and never flakes on a slow machine.</p>
 
-    <p><b class="hl">The rule:</b> a flaky concurrency test is a real bug — in the test's timing assumptions, or in the code it exercises. There is no third option called "retry it until it's green." Retrying a flake into a pass hides exactly the kind of race you're being paid to find.</p>`,
+    <p><b class="hl">The rule:</b> a flaky concurrency test is a real bug — in the test's timing assumptions, or in the code it exercises. There is no third option called "retry it until it's green." Retrying a flake into a pass hides exactly the kind of race you're being paid to find.</p>
+    <p class="sub" style="margin-top:14px">That's the map. Now work through the modules &mdash; tap a chip above to start drilling.</p>`,
   });
 
   /* =========================================================

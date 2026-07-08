@@ -42,7 +42,7 @@
       <div class="dnote seq" style="--i:0"><span class="spin" style="color:var(--accent)">&#8635;</span> between <b>every</b> callback: drain the <b style="color:var(--accent)">nextTick</b> queue, then the <b style="color:var(--ordered)">promise</b> microtask queue &mdash; both to empty &mdash; before moving on.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p>There are <b class="hl">two</b> micro-queues, not one. <code>process.nextTick</code> has its own queue that drains <b class="hl">before</b> the promise microtask queue (<code>.then</code>/<code>await</code>). Both are drained to empty between every callback and before each phase — so <code>nextTick</code> always beats a <code>.then</code>, and both still beat any timer.</p>
+    <p>There are <b class="hl">two</b> micro-queues, not one. <code>process.nextTick</code> has its own queue that drains <b class="hl">before</b> the promise microtask queue (<code>.then</code>/<code>await</code>). Both are drained to empty between every callback and before each phase — so at each drain point the <code>nextTick</code> queue empties before the promise queue, and both still beat any timer. (One wrinkle: a <code>nextTick</code> scheduled from <i>inside</i> a promise microtask waits for the current promise drain to finish — one of the quiz questions runs exactly that.)</p>
     <div class="impl">
       <div class="dlabel">reference &middot; the phase ring and the two micro-queues</div>
       <pre class="code"><span class="cm">// each phase runs its due callbacks; BETWEEN every callback Node drains:</span>
@@ -94,8 +94,9 @@ const tasks = inputs.map(x =&gt; doWork(x));   <span class="cm">// all in flight
 const results = await Promise.allSettled(tasks);
 
 <span class="cm">// THE SUBTLE await TRAP</span>
-await a;   <span class="cm">// if b rejects WHILE you're parked here, b had no handler yet</span>
-await b;   <span class="cm">// fix: start both first — const pb = b() — THEN await pb</span></pre>
+await a;   <span class="cm">// if b rejects WHILE you're parked here, b had no handler yet —</span>
+await b;   <span class="cm">// and starting b early doesn't help: this await attaches too late.</span>
+           <span class="cm">// fix: await Promise.all([a, b]) — handlers attach to BOTH up front</span></pre>
     </div>
     <p><b class="hl">Why it matters:</b> "just add a <code>.catch</code>" is right, but <i>when</i> you add it is the whole game. A handler attached one <code>await</code> too late doesn't stop the unhandled-rejection event that already fired. Start every promise with its failure path attached — then choose the combinator that matches the outcome you need.</p>` });
 
