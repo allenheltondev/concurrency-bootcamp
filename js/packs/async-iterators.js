@@ -138,7 +138,8 @@ class Channel {
   push(v) {                                <span class="cm">// producer side (push)</span>
     const w = this.#waiters.shift();
     if (w) w.resolve({ value: v, done: false });   <span class="cm">// a puller is parked — hand it over</span>
-    else this.#items.push(v);              <span class="cm">// nobody waiting — buffer it</span>
+    else this.#items.push(v);              <span class="cm">// nobody waiting — buffer it (unbounded here!</span>
+                                           <span class="cm">// cap it + block push to press back on the producer)</span>
   }
   close() { this.#closed = true; this.#waiters.forEach(w =&gt; w.resolve({ done: true })); }
   async *[Symbol.asyncIterator]() {        <span class="cm">// consumer side (pull)</span>
@@ -176,7 +177,7 @@ class Channel {
         <rect x="262" y="56" width="66" height="32" rx="8" fill="#11131c" stroke="#ff9a6b" stroke-width="1.4"/>
         <text x="295" y="70" fill="#ff9a6b" font-size="8" text-anchor="middle">yield v</text>
         <text x="295" y="82" fill="#8b90ab" font-size="7.5" text-anchor="middle">re-arm src 1</text>
-        <path d="M 295 88 Q 295 134 60 134 L 44 116" fill="none" stroke="#ff9a6b" stroke-width="1.2" stroke-dasharray="2 4"/>
+        <path d="M 295 88 Q 295 138 170 138 Q 92 138 86 90" fill="none" stroke="#ff9a6b" stroke-width="1.2" stroke-dasharray="2 4"/>
         <text x="170" y="147" fill="#6a7090" font-size="7.5" text-anchor="middle">only the winner gets a fresh next() — the others keep their in-flight one</text>
       </svg>
       <div class="lanes" style="margin-top:6px">

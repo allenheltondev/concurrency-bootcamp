@@ -1535,7 +1535,7 @@ function turn() {
       <div class="dlabel">one tick &middot; what order prints?</div>
       <pre class="code" style="margin:0 0 12px">console.log('A');                        <span class="cm">// sync</span>
 setTimeout(() =&gt; console.log('B'));       <span class="cm">// macro</span>
-Promise.resolve().then(() =&gt; log('C'));   <span class="cm">// micro</span>
+Promise.resolve().then(() =&gt; console.log('C'));  <span class="cm">// micro</span>
 console.log('D');                        <span class="cm">// sync</span></pre>
       <div class="histtape">
         <span class="chip2 sync seq pop" style="--i:0">A</span><span class="chip2 sync seq pop" style="--i:1">D</span>
@@ -1559,7 +1559,7 @@ let n = 0;
 })();
 
 <span class="cm">// all 1000 microtasks drain before 'timer' ever runs:</span>
-<span class="cm">// the microtask queue never reaches empty, so step 3 never finishes</span></pre>
+<span class="cm">// the queue doesn't reach empty until the whole chain has run</span></pre>
     </div>
     <p><b class="hl">Why it matters:</b> this is exactly how a runaway promise chain can freeze timers and rendering. Knowing the drain order — sync, then all microtasks, then one macrotask — is how you predict, and debug, any async sequence.</p>` },
 
@@ -1652,11 +1652,11 @@ async function withdraw(amount) {
         <line x1="170" y1="26" x2="170" y2="128" stroke="#2c3350" stroke-width="1"/>
         <text x="256" y="16" fill="#57e0b0" font-size="9" text-anchor="middle">SEMAPHORE &middot; 3 permits</text>
         <rect x="210" y="30" width="20" height="20" rx="5" fill="#11131c" stroke="#57e0b0" stroke-width="1.4">
-          <animate attributeName="fill" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.25;0.5;0.75;1" values="rgba(87,224,176,.28);#11131c;#11131c;rgba(87,224,176,.28);rgba(87,224,176,.28)"/></rect>
+          <animate attributeName="fill" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.72;0.78;0.94;1" values="rgba(87,224,176,.28);rgba(87,224,176,.28);#11131c;#11131c;rgba(87,224,176,.28)"/></rect>
         <rect x="246" y="30" width="20" height="20" rx="5" fill="#11131c" stroke="#57e0b0" stroke-width="1.4">
-          <animate attributeName="fill" dur="4.5s" begin="-1.5s" repeatCount="indefinite" keyTimes="0;0.25;0.5;0.75;1" values="rgba(87,224,176,.28);#11131c;#11131c;rgba(87,224,176,.28);rgba(87,224,176,.28)"/></rect>
+          <animate attributeName="fill" dur="4.5s" begin="-1.5s" repeatCount="indefinite" keyTimes="0;0.72;0.78;0.94;1" values="rgba(87,224,176,.28);rgba(87,224,176,.28);#11131c;#11131c;rgba(87,224,176,.28)"/></rect>
         <rect x="282" y="30" width="20" height="20" rx="5" fill="#11131c" stroke="#57e0b0" stroke-width="1.4">
-          <animate attributeName="fill" dur="4.5s" begin="-3s" repeatCount="indefinite" keyTimes="0;0.25;0.5;0.75;1" values="rgba(87,224,176,.28);#11131c;#11131c;rgba(87,224,176,.28);rgba(87,224,176,.28)"/></rect>
+          <animate attributeName="fill" dur="4.5s" begin="-3s" repeatCount="indefinite" keyTimes="0;0.72;0.78;0.94;1" values="rgba(87,224,176,.28);rgba(87,224,176,.28);#11131c;#11131c;rgba(87,224,176,.28)"/></rect>
         <text x="256" y="63" fill="#8b90ab" font-size="8" text-anchor="middle">up to 3 held at once</text>
         <g>
           <circle cx="200" cy="118" r="6.5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5"><animate attributeName="opacity" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.05;0.7;0.75;1" values="1;1;1;0.3;0.3"/></circle>
@@ -1669,15 +1669,15 @@ async function withdraw(amount) {
       <div class="dcols">
         <div class="dcol seq" style="--i:0">
           <div class="dlabel">mutex &middot; 1 permit</div>
-          <div class="permits"><div class="permit"></div></div>
+          <div class="permits"><div class="permit used"></div></div>
           <div style="margin-top:8px"><span class="chip2" style="border-color:var(--ordered);color:var(--ordered)">1 running</span></div>
           <div style="margin-top:4px"><span class="chip2" style="opacity:.55">waiting</span><span class="chip2" style="opacity:.55">waiting</span></div>
           <div class="dnote">release() hands the lock straight to the next waiter — never observably free.</div>
         </div>
         <div class="dcol seq" style="--i:1">
           <div class="dlabel">semaphore &middot; 3 permits</div>
-          <div class="permits"><div class="permit"></div><div class="permit"></div><div class="permit used"></div></div>
-          <div style="margin-top:8px"><span class="chip2" style="border-color:var(--ordered);color:var(--ordered)">2 running</span><span class="chip2" style="opacity:.55">1 waiting</span></div>
+          <div class="permits"><div class="permit used"></div><div class="permit used"></div><div class="permit used"></div></div>
+          <div style="margin-top:8px"><span class="chip2" style="border-color:var(--ordered);color:var(--ordered)">3 running</span><span class="chip2" style="opacity:.55">1 waiting</span></div>
           <div class="dnote">up to N run at once; the rest park until a permit frees.</div>
         </div>
       </div>
@@ -1764,7 +1764,7 @@ class Barrier {                        <span class="cm">// releases N together</
   }
 }</pre>
     </div>
-    <p><b class="hl">Why it matters:</b> a latch releases work on a one-time signal (config loaded, race start); a barrier syncs phases (all workers finish step 1 before any starts step 2). Note a latch is <i>not</i> a gate you can re-close — that one-shot property is exactly what makes late waiters safe.</p>` },
+    <p><b class="hl">Why it matters:</b> a latch releases work on a one-time signal (config loaded, race start); a barrier syncs phases (all workers finish step 1 before any starts step 2). Note a latch is <i>not</i> a gate you can re-close — that one-shot property is exactly what makes late waiters safe. And this barrier is single-use: a <i>cyclic</i> barrier also resets the count on release, so the same group can rendezvous again at the next phase.</p>` },
 
   { eb:"lesson 06 · primitives", title:"Condition variable", html:`
     <p class="big">A <b class="hl">condition variable</b> parks a task until a predicate becomes true, and a producer <b class="hl">signals</b> when the state it depends on changes. The waiter re-checks on every wake — so a stale or spurious wake just parks it again.</p>
@@ -2045,7 +2045,7 @@ getPool(); getPool(); getPool();               <span class="cm">// 3 callers -> 
       <div class="dnote seq" style="--i:7"><code style="color:var(--ordered)">Atomics.add(counter, 0, 1)</code> is one <b class="hl">indivisible</b> step — no thread can slip between read and write. <code>Atomics.wait</code> / <code>notify</code> build real cross-thread locks.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p>Workers normally have <b class="hl">separate</b> heaps — they communicate by copying messages, so there's nothing to race on. A <code>SharedArrayBuffer</code> is the deliberate exception: its bytes live in memory every worker can read and write directly. That's real parallelism on shared state, so <code>counter++</code> (read, add, write) can interleave and lose updates — the same torn read C or Java would give you.</p>
+    <p>Workers normally have <b class="hl">separate</b> heaps — they communicate by copying messages, so there's nothing to race on. A <code>SharedArrayBuffer</code> is the deliberate exception: its bytes live in memory every worker can read and write directly. That's real parallelism on shared state, so <code>counter++</code> (read, add, write) can interleave and lose updates — the same lost update C or Java would give you.</p>
     <div class="impl">
       <div class="dlabel">reference implementation &middot; shared memory across real threads</div>
       <pre class="code"><span class="cm">// main thread — hand every worker the SAME buffer</span>
@@ -2145,9 +2145,9 @@ consume(()   =&gt; q.pull());       <span class="cm">// slow: pull() blocks it w
           <animate attributeName="stroke" dur="6.5s" repeatCount="indefinite" keyTimes="0;0.28;0.30;0.45;0.47;0.73;0.75;1" values="#3a4160;#3a4160;#ff9a6b;#ff9a6b;#57e0b0;#57e0b0;#3a4160;#3a4160"/></rect>
         <text x="170" y="78" fill="#cdd2e6" font-size="9" text-anchor="middle">B</text>
         <text x="170" y="93" font-size="7.5" text-anchor="middle" fill="#ff9a6b" opacity="0">fail &middot; holds turn
-          <animate attributeName="opacity" dur="6.5s" repeatCount="indefinite" keyTimes="0;0.30;0.44;0.45;1" values="0;1;1;0;0"/></text>
+          <animate attributeName="opacity" dur="6.5s" repeatCount="indefinite" keyTimes="0;0.29;0.30;0.44;0.45;1" values="0;0;1;1;0;0"/></text>
         <text x="170" y="93" font-size="7.5" text-anchor="middle" fill="#57e0b0" opacity="0">retry &#10003;
-          <animate attributeName="opacity" dur="6.5s" repeatCount="indefinite" keyTimes="0;0.47;0.6;0.74;1" values="0;1;1;0;0"/></text>
+          <animate attributeName="opacity" dur="6.5s" repeatCount="indefinite" keyTimes="0;0.46;0.47;0.73;0.74;1" values="0;0;1;1;0;0"/></text>
         <rect x="240" y="54" width="80" height="52" rx="9" fill="#11131c" stroke="#3a4160" stroke-width="1.5">
           <animate attributeName="stroke" dur="6.5s" repeatCount="indefinite" keyTimes="0;0.73;0.75;1" values="#3a4160;#3a4160;#57e0b0;#57e0b0"/></rect>
         <text x="280" y="78" fill="#cdd2e6" font-size="9" text-anchor="middle">C</text>
@@ -2233,12 +2233,15 @@ seq.release(turn);</pre>
   for (const [i, item] of items.entries()) {
     const p = Promise.resolve().then(() =&gt; worker(item, i));
     results.push(p);
-    inFlight.add(p);
-    p.finally(() =&gt; inFlight.delete(p));
+    <span class="cm">// track a settled-signal, not p itself: it never rejects, so a</span>
+    <span class="cm">// failing job can't fire an unhandled rejection from the tracker</span>
+    const slot = p.then(() =&gt; {}, () =&gt; {});
+    inFlight.add(slot);
+    slot.then(() =&gt; inFlight.delete(slot));
     if (inFlight.size &gt;= limit)
       await Promise.race(inFlight);      <span class="cm">// free ONE slot, then continue</span>
   }
-  return Promise.all(results);
+  return Promise.all(results);           <span class="cm">// failures still surface here</span>
 }</pre>
     </div>
     <p><b class="hl">Why it matters:</b> this is the JS thread-pool/executor — the standard answer to "process this list without overwhelming the dependency."</p>` },
@@ -2424,20 +2427,19 @@ const winner = await select([
         <text x="200" y="76" fill="#57e0b0" font-size="7" text-anchor="start" opacity="0">one fire, after quiet<animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.46;0.5;0.9;1" values="0;0;1;1;0"/></text>
         <g fill="#57e0b0" stroke="#11131c" stroke-width="1.4">
           <circle cx="70" cy="108" r="6" opacity="0"><animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.07;0.11;0.95;1" values="0;0;1;1;0"/></circle>
-          <circle cx="130" cy="108" r="6" opacity="0"><animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.28;0.32;0.95;1" values="0;0;1;1;0"/></circle>
-          <circle cx="190" cy="108" r="6" opacity="0"><animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.48;0.52;0.95;1" values="0;0;1;1;0"/></circle>
+          <circle cx="138" cy="108" r="6" opacity="0"><animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.29;0.33;0.95;1" values="0;0;1;1;0"/></circle>
         </g>
-        <text x="248" y="112" fill="#6a7090" font-size="7" text-anchor="start">steady rate</text>
+        <text x="196" y="112" fill="#6a7090" font-size="7" text-anchor="start">no more calls &rarr; no more fires</text>
         <line x1="52" y1="16" x2="52" y2="118" stroke="#8e86f0" stroke-width="1.2" opacity="0.55"><animateTransform attributeName="transform" type="translate" dur="5s" repeatCount="indefinite" keyTimes="0;0.85;0.851;1" values="0 0;252 0;0 0;0 0"/></line>
       </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">debounce</div><div class="lstep good seq pop" style="--i:0">&hellip; wait for quiet &hellip; &rarr; ONE call</div>
-        <div class="lanehead seq" style="--i:1">throttle</div><div class="lstep good seq pop" style="--i:1">fire &middot; (skip) &middot; fire &middot; (skip) &middot; fire</div>
+        <div class="lanehead seq" style="--i:1">throttle</div><div class="lstep good seq pop" style="--i:1">fire &middot; (skip skip) &middot; fire &middot; then quiet &rarr; nothing</div>
       </div>
       <div class="dnote seq" style="--i:2">Debounce = collapse a burst to its trailing edge. Throttle = a steady rate cap.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p>The implementations are almost twins, but the timer logic is opposite. Debounce keeps <b class="hl">resetting</b> a timer on every call, so it only fires once the calls stop. Throttle records <i>when it last fired</i> and refuses until an interval has passed — so it fires on a steady cadence no matter how fast the calls arrive.</p>
+    <p>The implementations are almost twins, but the timer logic is opposite. Debounce keeps <b class="hl">resetting</b> a timer on every call, so it only fires once the calls stop. Throttle records <i>when it last fired</i> and refuses until an interval has passed — a steady cadence <i>while calls keep arriving</i>. Note this leading-edge version fires on the first call of a burst and <b class="hl">drops the trailing one</b> — the final scroll position never fires; add a trailing timer if you need it.</p>
     <div class="impl">
       <div class="dlabel">reference implementation &middot; collapse vs. rate-cap</div>
       <pre class="code">function debounce(fn, wait) {
@@ -2652,11 +2654,13 @@ function throttle(fn, interval) {
       <pre class="code">function withTimeout(workFn, ms) {
   const ctrl = new AbortController();
   const work  = workFn(ctrl.signal).then(v =&gt; ({ ok: v }));   <span class="cm">// work honours the signal</span>
-  const timer = sleep(ms).then(() =&gt; {
-    ctrl.abort();                        <span class="cm">// timer wins -> stop the work</span>
-    return { timedOut: true };
+  let cancelTimer;
+  const timer = new Promise(res =&gt; {
+    const t = setTimeout(() =&gt; { ctrl.abort(); res({ timedOut: true }); }, ms);
+    cancelTimer = () =&gt; clearTimeout(t);  <span class="cm">// the timer must be cancellable too</span>
   });
-  return Promise.race([work, timer]);
+  return Promise.race([work, timer])
+    .finally(cancelTimer);               <span class="cm">// work wins -> clear the losing timer</span>
 }
 
 <span class="cm">// errgroup is the same idea: one shared signal; the first task to fail</span>
@@ -2752,7 +2756,7 @@ while (!tryAcquire()) {            <span class="cm">// got 'not yet' -> spin or 
 const value = await fetchValue();  <span class="cm">// one thread, many in-flight operations</span></pre>
     </div>
     <p><b class="hl">Why it matters:</b> naming which model you're in — and its trade-off (a thread, or control, or throughput) — out loud is half of a concurrency interview.</p>
-    <p class="sub" style="margin-top:14px">That's the map. Now work through the modules &mdash; tap a chip above to start drilling.</p>` },
+    <p class="sub" style="margin-top:14px">That's the core map. The chapters ahead go deeper &mdash; ordered merge, async iterators, cancellation, Node's loop, testing &mdash; or tap a chip above to start drilling.</p>` },
 ];
 
 /* ---- lesson <-> skill cross-links ----

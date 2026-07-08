@@ -115,7 +115,7 @@ function waitForValue(source, signal) {
 const timeout = AbortSignal.timeout(5000);                 <span class="cm">// self-aborts after 5s</span>
 const both = AbortSignal.any([userSignal, timeout]);       <span class="cm">// aborts when EITHER does</span></pre>
     </div>
-    <p><b class="hl">Why it matters:</b> a timeout that doesn't thread a signal leaves the slow work running in the background (lesson 20's "cancel the loser"); a listener you never remove leaks; a parked waiter you reject but never unlink strands the resource behind it. Cancellation done right is a signal in, a rejection out, and every registration and resource cleaned up on the way.</p>` });
+    <p><b class="hl">Why it matters:</b> a timeout that doesn't thread a signal leaves the slow work running in the background (lesson 21's "cancel the loser"); a listener you never remove leaks; a parked waiter you reject but never unlink strands the resource behind it. Cancellation done right is a signal in, a rejection out, and every registration and resource cleaned up on the way.</p>` });
   LESSON_PRACTICE[liCancel] = { mod: "primitives", drill: "abortsem" };
 
   // ---- Lesson: the lock bugs that aren't in the lock ----
