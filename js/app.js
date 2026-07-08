@@ -953,7 +953,26 @@ loadProgress();
 render();
 document.getElementById("resetbtn").onclick=resetProgress;
 
+// header brand = home: back to the first module (lessons), same path as its nav chip
+document.getElementById("homebtn").onclick=()=>{ state.module=MODULES[0].id; render(); window.scrollTo({top:0}); };
+
 /* ---- offline support: install + work with no network ---- */
 if("serviceWorker" in navigator){
   window.addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 }
+
+/* ---- PWA install: Chrome buries its install affordance in the ⋮ menu, so
+   surface our own button whenever the browser says the app is installable ---- */
+let installPrompt=null;
+const installBtn=document.getElementById("installbtn");
+window.addEventListener("beforeinstallprompt",(e)=>{
+  e.preventDefault();               // suppress the mini-infobar; we own the UI
+  installPrompt=e; installBtn.hidden=false;
+});
+installBtn.onclick=async()=>{
+  if(!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice.catch(()=>{});
+  installPrompt=null; installBtn.hidden=true;  // a prompt object is single-use either way
+};
+window.addEventListener("appinstalled",()=>{ installPrompt=null; installBtn.hidden=true; });
