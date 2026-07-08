@@ -57,16 +57,24 @@ jobs:
           role-session-name: GitHubActions-ConcurrencyBootcamp-Deploy
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: SAM build
+        # Packages the backend Lambda code. The functions are dependency-free
+        # (no package.json), so this is a copy+zip — no Node toolchain needed.
+        run: sam build
+
       - name: SAM deploy
-        # Pure-infra template (no Lambda), so no `sam build` step is needed.
-        # Domain + zone come from repo variables so the template stays generic.
+        # Domain + zone + user pool come from repo variables so the template
+        # stays generic. COGNITO_USER_POOL_ID unset -> UserPoolId is empty ->
+        # the template's BackendEnabled condition is false and the stack
+        # deploys the static site only, exactly as before the backend existed.
         run: |
           sam deploy \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --parameter-overrides \
               "DomainName=${{ vars.DOMAIN_NAME }}" \
-              "HostedZoneId=${{ vars.HOSTED_ZONE_ID }}"
+              "HostedZoneId=${{ vars.HOSTED_ZONE_ID }}" \
+              "UserPoolId=${{ vars.COGNITO_USER_POOL_ID }}"
 
       - name: Diagnose failed deploy
         if: ${{ failure() }}
@@ -185,6 +193,22 @@ jobs:
           fi
 
           exit $fail
+
+      - name: Smoke test the API
+        # Only meaningful once the backend is enabled. An unauthenticated
+        # request must be rejected with 401 — that single probe proves both
+        # the CloudFront /api/* routing (a 404/403 would mean the behavior or
+        # route is wrong) and that the JWT authorizer is in front of the API.
+        if: ${{ vars.COGNITO_USER_POOL_ID != '' }}
+        run: |
+          URL="${{ steps.outputs.outputs.site-url }}"
+          code=$(curl -sS -o /dev/null -w "%{http_code}" "${URL}/api/health" || true)
+          if [ "$code" = "401" ]; then
+            echo "✓ /api/health unauthenticated -> 401 (routing + authorizer active)"
+          else
+            echo "✗ /api/health -> ${code} (expected 401)"
+            exit 1
+          fi
 
       - name: Write deployment summary
         run: |

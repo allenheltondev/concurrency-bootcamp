@@ -6,6 +6,16 @@ Description: >
   page is cross-origin isolated (required for real SharedArrayBuffer + Worker threads).
   Deploy in us-east-1: CloudFront's ACM certificate must live there.
 
+# W1028 fires inside the SAM transform's generated HttpApi Body: attaching a
+# conditioned function route to a conditioned API makes SAM emit a nested
+# Fn::If whose false branch cfn-lint flags as unreachable. Transform artifact,
+# not authored YAML — nothing to fix on our side.
+Metadata:
+  cfn-lint:
+    config:
+      ignore_checks:
+        - W1028
+
 Parameters:
   DomainName:
     Type: String
@@ -15,6 +25,18 @@ Parameters:
     Type: String
     Default: Z00189091F2OMRDR5LA95
     Description: Route53 hosted zone ID for the parent domain (readysetcloud.io).
+  UserPoolId:
+    Type: String
+    Default: ""
+    Description: >-
+      Id of the shared Ready, Set, Cloud Cognito user pool the backend
+      authenticates against. Leave empty to deploy the static site only —
+      every backend resource (API, table, app client, the CloudFront /api
+      behavior) is conditioned on this value, so the stack stays valid and
+      the site untouched until the id is supplied.
+
+Conditions:
+  BackendEnabled: !Not [!Equals [!Ref UserPoolId, ""]]
 
 Resources:
   # ---- Private origin bucket (no public access, no ACLs) ----
@@ -82,12 +104,40 @@ Resources:
         HttpVersion: http2and3
         IPV6Enabled: true
         PriceClass: PriceClass_All
-        Origins:
-          - Id: S3Origin
-            DomainName: !GetAtt SiteBucket.RegionalDomainName
-            OriginAccessControlId: !GetAtt OriginAccessControl.Id
-            S3OriginConfig:
-              OriginAccessIdentity: ""
+        Origins: !If
+          - BackendEnabled
+          - - Id: S3Origin
+              DomainName: !GetAtt SiteBucket.RegionalDomainName
+              OriginAccessControlId: !GetAtt OriginAccessControl.Id
+              S3OriginConfig:
+                OriginAccessIdentity: ""
+            - Id: ApiOrigin
+              DomainName: !Sub "${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+              CustomOriginConfig:
+                OriginProtocolPolicy: https-only
+                OriginSSLProtocols: [TLSv1.2]
+          - - Id: S3Origin
+              DomainName: !GetAtt SiteBucket.RegionalDomainName
+              OriginAccessControlId: !GetAtt OriginAccessControl.Id
+              S3OriginConfig:
+                OriginAccessIdentity: ""
+        # Same-origin API: /api/* goes to API Gateway, everything else to S3.
+        # CachingDisabled (every request hits the API) + AllViewerExceptHostHeader
+        # (forwards Authorization, withholds Host so execute-api resolves).
+        # No response headers policy: COOP/COEP belong to the page, not the API.
+        CacheBehaviors: !If
+          - BackendEnabled
+          - - PathPattern: "/api/*"
+              TargetOriginId: ApiOrigin
+              ViewerProtocolPolicy: https-only
+              Compress: true
+              AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+              CachedMethods: [GET, HEAD]
+              # Managed CachingDisabled policy.
+              CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+              # Managed AllViewerExceptHostHeader origin request policy.
+              OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+          - !Ref AWS::NoValue
         DefaultCacheBehavior:
           TargetOriginId: S3Origin
           ViewerProtocolPolicy: redirect-to-https
@@ -143,6 +193,102 @@ Resources:
         HostedZoneId: Z2FDTNDATAQYW2
         EvaluateTargetHealth: false
 
+  # ===========================================================
+  # Backend (all conditional on UserPoolId being supplied)
+  # ===========================================================
+
+  # ---- Single table: courses/badges catalogs + per-user progress, stats, badges ----
+  Table:
+    Type: AWS::DynamoDB::Table
+    Condition: BackendEnabled
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  # ---- App-specific client in the shared Ready, Set, Cloud user pool.
+  # Shared users (same sub everywhere), dedicated audience: tokens minted for
+  # other RSC apps are rejected by this API's authorizer, and this app's
+  # callback URLs / token lifetimes can change without touching other apps. ----
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Condition: BackendEnabled
+    Properties:
+      UserPoolId: !Ref UserPoolId
+      ClientName: !Sub "${AWS::StackName}-web"
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      SupportedIdentityProviders: [COGNITO]
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email, profile]
+      CallbackURLs:
+        - !Sub "https://${DomainName}"
+        - http://localhost:8080 # local dev (matches the README's http-server port)
+      LogoutURLs:
+        - !Sub "https://${DomainName}"
+        - http://localhost:8080
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+
+  # ---- HTTP API behind CloudFront's /api/* behavior. Route keys include the
+  # /api prefix because CloudFront forwards paths verbatim (it can't strip a
+  # prefix). Every route requires a valid JWT from the shared pool, scoped to
+  # this app's client. ----
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Condition: BackendEnabled
+    Properties:
+      Auth:
+        DefaultAuthorizer: CognitoJwt
+        Authorizers:
+          CognitoJwt:
+            IdentitySource: "$request.header.Authorization"
+            JwtConfiguration:
+              issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPoolId}"
+              audience:
+                - !Ref UserPoolClient
+
+  # ---- Placeholder route: proves the CloudFront routing + authorizer chain
+  # end to end (401 without a token, caller identity with one). ----
+  HealthFunction:
+    Type: AWS::Serverless::Function
+    Condition: BackendEnabled
+    Properties:
+      CodeUri: backend/functions/health/
+      Handler: index.handler
+      Runtime: nodejs22.x
+      Architectures: [arm64]
+      MemorySize: 256
+      Timeout: 10
+      Events:
+        Health:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /api/health
+
 Outputs:
   SiteUrl:
     Description: Live HTTPS URL.
@@ -156,3 +302,15 @@ Outputs:
   DistributionDomain:
     Description: Default CloudFront domain (fallback URL).
     Value: !GetAtt Distribution.DomainName
+  ApiUrl:
+    Condition: BackendEnabled
+    Description: Public base URL of the backend API (through CloudFront).
+    Value: !Sub "https://${DomainName}/api"
+  UserPoolClientId:
+    Condition: BackendEnabled
+    Description: This app's client id in the shared user pool (the UI phase needs it).
+    Value: !Ref UserPoolClient
+  TableName:
+    Condition: BackendEnabled
+    Description: DynamoDB table holding catalogs, progress, stats, and badges.
+    Value: !Ref Table

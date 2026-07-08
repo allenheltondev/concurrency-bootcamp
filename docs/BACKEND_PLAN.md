@@ -185,15 +185,22 @@ how a new course or badge appears. No console clicking, no custom resource.
   variable you asked for). Issuer URL is derived:
   `https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPoolId}`. No API
   domain parameter needed — the API rides the existing site domain.
+- **Dark until configured**: `UserPoolId` defaults to empty, and every
+  backend resource (table, app client, API, functions, the CloudFront
+  `/api/*` origin + behavior) sits behind a `BackendEnabled` condition. With
+  `COGNITO_USER_POOL_ID` unset the stack deploys the static site exactly as
+  before; setting the variable materializes the whole backend on the next
+  deploy. Backend phases can merge before the pool id is available.
 - **New GitHub repo variable**: `COGNITO_USER_POOL_ID`, passed through
   `--parameter-overrides` in `deploy.yml` exactly like `DOMAIN_NAME` is today.
 - **Workflow updates** (`deploy.yml`): add `sam build` before `sam deploy`
   (first Lambda in the stack), add the catalog seed step, and extend the smoke
-  test: unauthenticated `GET https://bootcamp.readysetcloud.io/api/courses`
+  test: unauthenticated `GET https://bootcamp.readysetcloud.io/api/health`
   must return `401`, proving both the CloudFront routing and the authorizer
-  in one probe. Note the `/api/*` behavior is a distribution config change —
-  it deploys in the same stack update, and the existing `/*` invalidation
-  step already covers any edge staleness.
+  in one probe (skipped while `COGNITO_USER_POOL_ID` is unset). Note the
+  `/api/*` behavior is a distribution config change — it deploys in the same
+  stack update, and the existing `/*` invalidation step already covers any
+  edge staleness.
 - **CI updates** (`ci.yml`): run the new backend unit tests; `node --check`
   already sweeps `js/`, extend the sweep to `backend/`.
 - **Outputs**: `ApiUrl`, `UserPoolClientId` — everything the UI phase will

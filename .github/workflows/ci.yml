@@ -42,13 +42,14 @@ jobs:
 
       - name: Check JavaScript syntax
         # App scripts live in js/ (core, content, packs, app) plus the
-        # standalone files (worker, Node reference, service worker). Parse
-        # them all so a typo can't ship a broken page, worker, or cache.
+        # standalone files (worker, Node reference, service worker) and the
+        # backend Lambda handlers. Parse them all so a typo can't ship a
+        # broken page, worker, cache, or API route.
         run: |
           node --check worker.js
           node --check workers-atomics.js
           node --check sw.js
-          for f in js/*.js js/packs/*.js; do
+          for f in js/*.js js/packs/*.js backend/functions/*/*.mjs; do
             [ -e "$f" ] || continue
             node --check "$f"
           done
