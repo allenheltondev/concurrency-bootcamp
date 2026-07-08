@@ -1,7 +1,10 @@
 /* Concurrency Bootcamp service worker — offline-first app shell.
    Bump CACHE on every content change so clients pick up the new build. */
-const CACHE = "cbootcamp-v2";
-const SHELL = ["./", "./index.html", "./worker.js", "./manifest.webmanifest", "./icon.svg"];
+const CACHE = "cbootcamp-v3";
+const SHELL = [
+  "./", "./index.html", "./worker.js", "./manifest.webmanifest", "./icon.svg",
+  "./js/core.js", "./js/content.js", "./js/app.js",
+];
 
 // Precache the shell so the app opens with no network.
 self.addEventListener("install", (e) => {

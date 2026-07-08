@@ -108,6 +108,10 @@ jobs:
           aws s3 cp worker.js "s3://${BUCKET}/worker.js" \
             --content-type "text/javascript; charset=utf-8" \
             --cache-control "public, max-age=300"
+          # App scripts (core/content/packs/app) — everything under js/.
+          aws s3 cp js/ "s3://${BUCKET}/js/" --recursive \
+            --content-type "text/javascript; charset=utf-8" \
+            --cache-control "public, max-age=300"
           # PWA assets. The service worker must not be cached long, or
           # clients stay pinned to a stale build.
           aws s3 cp sw.js "s3://${BUCKET}/sw.js" \

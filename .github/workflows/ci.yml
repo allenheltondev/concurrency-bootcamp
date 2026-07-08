@@ -38,19 +38,34 @@ jobs:
         run: sam validate --lint --region us-east-1
 
       - name: Check JavaScript syntax
-        # The app is a single inline <script> plus standalone JS files
-        # (worker, Node reference, service worker). Parse them all so a
-        # typo can't ship a broken page, worker, or offline cache.
+        # App scripts live in js/ (core, content, packs, app) plus the
+        # standalone files (worker, Node reference, service worker). Parse
+        # them all so a typo can't ship a broken page, worker, or cache.
         run: |
           node --check worker.js
           node --check workers-atomics.js
           node --check sw.js
+          for f in js/*.js js/packs/*.js; do
+            [ -e "$f" ] || continue
+            node --check "$f"
+          done
+          echo "all app scripts parse OK"
+
+      - name: Validate content
+        # Executes every write-it exercise's reference solution against its
+        # own sandbox tests and runs every drill demo — a broken exercise or
+        # a content pack with failing assertions cannot merge.
+        run: node tools/validate-content.mjs
+
+      - name: Check service worker precaches every app script
+        # A js/ file missing from the SHELL list breaks the app offline.
+        run: |
           node -e '
             const fs = require("fs");
-            const vm = require("vm");
-            const html = fs.readFileSync("index.html", "utf8");
-            const m = html.match(/<script>([\s\S]*?)<\/script>/);
-            if (!m) { console.error("no inline <script> found in index.html"); process.exit(1); }
-            new vm.Script(m[1]);
-            console.log("index.html inline script parses OK");
+            const sw = fs.readFileSync("sw.js", "utf8");
+            const files = ["js/core.js", "js/content.js", "js/app.js",
+              ...(fs.existsSync("js/packs") ? fs.readdirSync("js/packs").filter(f => f.endsWith(".js")).map(f => "js/packs/" + f) : [])];
+            const missing = files.filter(f => !sw.includes("./" + f));
+            if (missing.length) { console.error("sw.js SHELL is missing: " + missing.join(", ")); process.exit(1); }
+            console.log("sw.js precaches all " + files.length + " app scripts");
           '
