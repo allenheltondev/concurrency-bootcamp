@@ -188,5 +188,17 @@ check("badges survive reset", parse(r).badges.length === 4);
 r = await invoke("GET", "/api/me");
 check("xp back to 0", parse(r).xp === 0);
 
+/* ---- full account-data erasure: unlike a reset, nothing survives ---- */
+await invoke("PUT", "/api/me/courses/js-concurrency", putBody({ solved: { a: true } }));
+r = await invoke("DELETE", "/api/me");
+check("delete account 204", r.statusCode === 204, r.statusCode);
+r = await invoke("GET", "/api/me/badges");
+check("badges erased", parse(r).badges.length === 0);
+r = await invoke("GET", "/api/me/courses");
+check("progress erased", parse(r).courses.length === 0);
+r = await invoke("GET", "/api/me");
+check("profile back to zero-state", parse(r).xp === 0 && parse(r).createdAt === null, r.body);
+check("catalogs untouched by account deletion", [...store.keys()].filter((k) => k.startsWith("USER#")).length === 0 && store.size === 6);
+
 console.log(failures ? `\n${failures} FAILED` : "\nall checks passed");
 process.exit(failures ? 1 : 0);

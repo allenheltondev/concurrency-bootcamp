@@ -17,6 +17,7 @@ export class PutCommand extends Cmd {}
 export class DeleteCommand extends Cmd {}
 export class QueryCommand extends Cmd {}
 export class UpdateCommand extends Cmd {}
+export class BatchWriteCommand extends Cmd {}
 
 class CondFail extends Error {
   constructor() { super("The conditional request failed"); this.name = "ConditionalCheckFailedException"; }
@@ -49,6 +50,16 @@ export class DynamoDBDocumentClient {
       return {};
     }
     if (cmd instanceof DeleteCommand) { store.delete(key(i.Key)); return {}; }
+    if (cmd instanceof BatchWriteCommand) {
+      for (const [, requests] of Object.entries(i.RequestItems)) {
+        for (const r of requests) {
+          if (r.DeleteRequest) store.delete(key(r.DeleteRequest.Key));
+          else if (r.PutRequest) store.set(key(r.PutRequest.Item), structuredClone(r.PutRequest.Item));
+          else throw new Error("fake ddb: unsupported batch request");
+        }
+      }
+      return { UnprocessedItems: {} };
+    }
     if (cmd instanceof QueryCommand) {
       const v = i.ExpressionAttributeValues;
       const pk = v[":pk"];

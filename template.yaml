@@ -50,6 +50,7 @@ Globals:
         POWERTOOLS_SERVICE_NAME: concurrency-bootcamp-api
         POWERTOOLS_METRICS_NAMESPACE: ConcurrencyBootcamp
         POWERTOOLS_LOG_LEVEL: INFO
+        NODE_OPTIONS: --enable-source-maps
 
 Resources:
   # ---- Private origin bucket (no public access, no ACLs) ----
@@ -217,6 +218,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
+      DeletionProtectionEnabled: true
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: pk
@@ -246,6 +248,9 @@ Resources:
       ExplicitAuthFlows:
         - ALLOW_USER_SRP_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
+        # Lets the integration smoke script (backend/tools/integration-smoke.mjs)
+        # sign in a dedicated test user without an SRP implementation.
+        - ALLOW_USER_PASSWORD_AUTH
       SupportedIdentityProviders: [COGNITO]
       AllowedOAuthFlowsUserPoolClient: true
       AllowedOAuthFlows: [code]
@@ -272,6 +277,11 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Condition: BackendEnabled
     Properties:
+      # Bounded, not generous: a learning app syncing progress needs nowhere
+      # near this; the cap exists so a bug or abuse can't run up the bill.
+      DefaultRouteSettings:
+        ThrottlingRateLimit: 50
+        ThrottlingBurstLimit: 100
       Auth:
         DefaultAuthorizer: CognitoJwt
         Authorizers:
@@ -294,7 +304,9 @@ Resources:
       BuildProperties:
         Minify: true
         Target: node22
-        Sourcemap: false
+        # Sourcemaps + --enable-source-maps (below) keep stack traces in the
+        # structured error logs readable despite minification.
+        Sourcemap: true
         EntryPoints:
           - src/api.mjs
         External:
@@ -313,6 +325,15 @@ Resources:
             ApiId: !Ref HttpApi
             Method: ANY
             Path: /api/{proxy+}
+
+  # ---- Explicit log group: without this, Lambda auto-creates one that
+  # retains logs forever. ----
+  ApiFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: BackendEnabled
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ApiFunction}"
+      RetentionInDays: 30
 
 Outputs:
   SiteUrl:

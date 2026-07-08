@@ -195,6 +195,7 @@ they're also the HTTP API route keys).
 | `GET /api/me/courses/{courseId}` | Full progress doc (summary + detail + version) for one course |
 | `PUT /api/me/courses/{courseId}` | Upsert progress: body is `{ detail, version }`; server recomputes summary, bumps version, sets timestamps, updates XP/streak, evaluates badges; `409` on version conflict. Response includes `newBadges` + updated stats so a future UI can toast them |
 | `DELETE /api/me/courses/{courseId}` | Reset my progress in a course (the backend twin of the footer's Reset button). Earned badges stay |
+| `DELETE /api/me` | Full account-data erasure: profile, all progress, all badges — batched deletes over the user's partition |
 | `GET /api/badges` | Badge catalog (name, description, icon, criteria) |
 | `GET /api/me` | My profile + gamification stats (XP, streaks) |
 | `GET /api/me/badges` | Badges I've earned, with `earnedAt` |
@@ -248,13 +249,30 @@ merge. Editing the JSON and merging is how a new course or badge appears.
 
 ## Work breakdown (each phase = one PR, independently mergeable, site untouched)
 
-Status: phases 1–4 are implemented (dark — nothing deploys until
-`COGNITO_USER_POOL_ID` is set), and phase 5's unit-test layer is in place:
-`backend/test/` drives the exported handler with synthetic API Gateway
-events through the full middy → Powertools → router chain against an
-in-memory DynamoDB fake, wired into CI. Remaining in phase 5: an integration
-smoke script against the deployed API with a real test-user token, and
-CloudWatch alarms. Phase 6 stays parked.
+Status: phases 1–5 are implemented (dark — nothing deploys until
+`COGNITO_USER_POOL_ID` is set) except CloudWatch alarms, which are
+deliberately deferred. Phase 5 delivered:
+
+- **Unit tests in CI**: `backend/test/` drives the exported handler with
+  synthetic API Gateway events through the full middy → Powertools → router
+  chain against an in-memory DynamoDB fake — 50 checks including the
+  log-contract and no-leaky-500 assertions.
+- **Integration smoke script** (`backend/tools/integration-smoke.mjs`):
+  hits the deployed API through CloudFront with a real Cognito token —
+  verifies the 401 boundary, issuer/audience config, routing, catalogs, and
+  (opt-in via `SMOKE_MUTATE=1`, dedicated test user only) the full
+  PUT → 409 → DELETE write cycle. Sign-in uses `USER_PASSWORD_AUTH` (enabled
+  on the app client for exactly this) or a pre-minted `TOKEN`. Run manually
+  post-deploy; wiring it into the deploy workflow just needs the test-user
+  secrets.
+- **Hardening**: request validation + body-size cap (earlier), API stage
+  throttling (50 rps / 100 burst), 30-day log retention via an explicit log
+  group, DynamoDB deletion protection, esbuild sourcemaps +
+  `--enable-source-maps` so minified stack traces in error logs stay
+  readable, and `DELETE /api/me` for full account-data erasure.
+
+Remaining from phase 5: CloudWatch alarms (deferred by choice — the metrics
+they'd alarm on are already emitted). Phase 6 stays parked.
 
 **Phase 1 — Infra skeleton. ✅** Template additions: DynamoDB table, user-pool
 client against the shared pool, HTTP API + JWT authorizer, the CloudFront

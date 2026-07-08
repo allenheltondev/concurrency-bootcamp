@@ -114,5 +114,9 @@ export const createProgressService = ({ catalogRepository, userRepository, clock
     // Badges are permanent and streaks reflect activity — both untouched.
     const { xp } = computeXp(await userRepository.listProgress(sub));
     await userRepository.setProfileXp(sub, xp, clock().toISOString());
-  }
+  },
+
+  /* Full erasure — unlike a course reset, nothing survives: profile, all
+     progress, and earned badges go. The user's next sync starts from zero. */
+  deleteAccountData: (sub) => userRepository.deleteAllUserData(sub)
 });

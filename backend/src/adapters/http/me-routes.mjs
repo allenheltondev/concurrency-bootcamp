@@ -40,6 +40,16 @@ export const registerMeRoutes = (app, { progressService }) => {
     return result;
   }, { validation: { req: { path: courseIdParams, body: progressBody } } });
 
+  // Full account-data erasure: profile, all course progress, all badges.
+  app.delete("/me", async (reqCtx) => {
+    const sub = subOf(reqCtx);
+    const deleted = await progressService.deleteAccountData(sub);
+
+    metrics.addMetric("AccountDeleted", MetricUnit.Count, 1);
+    logger.info("account data deleted", { sub, itemsDeleted: deleted });
+    return new Response(null, { status: 204 });
+  });
+
   app.delete("/me/courses/:courseId", async (reqCtx) => {
     const sub = subOf(reqCtx);
     const { courseId } = reqCtx.valid.req.path;

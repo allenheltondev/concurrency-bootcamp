@@ -2,7 +2,7 @@
    earned badges. Owns the key scheme and the conditional-write expressions;
    storage-level failures surface as domain errors (OptimisticLockError),
    never as AWS exception types. */
-import { DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { BatchWriteCommand, DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { OptimisticLockError } from "../../domain/errors.mjs";
 import { ddb, TABLE, toDomain } from "./client.mjs";
 
@@ -107,6 +107,27 @@ export const createUserRepository = () => {
         TableName: TABLE,
         Key: { pk: userPk(sub), sk: progressSk(courseId) }
       }));
+    },
+
+    /* Removes every item in the user's partition — profile, progress, and
+       earned badges. Batches of 25 (the BatchWrite limit), retrying
+       unprocessed keys a few times before giving up loudly. */
+    async deleteAllUserData(sub) {
+      const items = await queryPartition(sub);
+      let deleted = 0;
+      for (let i = 0; i < items.length; i += 25) {
+        let requests = items.slice(i, i + 25).map((item) => ({
+          DeleteRequest: { Key: { pk: item.pk, sk: item.sk } }
+        }));
+        for (let attempt = 0; requests.length > 0; attempt++) {
+          if (attempt >= 3) throw new Error(`account deletion left ${requests.length} items after retries`);
+          const res = await ddb.send(new BatchWriteCommand({ RequestItems: { [TABLE]: requests } }));
+          const unprocessed = res.UnprocessedItems?.[TABLE] ?? [];
+          deleted += requests.length - unprocessed.length;
+          requests = unprocessed;
+        }
+      }
+      return deleted;
     }
   };
 };
