@@ -42,13 +42,14 @@ jobs:
 
       - name: Check JavaScript syntax
         # App scripts live in js/ (core, content, packs, app) plus the
-        # standalone files (worker, Node reference, service worker). Parse
-        # them all so a typo can't ship a broken page, worker, or cache.
+        # standalone files (worker, Node reference, service worker) and the
+        # backend Lambda handlers. Parse them all so a typo can't ship a
+        # broken page, worker, cache, or API route.
         run: |
           node --check worker.js
           node --check workers-atomics.js
           node --check sw.js
-          for f in js/*.js js/packs/*.js; do
+          for f in js/*.js js/packs/*.js backend/src/*.mjs backend/src/*/*.mjs; do
             [ -e "$f" ] || continue
             node --check "$f"
           done
@@ -59,6 +60,29 @@ jobs:
         # own sandbox tests and runs every drill demo — a broken exercise or
         # a content pack with failing assertions cannot merge.
         run: node tools/validate-content.mjs
+
+      - name: Validate backend catalogs
+        # Dry run of the deploy-time seeder: parses backend/data/*.json,
+        # checks ids/criteria/course references, and computes totalItems from
+        # the real app content — a bad catalog entry cannot merge.
+        run: node backend/tools/seed-catalog.mjs ci-dry-run > /dev/null
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Lint the backend
+        # @eslint/js recommended rules, plus a boundary rule: src/domain (the
+        # hexagonal core) may not import the AWS SDK, Powertools, or adapters.
+        run: npm run lint
+        working-directory: backend
+
+      - name: Test the backend API
+        # Drives the exported lambdalith handler with synthetic API Gateway
+        # events — the full middy -> Powertools -> router -> handler chain —
+        # against an in-memory DynamoDB fake (see backend/test/).
+        run: npm test
+        working-directory: backend
 
       - name: Run practice pack tests against reference solutions
         # Stages practice/solutions/*.mjs over the skeleton slots and runs

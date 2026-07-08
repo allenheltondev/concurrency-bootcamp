@@ -57,16 +57,34 @@ jobs:
           role-session-name: GitHubActions-ConcurrencyBootcamp-Deploy
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install backend dependencies
+        # Powertools (bundled into the lambdalith) + esbuild (used by sam build).
+        run: npm ci
+        working-directory: backend
+
+      - name: SAM build
+        # esbuild-bundles the lambdalith (backend/src/api.mjs); the AWS SDK
+        # stays external because the Lambda runtime ships it.
+        run: sam build
+
       - name: SAM deploy
-        # Pure-infra template (no Lambda), so no `sam build` step is needed.
-        # Domain + zone come from repo variables so the template stays generic.
+        # Domain + zone + user pool come from repo variables so the template
+        # stays generic. COGNITO_USER_POOL_ID unset -> UserPoolId is empty ->
+        # the template's BackendEnabled condition is false and the stack
+        # deploys the static site only, exactly as before the backend existed.
         run: |
           sam deploy \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --parameter-overrides \
               "DomainName=${{ vars.DOMAIN_NAME }}" \
-              "HostedZoneId=${{ vars.HOSTED_ZONE_ID }}"
+              "HostedZoneId=${{ vars.HOSTED_ZONE_ID }}" \
+              "UserPoolId=${{ vars.COGNITO_USER_POOL_ID }}"
 
       - name: Diagnose failed deploy
         if: ${{ failure() }}
@@ -102,7 +120,29 @@ jobs:
             echo "site-url=$(read_out SiteUrl)"
             echo "bucket=$(read_out BucketName)"
             echo "distribution-id=$(read_out DistributionId)"
+            echo "table-name=$(read_out TableName)"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Seed course & badge catalogs
+        # Idempotent PutRequests — re-seeding overwrites catalog entries in
+        # place and never touches user partitions. Editing backend/data/*.json
+        # and merging is how a course or badge ships.
+        if: ${{ vars.COGNITO_USER_POOL_ID != '' }}
+        run: |
+          TABLE="${{ steps.outputs.outputs.table-name }}"
+          node backend/tools/seed-catalog.mjs "$TABLE" > /tmp/seed-chunks.json
+          count=$(jq length /tmp/seed-chunks.json)
+          for i in $(seq 0 $((count - 1))); do
+            jq ".[$i]" /tmp/seed-chunks.json > /tmp/chunk.json
+            unprocessed=$(aws dynamodb batch-write-item \
+              --request-items file:///tmp/chunk.json \
+              --query 'UnprocessedItems' --output json)
+            if [ "$unprocessed" != "{}" ]; then
+              echo "batch $i left unprocessed items: $unprocessed"
+              exit 1
+            fi
+          done
+          echo "catalogs seeded"
 
       - name: Upload site to S3
         # Short max-age so content updates surface fast; the invalidation
@@ -185,6 +225,22 @@ jobs:
           fi
 
           exit $fail
+
+      - name: Smoke test the API
+        # Only meaningful once the backend is enabled. An unauthenticated
+        # request must be rejected with 401 — that single probe proves both
+        # the CloudFront /api/* routing (a 404/403 would mean the behavior or
+        # route is wrong) and that the JWT authorizer is in front of the API.
+        if: ${{ vars.COGNITO_USER_POOL_ID != '' }}
+        run: |
+          URL="${{ steps.outputs.outputs.site-url }}"
+          code=$(curl -sS -o /dev/null -w "%{http_code}" "${URL}/api/health" || true)
+          if [ "$code" = "401" ]; then
+            echo "✓ /api/health unauthenticated -> 401 (routing + authorizer active)"
+          else
+            echo "✗ /api/health -> ${code} (expected 401)"
+            exit 1
+          fi
 
       - name: Write deployment summary
         run: |

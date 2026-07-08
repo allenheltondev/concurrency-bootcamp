@@ -100,7 +100,8 @@ backend, no third-party scripts, no tracking.
 | `manifest.webmanifest`| Web app manifest — makes the site installable to a home screen.      |
 | `icon.svg`          | App / home-screen icon (the event loop, with ordered + racing tasks). |
 | `workers-atomics.js`| Node (`worker_threads`) logic reference — run it to see the race.      |
-| `template.yaml`     | SAM/CloudFormation: S3 + CloudFront + OAC + COOP/COEP + ACM + Route53. |
+| `template.yaml`     | SAM/CloudFormation: S3 + CloudFront + OAC + COOP/COEP + ACM + Route53, plus an off-by-default backend (Cognito-authorized API + DynamoDB) that stays dark until a user pool id is configured — see `docs/BACKEND_PLAN.md`. |
+| `backend/`          | The (dark, in-progress) backend API: a single Lambda "lambdalith" routed by the Powertools event handler, plus catalogs, seeder, and tests. The live app doesn't call it yet. |
 
 ## Progress & offline
 
