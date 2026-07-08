@@ -110,7 +110,29 @@ jobs:
             echo "site-url=$(read_out SiteUrl)"
             echo "bucket=$(read_out BucketName)"
             echo "distribution-id=$(read_out DistributionId)"
+            echo "table-name=$(read_out TableName)"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Seed course & badge catalogs
+        # Idempotent PutRequests — re-seeding overwrites catalog entries in
+        # place and never touches user partitions. Editing backend/data/*.json
+        # and merging is how a course or badge ships.
+        if: ${{ vars.COGNITO_USER_POOL_ID != '' }}
+        run: |
+          TABLE="${{ steps.outputs.outputs.table-name }}"
+          node backend/tools/seed-catalog.mjs "$TABLE" > /tmp/seed-chunks.json
+          count=$(jq length /tmp/seed-chunks.json)
+          for i in $(seq 0 $((count - 1))); do
+            jq ".[$i]" /tmp/seed-chunks.json > /tmp/chunk.json
+            unprocessed=$(aws dynamodb batch-write-item \
+              --request-items file:///tmp/chunk.json \
+              --query 'UnprocessedItems' --output json)
+            if [ "$unprocessed" != "{}" ]; then
+              echo "batch $i left unprocessed items: $unprocessed"
+              exit 1
+            fi
+          done
+          echo "catalogs seeded"
 
       - name: Upload site to S3
         # Short max-age so content updates surface fast; the invalidation

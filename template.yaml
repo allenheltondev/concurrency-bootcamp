@@ -38,6 +38,16 @@ Parameters:
 Conditions:
   BackendEnabled: !Not [!Equals [!Ref UserPoolId, ""]]
 
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Architectures: [arm64]
+    MemorySize: 256
+    Timeout: 10
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref Table
+
 Resources:
   # ---- Private origin bucket (no public access, no ACLs) ----
   SiteBucket:
@@ -269,7 +279,7 @@ Resources:
               audience:
                 - !Ref UserPoolClient
 
-  # ---- Placeholder route: proves the CloudFront routing + authorizer chain
+  # ---- Health route: proves the CloudFront routing + authorizer chain
   # end to end (401 without a token, caller identity with one). ----
   HealthFunction:
     Type: AWS::Serverless::Function
@@ -277,10 +287,6 @@ Resources:
     Properties:
       CodeUri: backend/functions/health/
       Handler: index.handler
-      Runtime: nodejs22.x
-      Architectures: [arm64]
-      MemorySize: 256
-      Timeout: 10
       Events:
         Health:
           Type: HttpApi
@@ -288,6 +294,129 @@ Resources:
             ApiId: !Ref HttpApi
             Method: GET
             Path: /api/health
+
+  # ---- Catalog reads (course + badge definitions, seeded at deploy) ----
+  GetCoursesFunction:
+    Type: AWS::Serverless::Function
+    Condition: BackendEnabled
+    Properties:
+      CodeUri: backend/functions/get-courses/
+      Handler: index.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref Table
+      Events:
+        List:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /api/courses
+        One:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /api/courses/{courseId}
+
+  GetBadgesFunction:
+    Type: AWS::Serverless::Function
+    Condition: BackendEnabled
+    Properties:
+      CodeUri: backend/functions/get-badges/
+      Handler: index.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref Table
+      Events:
+        List:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /api/badges
+
+  # ---- "Me" reads: profile + stats, cross-course summaries, earned badges ----
+  GetMeFunction:
+    Type: AWS::Serverless::Function
+    Condition: BackendEnabled
+    Properties:
+      CodeUri: backend/functions/get-me/
+      Handler: index.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref Table
+      Events:
+        Profile:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /api/me
+        Badges:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /api/me/badges
+
+  GetMyCoursesFunction:
+    Type: AWS::Serverless::Function
+    Condition: BackendEnabled
+    Properties:
+      CodeUri: backend/functions/get-my-courses/
+      Handler: index.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref Table
+      Events:
+        List:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /api/me/courses
+        One:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /api/me/courses/{courseId}
+
+  # ---- The write path: progress upsert -> summary, XP, streak, badge awards ----
+  PutMyCourseFunction:
+    Type: AWS::Serverless::Function
+    Condition: BackendEnabled
+    Properties:
+      CodeUri: backend/functions/put-my-course/
+      Handler: index.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Table
+      Events:
+        Put:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: PUT
+            Path: /api/me/courses/{courseId}
+
+  DeleteMyCourseFunction:
+    Type: AWS::Serverless::Function
+    Condition: BackendEnabled
+    Properties:
+      CodeUri: backend/functions/delete-my-course/
+      Handler: index.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Table
+      Events:
+        Delete:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: DELETE
+            Path: /api/me/courses/{courseId}
 
 Outputs:
   SiteUrl:

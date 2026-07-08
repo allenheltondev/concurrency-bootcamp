@@ -61,6 +61,12 @@ jobs:
         # a content pack with failing assertions cannot merge.
         run: node tools/validate-content.mjs
 
+      - name: Validate backend catalogs
+        # Dry run of the deploy-time seeder: parses backend/data/*.json,
+        # checks ids/criteria/course references, and computes totalItems from
+        # the real app content — a bad catalog entry cannot merge.
+        run: node backend/tools/seed-catalog.mjs ci-dry-run > /dev/null
+
       - name: Run practice pack tests against reference solutions
         # Stages practice/solutions/*.mjs over the skeleton slots and runs
         # every practice/*.test.mjs suite, so an edit that breaks a test or

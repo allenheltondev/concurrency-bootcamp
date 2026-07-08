@@ -1,0 +1,58 @@
+[
+  {
+    "id": "first-solve",
+    "name": "First Await",
+    "icon": "🎯",
+    "description": "Solve your first exercise.",
+    "criteria": { "type": "total-solved", "count": 1 }
+  },
+  {
+    "id": "solved-25",
+    "name": "Warmed Up",
+    "icon": "🔥",
+    "description": "Solve 25 exercises across all courses.",
+    "criteria": { "type": "total-solved", "count": 25 }
+  },
+  {
+    "id": "solved-100",
+    "name": "Unbounded Concurrency",
+    "icon": "🚀",
+    "description": "Solve 100 exercises across all courses.",
+    "criteria": { "type": "total-solved", "count": 100 }
+  },
+  {
+    "id": "js-concurrency-halfway",
+    "name": "Half-Open Barrier",
+    "icon": "⛰️",
+    "description": "Reach 50% in the JavaScript Concurrency Bootcamp.",
+    "criteria": { "type": "percent-complete", "courseId": "js-concurrency", "threshold": 50 }
+  },
+  {
+    "id": "js-concurrency-complete",
+    "name": "Race Condition Survivor",
+    "icon": "🏁",
+    "description": "Complete every exercise in the JavaScript Concurrency Bootcamp.",
+    "criteria": { "type": "course-completed", "courseId": "js-concurrency" }
+  },
+  {
+    "id": "streak-3",
+    "name": "Three-Day Lease",
+    "icon": "📆",
+    "description": "Practice three days in a row.",
+    "criteria": { "type": "streak", "days": 3 }
+  },
+  {
+    "id": "streak-7",
+    "name": "Week-Long Lock",
+    "icon": "🔒",
+    "description": "Practice seven days in a row.",
+    "criteria": { "type": "streak", "days": 7 }
+  },
+  {
+    "id": "first-course",
+    "name": "Graduate",
+    "icon": "🎓",
+    "description": "Complete your first course.",
+    "criteria": { "type": "courses-completed", "count": 1 }
+  }
+]

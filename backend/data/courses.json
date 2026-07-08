@@ -1,0 +1,10 @@
+[
+  {
+    "id": "js-concurrency",
+    "title": "JavaScript Concurrency Bootcamp",
+    "description": "Learn and practice JavaScript concurrency from the event loop up: animated lessons, tap-driven drills for every primitive, spot-the-bug and write-it modules, durable-execution hazards, and a scored test mode.",
+    "status": "active",
+    "contentVersion": 1,
+    "totalItems": "auto"
+  }
+]

@@ -47,8 +47,10 @@ Browser ──(later)──► CloudFront ──► API Gateway HTTP API ──�
   phase needs **no CORS at all**; the execute-api URL stays reachable as a
   debugging back door but isn't part of the contract.
 - **Compute**: Node.js 22 Lambda functions in `backend/functions/`, one
-  handler per route, bundled with esbuild via `sam build` `Metadata`. AWS SDK
-  v3 only, no other runtime deps.
+  handler per resource. Dependency-free on purpose: the runtime ships AWS
+  SDK v3, so there's no package.json, no bundler, and `sam build` is a plain
+  copy+zip. If a real dependency ever appears, that function grows esbuild
+  `Metadata` then — not before.
 - **Data**: one DynamoDB table (`PAY_PER_REQUEST`, PITR on), single-table
   design below.
 - **Same stack** (`template.yaml`), new resources. One stack, one deploy
@@ -62,8 +64,8 @@ Identity is the Cognito `sub` (stable per user in the shared pool).
 
 | Entity | pk | sk | Notes |
 | --- | --- | --- | --- |
-| Course catalog entry | `COURSE#<courseId>` | `METADATA` | title, description, `totalItems`, `contentVersion`, `status` (active/draft/retired) |
-| Badge catalog entry | `BADGE#<badgeId>` | `METADATA` | name, description, icon, `scope` (global / per-course), declarative `criteria` (below) |
+| Course catalog entry | `COURSES` | `COURSE#<courseId>` | title, description, `totalItems`, `contentVersion`, `status` (active/draft/retired) |
+| Badge catalog entry | `BADGES` | `BADGE#<badgeId>` | name, description, icon, declarative `criteria` (below; a `courseId` inside the criteria makes a badge course-scoped) |
 | User profile | `USER#<sub>` | `PROFILE` | createdAt, lastSeenAt, plus gamification stats: `xp`, `currentStreak`, `longestStreak`, `lastActivityDate` |
 | Course progress | `USER#<sub>` | `COURSE#<courseId>` | summary **and** detail in one item, below |
 | Earned badge | `USER#<sub>` | `BADGE#<badgeId>` | `earnedAt`, `courseId` if course-scoped; write is conditional on `attribute_not_exists(pk)` so awards are idempotent and `earnedAt` never moves |
@@ -89,13 +91,13 @@ Access patterns, all satisfied without a GSI:
 
 | Question | Operation |
 | --- | --- |
-| What courses / badges exist? | Catalogs are small: `Scan` with a type filter now, or a `GSI1: type` if/when the table grows. Start with the simple thing. |
+| What courses / badges exist? | `Query pk = COURSES` / `Query pk = BADGES` — each catalog is one small partition, so listing is a Query, never a Scan over user data. |
 | All my courses + status ("what have I done?") | `Query pk = USER#<sub>, sk begins_with COURSE#` |
 | My progress in one course | `GetItem (USER#<sub>, COURSE#<courseId>)` |
 | My badges | `Query pk = USER#<sub>, sk begins_with BADGE#` |
 | My profile + stats | `GetItem (USER#<sub>, PROFILE)` |
 | Everything about me at once | `Query pk = USER#<sub>` |
-| Course metadata | `GetItem (COURSE#<courseId>, METADATA)` |
+| Course metadata | `GetItem (COURSES, COURSE#<courseId>)` |
 
 **Write concurrency** (fitting, for this app): `PUT` progress uses optimistic
 locking — the item carries a `version` number; the client sends the version it
@@ -171,13 +173,18 @@ and any content delivery (course content stays static in `js/content.js` /
 
 ## Catalog seeding
 
-Courses are declared in `backend/data/courses.json` (starting with the single
-`js-concurrency` entry — `totalItems` matches the app's `TOTAL`) and badges
-in `backend/data/badges.json` (launch set: first drill solved, course
-started, course 50% / completed, N-day streaks, first course completed). A
-small idempotent script (`backend/tools/seed-catalog.mjs`, plain `PutItem`s)
-runs as a post-deploy step in the workflow. Editing the JSON and merging is
-how a new course or badge appears. No console clicking, no custom resource.
+Courses are declared in `backend/data/courses.json` and badges in
+`backend/data/badges.json` (launch set: first solve, 25/100 solved, course
+50% / completed, 3- and 7-day streaks, first course completed).
+`backend/tools/seed-catalog.mjs` validates both files (ids, criteria types,
+course references), emits `BatchWriteItem` payloads, and the deploy workflow
+feeds them to the AWS CLI — idempotent, catalog partitions only, no SDK
+install, no custom resource. The `js-concurrency` entry declares
+`"totalItems": "auto"`: the seeder loads the app content in a Node VM (same
+strategy as `tools/validate-content.mjs`) and applies `js/app.js`'s exact
+`TOTAL` formula, so the catalog count can never drift from what the app
+counts. CI runs the seeder as a dry run, so a bad catalog entry cannot
+merge. Editing the JSON and merging is how a new course or badge appears.
 
 ## Deployment & config changes
 
@@ -208,7 +215,10 @@ how a new course or badge appears. No console clicking, no custom resource.
 
 ## Work breakdown (each phase = one PR, independently mergeable, site untouched)
 
-**Phase 1 — Infra skeleton.** Template additions: DynamoDB table, user-pool
+Status: phases 1–4 are implemented (dark — nothing deploys until
+`COGNITO_USER_POOL_ID` is set); phase 5 is next, phase 6 stays parked.
+
+**Phase 1 — Infra skeleton. ✅** Template additions: DynamoDB table, user-pool
 client against the shared pool, HTTP API + JWT authorizer, the CloudFront
 `/api/*` origin + behavior, the `UserPoolId` parameter, one placeholder
 route. Workflow: `sam build`, `COGNITO_USER_POOL_ID` variable, 401 smoke
@@ -216,16 +226,16 @@ test. *Proves end-to-end: `bootcamp.readysetcloud.io/api/*` reaches the API,
 a real token from the shared pool passes the authorizer, and no token gets
 401.*
 
-**Phase 2 — Catalogs.** `courses.json` + `badges.json` + seed script + seed
+**Phase 2 — Catalogs. ✅** `courses.json` + `badges.json` + seed script + seed
 step; `GET /api/courses`, `GET /api/courses/{courseId}`, `GET /api/badges`.
 Small, mostly mechanical.
 
-**Phase 3 — Progress.** The core: `GET/PUT/DELETE /api/me/courses*`,
+**Phase 3 — Progress. ✅** The core: `GET/PUT/DELETE /api/me/courses*`,
 `GET /api/me`, summary computation from `detail.solved`, versioned
 conditional writes with `409` merge semantics, profile item upsert on first
 write with XP + streak updates.
 
-**Phase 4 — Badges.** Criteria evaluators, award writes in the `PUT` path,
+**Phase 4 — Badges. ✅** Criteria evaluators, award writes in the `PUT` path,
 `newBadges` in the response, `GET /api/me/badges`. Depends on phase 3's
 write path.
 
