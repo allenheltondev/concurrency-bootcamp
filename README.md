@@ -94,6 +94,7 @@ backend, no third-party scripts, no tracking.
 | `js/app.js`         | State, persistence, rendering, the write-it sandbox, test mode.        |
 | `practice/`         | Blank-file pattern reps with runnable Node tests (see above).          |
 | `tools/validate-content.mjs` | Executes every exercise's reference against its own tests; runs in CI. |
+| `tools/test-solutions.mjs` | Runs every `practice/*.test.mjs` suite against its reference solution; runs in CI. |
 | `worker.js`         | Same-origin Web Worker for the real SharedArrayBuffer data race.       |
 | `sw.js`             | Service worker — precaches the app shell so it runs fully offline.     |
 | `manifest.webmanifest`| Web app manifest — makes the site installable to a home screen.      |
@@ -143,9 +144,12 @@ console on the deployed origin.
 ## Deploy
 
 Deployment is fully automated by GitHub Actions (`.github/workflows/deploy.yml`):
-every push to `main` (or a manual **Run workflow**) runs `sam deploy`, uploads the
-site, and invalidates `/*`. It authenticates to AWS via OIDC (`AWS_DEPLOY_ROLE_ARN`)
-and deploys in `us-east-1` — where CloudFront's ACM certificate must live.
+every push to `main` (or a manual **Run workflow**) re-runs the full CI validation
+as a gate, then runs `sam deploy`, uploads the site, invalidates `/*`, waits for
+the invalidation to complete, and smoke-tests the live site (status codes, the
+COOP/COEP isolation headers, and that the served `index.html` matches the commit).
+It authenticates to AWS via OIDC (`AWS_DEPLOY_ROLE_ARN`) and deploys in
+`us-east-1` — where CloudFront's ACM certificate must live.
 
 To add or rename a deployed file, update the **Upload site to S3** step in that
 workflow — it's the single source of truth for what ships.

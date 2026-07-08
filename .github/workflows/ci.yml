@@ -2,8 +2,11 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches: [main]
+  # No push trigger for main: deploy.yml calls this workflow as its gating
+  # job on every main push, so a standalone run there would be a duplicate.
+  # Lets deploy.yml run this exact validation before deploying, so a deploy
+  # can never start from a commit that hasn't passed CI.
+  workflow_call:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -56,6 +59,12 @@ jobs:
         # own sandbox tests and runs every drill demo — a broken exercise or
         # a content pack with failing assertions cannot merge.
         run: node tools/validate-content.mjs
+
+      - name: Run practice pack tests against reference solutions
+        # Stages practice/solutions/*.mjs over the skeleton slots and runs
+        # every practice/*.test.mjs suite, so an edit that breaks a test or
+        # its reference solution (or orphans either one) cannot merge.
+        run: node tools/test-solutions.mjs
 
       - name: Check service worker precaches every app script
         # A js/ file missing from the SHELL list breaks the app offline.

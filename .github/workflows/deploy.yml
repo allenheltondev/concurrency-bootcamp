@@ -21,8 +21,15 @@ env:
   STACK_NAME: concurrency-bootcamp
 
 jobs:
+  # The same validation PRs run, re-run here as a gate: a push to main or a
+  # manual dispatch cannot deploy a commit that fails CI.
+  validate:
+    name: Validate
+    uses: ./.github/workflows/ci.yml
+
   deploy:
     name: sam deploy production
+    needs: validate
     runs-on: ubuntu-latest
     environment:
       name: Production
@@ -109,7 +116,9 @@ jobs:
             --content-type "text/javascript; charset=utf-8" \
             --cache-control "public, max-age=300"
           # App scripts (core/content/packs/app) — everything under js/.
-          aws s3 cp js/ "s3://${BUCKET}/js/" --recursive \
+          # sync --delete so a renamed or removed pack doesn't linger in the
+          # bucket serving stale code forever.
+          aws s3 sync js/ "s3://${BUCKET}/js/" --delete \
             --content-type "text/javascript; charset=utf-8" \
             --cache-control "public, max-age=300"
           # PWA assets. The service worker must not be cached long, or
@@ -124,11 +133,58 @@ jobs:
             --content-type "image/svg+xml" \
             --cache-control "public, max-age=300"
 
-      - name: Invalidate CloudFront
+      - name: Invalidate CloudFront and wait for completion
+        # Waiting (instead of fire-and-forget) means the smoke test below
+        # sees the build we just uploaded, not a stale cached copy — and the
+        # run isn't green until the CDN is actually serving the new version.
         run: |
-          aws cloudfront create-invalidation \
-            --distribution-id "${{ steps.outputs.outputs.distribution-id }}" \
-            --paths "/*"
+          DIST_ID="${{ steps.outputs.outputs.distribution-id }}"
+          INV_ID=$(aws cloudfront create-invalidation \
+            --distribution-id "$DIST_ID" \
+            --paths "/*" \
+            --query "Invalidation.Id" --output text)
+          echo "created invalidation ${INV_ID}, waiting for it to complete..."
+          aws cloudfront wait invalidation-completed \
+            --distribution-id "$DIST_ID" --id "$INV_ID"
+          echo "invalidation complete"
+
+      - name: Smoke test the live site
+        # The deploy isn't done because the AWS calls succeeded — it's done
+        # when the site serves the bits we just pushed. Verify status codes,
+        # the COOP/COEP isolation headers the whole app depends on, and that
+        # the served index.html is byte-identical to this commit's.
+        run: |
+          URL="${{ steps.outputs.outputs.site-url }}"
+          fail=0
+
+          # `|| true` on the curls: a connection failure should show up as a
+          # ✗ line in the report below, not abort the step (bash -e) opaquely.
+          for p in / /worker.js /sw.js /manifest.webmanifest /js/app.js /js/core.js /js/content.js; do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" "${URL}${p}" || true)
+            if [ "$code" = "200" ]; then
+              echo "✓ ${p} -> ${code}"
+            else
+              echo "✗ ${p} -> ${code} (expected 200)"
+              fail=1
+            fi
+          done
+
+          headers=$(curl -sSI "${URL}/" || true)
+          echo "$headers" | grep -qi "^cross-origin-opener-policy: same-origin" \
+            && echo "✓ COOP: same-origin" || { echo "✗ missing Cross-Origin-Opener-Policy: same-origin"; fail=1; }
+          echo "$headers" | grep -qi "^cross-origin-embedder-policy: require-corp" \
+            && echo "✓ COEP: require-corp" || { echo "✗ missing Cross-Origin-Embedder-Policy: require-corp"; fail=1; }
+
+          served=$(curl -sS "${URL}/" 2>/dev/null | sha256sum | cut -d' ' -f1)
+          local_hash=$(sha256sum index.html | cut -d' ' -f1)
+          if [ "$served" = "$local_hash" ]; then
+            echo "✓ served index.html matches this commit"
+          else
+            echo "✗ served index.html (${served}) != repo index.html (${local_hash}) — CDN is serving a stale build"
+            fail=1
+          fi
+
+          exit $fail
 
       - name: Write deployment summary
         run: |
