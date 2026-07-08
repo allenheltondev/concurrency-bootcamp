@@ -23,8 +23,9 @@ a deliberately separate, final phase.
 ```
                     shared Ready Set Cloud user pool (external, referenced by id)
                                         │ JWT (issuer/audience)
-Browser ──(later)── HTTPS ──► API Gateway HTTP API ──► Lambda (Node 22, esbuild) ──► DynamoDB
-                    api.bootcamp.readysetcloud.io        one function per route      single table
+Browser ──(later)──► CloudFront ──► API Gateway HTTP API ──► Lambda (Node 22, esbuild) ──► DynamoDB
+   bootcamp.readysetcloud.io/api/*      routes /api/*          one function per route      single table
+   (existing distribution, new behavior)
 ```
 
 - **Auth**: the existing shared Cognito user pool is *not* created by this
@@ -33,10 +34,18 @@ Browser ──(later)── HTTPS ──► API Gateway HTTP API ──► Lambd
   app-specific client — and wires an API Gateway **JWT authorizer** to the
   pool's issuer URL. Every route requires a valid token; the user identity is
   the token's `sub` claim, never anything client-supplied.
-- **API**: API Gateway **HTTP API** (cheaper, native JWT authorizer) at
-  `api.bootcamp.readysetcloud.io` (regional ACM cert + Route53 alias, both in
-  the template — we already deploy in us-east-1). CORS locked to the site
-  origin.
+- **API**: API Gateway **HTTP API** (cheaper, native JWT authorizer), reached
+  through the **existing CloudFront distribution** at
+  `bootcamp.readysetcloud.io/api/*` — a second origin plus an `/api/*` cache
+  behavior, no new domain, cert, or DNS record. Because CloudFront can't
+  strip a path prefix, the HTTP API's route keys simply include it
+  (`GET /api/courses`, …). The `/api/*` behavior uses the managed
+  `CachingDisabled` cache policy and `AllViewerExceptHostHeader` origin
+  request policy (forwards `Authorization`, withholds `Host` so the
+  execute-api endpoint resolves), allows all HTTP methods, and skips the
+  COOP/COEP headers policy. The API is same-origin with the site, so the UI
+  phase needs **no CORS at all**; the execute-api URL stays reachable as a
+  debugging back door but isn't part of the contract.
 - **Compute**: Node.js 22 Lambda functions in `backend/functions/`, one
   handler per route, bundled with esbuild via `sam build` `Metadata`. AWS SDK
   v3 only, no other runtime deps.
@@ -91,14 +100,17 @@ lesson anecdote.
 
 All routes JWT-protected; user comes from `sub`.
 
+All paths are as the browser sees them (CloudFront forwards them verbatim, so
+they're also the HTTP API route keys).
+
 | Method + path | Purpose |
 | --- | --- |
-| `GET /courses` | Catalog: id, title, description, totalItems, status |
-| `GET /courses/{courseId}` | One course's metadata |
-| `GET /me/courses` | My cross-course summary list (the "what have I done" view) |
-| `GET /me/courses/{courseId}` | Full progress doc (summary + detail + version) for one course |
-| `PUT /me/courses/{courseId}` | Upsert progress: body is `{ detail, version }`; server recomputes summary, bumps version, sets timestamps; `409` on version conflict |
-| `DELETE /me/courses/{courseId}` | Reset my progress in a course (the backend twin of the footer's Reset button) |
+| `GET /api/courses` | Catalog: id, title, description, totalItems, status |
+| `GET /api/courses/{courseId}` | One course's metadata |
+| `GET /api/me/courses` | My cross-course summary list (the "what have I done" view) |
+| `GET /api/me/courses/{courseId}` | Full progress doc (summary + detail + version) for one course |
+| `PUT /api/me/courses/{courseId}` | Upsert progress: body is `{ detail, version }`; server recomputes summary, bumps version, sets timestamps; `409` on version conflict |
+| `DELETE /api/me/courses/{courseId}` | Reset my progress in a course (the backend twin of the footer's Reset button) |
 
 Deliberately **not** in v1: per-item progress endpoints (the detail blob
 covers it), admin/course-authoring endpoints (catalog is seeded at deploy),
@@ -115,16 +127,19 @@ course appears. No console clicking, no custom resource.
 
 ## Deployment & config changes
 
-- **New template parameters**: `UserPoolId` (the shared pool — the deployment
-  variable you asked for), `ApiDomainName` (default
-  `api.bootcamp.readysetcloud.io`). Issuer URL is derived:
-  `https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPoolId}`.
+- **New template parameter**: `UserPoolId` (the shared pool — the deployment
+  variable you asked for). Issuer URL is derived:
+  `https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPoolId}`. No API
+  domain parameter needed — the API rides the existing site domain.
 - **New GitHub repo variable**: `COGNITO_USER_POOL_ID`, passed through
   `--parameter-overrides` in `deploy.yml` exactly like `DOMAIN_NAME` is today.
 - **Workflow updates** (`deploy.yml`): add `sam build` before `sam deploy`
   (first Lambda in the stack), add the catalog seed step, and extend the smoke
-  test: unauthenticated `GET /courses` must return `401`, proving the
-  authorizer is actually in front of the API.
+  test: unauthenticated `GET https://bootcamp.readysetcloud.io/api/courses`
+  must return `401`, proving both the CloudFront routing and the authorizer
+  in one probe. Note the `/api/*` behavior is a distribution config change —
+  it deploys in the same stack update, and the existing `/*` invalidation
+  step already covers any edge staleness.
 - **CI updates** (`ci.yml`): run the new backend unit tests; `node --check`
   already sweeps `js/`, extend the sweep to `backend/`.
 - **Outputs**: `ApiUrl`, `UserPoolClientId` — everything the UI phase will
@@ -133,10 +148,12 @@ course appears. No console clicking, no custom resource.
 ## Work breakdown (each phase = one PR, independently mergeable, site untouched)
 
 **Phase 1 — Infra skeleton.** Template additions: DynamoDB table, user-pool
-client against the shared pool, HTTP API + JWT authorizer + custom domain +
-CORS, template parameters, one placeholder route. Workflow: `sam build`,
-`COGNITO_USER_POOL_ID` variable, 401 smoke test. *Proves end-to-end: a real
-token from the shared pool passes the authorizer; no token gets 401.*
+client against the shared pool, HTTP API + JWT authorizer, the CloudFront
+`/api/*` origin + behavior, the `UserPoolId` parameter, one placeholder
+route. Workflow: `sam build`, `COGNITO_USER_POOL_ID` variable, 401 smoke
+test. *Proves end-to-end: `bootcamp.readysetcloud.io/api/*` reaches the API,
+a real token from the shared pool passes the authorizer, and no token gets
+401.*
 
 **Phase 2 — Courses.** `courses.json` + seed script + seed step;
 `GET /courses`, `GET /courses/{courseId}`. Small, mostly mechanical.
@@ -162,12 +179,14 @@ blob via `PUT` and merges on `409` (union `solved`, newest `position`, union
 `misses` capped at 50). First login migrates existing local progress up.
 Signed-out users keep today's experience forever — accounts stay optional.
 
-## Open items to confirm
+## Decisions
 
-1. Course id for the current app: proposing `js-concurrency`.
-2. API host: proposing `api.bootcamp.readysetcloud.io` under the existing
-   hosted zone.
-3. Shared-pool assumption: this stack creates its **own app client** in the
-   shared pool (standard multi-app pattern, no interference with other Ready
-   Set Cloud apps). If you'd rather share a client too, the client id becomes
-   a second deployment variable instead.
+1. Course id for the current app: `js-concurrency`. ✅
+2. API routing: through the existing CloudFront distribution at
+   `bootcamp.readysetcloud.io/api/*` — no separate API subdomain. ✅
+3. App client: this stack creates its **own app client** in the shared pool
+   (dedicated `aud`, so the JWT authorizer rejects tokens minted for other
+   Ready Set Cloud apps; own callback URLs and token lifetimes; same users
+   and same `sub` everywhere). If you'd rather reuse an existing client, the
+   client id becomes a second deployment variable and the authorizer's
+   audience points at it instead — everything else in this plan is unchanged.
