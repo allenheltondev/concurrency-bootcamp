@@ -4,6 +4,9 @@ const CACHE = "cbootcamp-v3";
 const SHELL = [
   "./", "./index.html", "./worker.js", "./manifest.webmanifest", "./icon.svg",
   "./js/core.js", "./js/content.js", "./js/app.js",
+  "./js/packs/ordered-merge.js",
+  "./js/packs/async-iterators.js",
+  "./js/packs/node-loop.js",
   "./js/packs/temporal-map.js",
 ];
 
