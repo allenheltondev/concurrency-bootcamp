@@ -202,8 +202,11 @@ they're also the HTTP API route keys).
 
 Deliberately **not** in v1: per-item progress endpoints (the detail blob
 covers it), admin/course-authoring endpoints (catalog is seeded at deploy),
-and any content delivery (course content stays static in `js/content.js` /
-`js/packs/` — the backend tracks progress, it doesn't serve lessons).
+and any content delivery — course content is static, versioned code served
+by CloudFront, and the API never serves lessons. That split ("the site is
+the textbook, the API is the gradebook"), including the per-course pack
+segmentation plan and the shell↔pack versioning rule, is recorded in
+**`docs/adr/0001-static-course-content.md`**.
 
 ## Catalog seeding
 
@@ -337,3 +340,7 @@ Signed-out users keep today's experience forever — accounts stay optional.
    domain-purity boundary is lint-enforced in CI. ✅
 8. **ESLint** (default `@eslint/js` recommended rules) runs in CI for the
    backend, alongside the tests. ✅
+9. **Content delivery**: course content stays static, versioned code (packs
+   on CloudFront); the API is progress-only. Scaling plan is per-course
+   lazy-loaded packs, not a platform change. Full rationale, consequences,
+   and revisit triggers: `docs/adr/0001-static-course-content.md`. ✅
