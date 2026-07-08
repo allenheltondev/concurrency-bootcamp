@@ -29,6 +29,16 @@ read/write lock, concurrency pool, condition variable, async dedup, dining
 philosophers, durable workflow) with a scenario describing how it misbehaves
 and one subtle fault hiding in the implementation — read the whole thing, tap
 the buggy line(s), and check.
+A **Write it** module then takes the options away entirely — the writing half
+of mastery, still one-thumb tap-driven: a spec, a scaffold, and a shuffled
+bank of code lines (some belong, some are traps) that you tap into place to
+assemble the real implementation — mutex, async queue, concurrency pool,
+token bucket, debounce, `Promise.all` from scratch, retry with backoff, and
+in-flight dedup. Grading is honest: your assembled code actually executes
+against real assertions in a sandboxed Web Worker, so any arrangement that
+behaves correctly passes, every failing run explains itself (trap lines
+included), and a deadlock or infinite loop just times out — it can never
+freeze the page.
 A **Test mode** then quizzes you across everything — shuffled options, first
 answer counts, scored — as a real readiness check. Throughout the drills and
 quiz, the answer choices are permuted on every load, so nothing can be solved

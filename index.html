@@ -114,6 +114,19 @@
   .codeline.miss{border:1px dashed var(--race);opacity:.7}
   .codeline:disabled{cursor:default}
 
+  /* write it: assemble the implementation from a shuffled line bank */
+  .built{background:#11131c;border:1px solid var(--line);border-radius:10px;padding:6px;margin:0;overflow-x:auto}
+  .built .ghost{font-family:var(--mono);font-size:12px;color:var(--faint);padding:10px;text-align:center}
+  .wline{display:flex;gap:10px;width:100%;text-align:left;font-family:var(--mono);font-size:12.5px;line-height:1.7;background:rgba(142,134,240,.08);border:1px solid var(--line);border-radius:6px;color:#cdd2e6;padding:2px 8px;margin:3px 0;cursor:pointer}
+  .wline .ln{color:var(--faint);user-select:none;min-width:1.6em;text-align:right;flex:0 0 auto}
+  .wline .src{white-space:pre;flex:1 1 auto}
+  .wline:active{transform:scale(.997)}
+  .wline.locked{cursor:default;background:var(--ok-bg);border-color:rgba(87,224,176,.35)}
+  .banklabel{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--race);text-transform:uppercase;margin:12px 0 6px}
+  .bankbox{display:flex;flex-direction:column;gap:6px}
+  .bankline{display:block;width:100%;text-align:left;font-family:var(--mono);font-size:12.5px;line-height:1.7;background:var(--surface2);border:1px dashed var(--line);border-radius:8px;color:#cdd2e6;padding:6px 10px;cursor:pointer;white-space:pre;overflow-x:auto}
+  .bankline:active{transform:scale(.995)}
+
   /* buttons */
   .btn{
     font-family:var(--mono);font-size:13px;letter-spacing:.02em;
@@ -648,6 +661,7 @@ const MODULES = [
   { id:"toolkit", label:"interview kit", type:"drills" },
   { id:"durable", label:"durable execution", type:"drills" },
   { id:"bughunt", label:"spot the bug", type:"bugs" },
+  { id:"write", label:"write it", type:"write" },
   { id:"test", label:"test yourself", type:"test" },
 ];
 
@@ -1754,15 +1768,377 @@ const BUGHUNT = [
 ];
 
 /* ===========================================================
+   WRITE IT — assemble the implementation from a shuffled line
+   bank (Parsons problems with distractors). Grading is honest:
+   the assembled code actually RUNS against assertions in a
+   sandboxed worker — any arrangement that passes the tests
+   passes. Each exercise:
+     lines       the reference body, in order (shown on solve)
+     distractors plausible trap lines; each explains itself if
+                 it's in the build when the tests fail
+     test        source appended after the user's code in the
+                 sandbox; log()/assert() like the demo runners
+   =========================================================== */
+const WRITE = [
+  { id:"w-mutex", title:"Mutex — write it", why:"one holder at a time, handed over directly", lesson:3,
+    spec:"Write both methods. acquire() takes the lock if it's free, otherwise parks on the queue. release() must hand the lock DIRECTLY to the next waiter — the lock must never look free while someone is queued.",
+    pre:`class Mutex {
+  #locked = false;
+  #queue = [];`,
+    post:`}`,
+    lines:[
+      "  async acquire() {",
+      "    if (!this.#locked) { this.#locked = true; return; }",
+      "    const d = deferred();",
+      "    this.#queue.push(d);",
+      "    await d.promise;",
+      "  }",
+      "  release() {",
+      "    const next = this.#queue.shift();",
+      "    if (next) next.resolve();",
+      "    else this.#locked = false;",
+      "  }",
+    ],
+    distractors:[
+      { code:"    this.#locked = false;",
+        why:"Clearing #locked while a waiter exists makes the lock observably free for an instant — a brand-new acquire() barges in while the woken waiter also proceeds: two holders." },
+      { code:"    if (next) this.#locked = false;",
+        why:"Backwards. When a waiter exists the lock transfers and STAYS held; only when the queue is empty do you clear #locked." },
+      { code:"    this.#queue.push(deferred());",
+        why:"Pushes a deferred but awaits nothing — acquire() returns immediately without the lock. Park on the SAME deferred you queued: await d.promise." },
+    ],
+    test:`const m = new Mutex();
+let inside = 0, peak = 0, finished = 0;
+async function job(name) {
+  await m.acquire();
+  inside++; peak = Math.max(peak, inside);
+  await sleep(5);
+  inside--; finished++;
+  m.release();
+}
+await Promise.all([job("A"), job("B"), job("C")]);
+log("3 jobs through the critical section, peak occupancy " + peak);
+assert(finished === 3, "all 3 jobs must finish - release() has to wake the queue");
+assert(peak === 1, "two jobs were inside the critical section at once - mutual exclusion broken");
+const m2 = new Mutex();
+await m2.acquire();
+let holders = 0;
+const enter = async () => { await m2.acquire(); holders++; };
+const parked = enter();     // parks on the queue
+m2.release();               // must hand over directly...
+const barger = enter();     // ...so this newcomer must queue, not barge
+await sleep(10);
+log("release with one waiter parked + an instant barge attempt: " + holders + " holder(s)");
+assert(holders === 1, "the lock looked free for an instant - a barger got in alongside the woken waiter");`,
+    pass:"mutual exclusion held, and release() handed over with no gap for a barger",
+    takeaway:"The whole trick is the direct handoff: release() never clears #locked while a waiter exists, so there is no instant where a newcomer can slip in ahead of the queue.",
+    hint:"acquire() first: fast path (free → take it and return), slow path (make a deferred, queue it, await it). Then release(): wake the next waiter if there is one; otherwise — and only otherwise — clear #locked." },
+
+  { id:"w-queue", title:"Async queue — write it", why:"producer/consumer handoff, exactly once", lesson:3,
+    spec:"push() delivers an item to exactly one place: a parked waiter if one exists, else the buffer. pop() returns a buffered item immediately, or parks until a push wakes it with the item.",
+    pre:`class AsyncQueue {
+  #items = [];
+  #waiters = [];`,
+    post:`}`,
+    lines:[
+      "  push(item) {",
+      "    const w = this.#waiters.shift();",
+      "    if (w) w.resolve(item);",
+      "    else this.#items.push(item);",
+      "  }",
+      "  async pop() {",
+      "    if (this.#items.length > 0) return this.#items.shift();",
+      "    const d = deferred();",
+      "    this.#waiters.push(d);",
+      "    return d.promise;",
+      "  }",
+    ],
+    distractors:[
+      { code:"    this.#items.push(item);",
+        why:"Unconditional store: when a waiter exists the item lands in the buffer AND wakes the waiter — deliver to exactly one place or you double-count (or strand the item)." },
+      { code:"    if (w) w.resolve(this.#items.shift());",
+        why:"The item in hand never entered #items — this wakes the waiter with undefined (or an older item) and loses the new one." },
+      { code:"    return d;",
+        why:"Returns the deferred wrapper itself, immediately — the caller gets an object instead of parking until push() delivers the item. Return d.promise." },
+    ],
+    test:`const q = new AsyncQueue();
+const first = q.pop();          // consumer arrives before any item
+q.push("a");
+assert(await first === "a", "a parked pop() must be woken by the next push, with the item");
+log("pop-before-push: parked consumer got \\"a\\"");
+q.push("b"); q.push("c");       // producer runs ahead
+assert(await q.pop() === "b", "buffered items must come out in FIFO order");
+assert(await q.pop() === "c", "buffered items must come out in FIFO order");
+log("push-before-pop: b, c buffered and served in order");
+const p = q.pop();
+q.push("d");
+assert(await p === "d", "each item must be delivered exactly once");
+const empty = await Promise.race([q.pop(), sleep(15).then(() => "still-waiting")]);
+assert(empty === "still-waiting", "pop() on an empty queue must park, not return");
+log("exactly-once delivery held; empty pop parks");`,
+    pass:"handoff worked both directions, FIFO held, nothing lost or duplicated",
+    takeaway:"push() and pop() are mirror images: each checks the other side's line first (a parked waiter / a buffered item) and only then falls back to its own (buffer it / park).",
+    hint:"push(): try to hand the item to a parked waiter first; only buffer when nobody is waiting. pop(): drain the buffer first; only park when it's empty." },
+
+  { id:"w-pool", title:"Concurrency pool — write it", why:"N workers drain a shared cursor", lesson:12,
+    spec:"Run fn over every item with at most `limit` in flight, and return the results in input order. The worker-pool pattern: a shared cursor, `limit` workers that loop claiming the next index.",
+    pre:`async function mapPool(items, limit, fn) {`,
+    post:`}`,
+    lines:[
+      "  const results = new Array(items.length);",
+      "  let next = 0;",
+      "  async function worker() {",
+      "    while (next < items.length) {",
+      "      const i = next++;",
+      "      results[i] = await fn(items[i], i);",
+      "    }",
+      "  }",
+      "  const n = Math.min(limit, items.length);",
+      "  await Promise.all(Array.from({ length: n }, worker));",
+      "  return results;",
+    ],
+    distractors:[
+      { code:"      results[i] = await fn(items[next], i);",
+        why:"By the time fn runs, other workers have advanced next — you'd process a shifted (or undefined) item. Claim the index once (const i = next++) and use i everywhere after." },
+      { code:"      const i = ++next;",
+        why:"Pre-increment claims the slot AFTER advancing: index 0 is never processed and the last worker runs one past the end." },
+      { code:"  await Promise.race(Array.from({ length: n }, worker));",
+        why:"race settles when the FIRST worker drains its last item — the others are still mid-flight, so you return with holes in results." },
+    ],
+    test:`let running = 0, peak = 0, calls = 0;
+const fn = async (x) => { calls++; running++; peak = Math.max(peak, running); await sleep(10); running--; return x * 2; };
+const out = await mapPool([1, 2, 3, 4, 5], 2, fn);
+log("5 items, limit 2 -> results [" + out.join(", ") + "], peak in-flight " + peak);
+assert(Array.isArray(out) && out.length === 5, "must return one result per item");
+assert(out.join(",") === "2,4,6,8,10", "results must line up with their input positions");
+assert(calls === 5, "every item must be processed exactly once (fn ran " + calls + " times)");
+assert(peak === 2, "with limit 2, exactly 2 items should be in flight at the busiest moment (peak was " + peak + ")");
+const one = await mapPool(["only"], 4, async (x) => x.toUpperCase());
+assert(one.length === 1 && one[0] === "ONLY", "limit larger than the item count must still work");
+log("limit > items handled");`,
+    pass:"all items processed once each, in-order results, in-flight count pinned at the limit",
+    takeaway:"The shared cursor IS the coordination: next++ atomically claims a slot (single-threaded JS — no torn read), so `limit` copies of the same loop never collide and the pool self-balances.",
+    hint:"Shape: results array + cursor, an inner async worker() that loops { claim i = next++, results[i] = await fn(...) }, then launch min(limit, items.length) workers and await them ALL." },
+
+  { id:"w-tokenbucket", title:"Token bucket — write it", why:"burst up to capacity, then the drip rate", lesson:14,
+    spec:"refill() drips one token per tick but never past capacity. tryRemove() spends a token if one exists, else denies. The constructor (given) starts the bucket full and ticks refill() on an interval.",
+    pre:`class TokenBucket {
+  constructor(capacity, refillMs) {
+    this.capacity = capacity;
+    this.tokens = capacity;
+    setInterval(() => this.refill(), refillMs);
+  }`,
+    post:`}`,
+    lines:[
+      "  refill() {",
+      "    if (this.tokens < this.capacity) this.tokens++;",
+      "  }",
+      "  tryRemove() {",
+      "    if (this.tokens === 0) return false;",
+      "    this.tokens--;",
+      "    return true;",
+      "  }",
+    ],
+    distractors:[
+      { code:"    this.tokens++;",
+        why:"Refilling with no cap lets tokens pile up through every quiet period — then one giant burst blows straight past the limit. Capacity IS the burst budget." },
+      { code:"    if (this.tokens === 0) this.tokens = this.capacity;",
+        why:"Refill-to-full-on-empty turns the limiter into a pulse: starve, then full burst. The steady one-per-tick drip (capped) is what smooths the rate." },
+      { code:"    return this.tokens >= 0;",
+        why:"Zero tokens must deny. This lets the request through without ever spending a token, so the bucket never pushes back at all." },
+    ],
+    test:`const b = new TokenBucket(3, 15);
+let granted = 0;
+for (let i = 0; i < 10; i++) if (b.tryRemove()) granted++;
+log("burst of 10 asks against capacity 3: " + granted + " granted");
+assert(granted === 3, "a fresh bucket of capacity 3 must grant exactly 3 of a burst of 10 (granted " + granted + ")");
+await sleep(50);                 // ~3 refill ticks
+let refilled = 0;
+for (let i = 0; i < 10; i++) if (b.tryRemove()) refilled++;
+log("after ~3 ticks: " + refilled + " granted");
+assert(refilled >= 2 && refilled <= 4, "about 3 tokens should have dripped back (got " + refilled + ")");
+await sleep(200);                // long quiet period: ~13 ticks
+let burst = 0;
+for (let i = 0; i < 10; i++) if (b.tryRemove()) burst++;
+assert(burst === 3, "tokens must cap at capacity during quiet periods - a burst of " + burst + " means the bucket overfilled");
+log("long quiet period: bucket capped at capacity");`,
+    pass:"burst capped at capacity, tokens dripped back, and the quiet period didn't overfill the bucket",
+    takeaway:"Two rules make the limiter: spend-if-available (deny at zero, no debt) and drip-with-a-ceiling (quiet time buys you at most `capacity` of future burst, never more).",
+    hint:"refill() is one guarded increment — the guard against capacity is the entire point. tryRemove() is deny-at-zero, else decrement and allow." },
+
+  { id:"w-debounce", title:"Debounce — write it", why:"only the last call in a burst fires", lesson:16,
+    spec:"Return a wrapped function. Every call cancels the pending timer and arms a fresh one — so fn runs once, ms after the burst goes quiet, with the LAST call's arguments.",
+    pre:`function debounce(fn, ms) {`,
+    post:`}`,
+    lines:[
+      "  let timer = null;",
+      "  return (...args) => {",
+      "    clearTimeout(timer);",
+      "    timer = setTimeout(() => fn(...args), ms);",
+      "  };",
+    ],
+    distractors:[
+      { code:"    timer = setTimeout(fn(...args), ms);",
+        why:"fn(...args) CALLS fn right now and hands its return value to setTimeout — the burst isn't quieted at all. Wrap it in a closure: () => fn(...args)." },
+      { code:"    if (timer) return;",
+        why:"Ignoring calls while a timer is pending means the FIRST call in the burst wins — a broken throttle. Debounce must reset the countdown so the LAST call and its args win." },
+      { code:"  let timer = setTimeout(fn, ms);",
+        why:"Arming a timer before any call schedules a stray invocation of fn with no arguments — start with nothing pending." },
+    ],
+    test:`const hits = [];
+const save = debounce((v) => hits.push(v), 30);
+save(1); await sleep(10); save(2); await sleep(10); save(3);
+await sleep(60);
+log("burst 1,2,3 inside the window -> fired with: [" + hits.join(", ") + "]");
+assert(hits.length === 1, "a burst of 3 calls inside the window must collapse to exactly 1 run (got " + hits.length + ")");
+assert(hits[0] === 3, "the LAST call's arguments must win (fired with " + hits[0] + ")");
+save(4);
+await sleep(60);
+assert(hits.length === 2 && hits[1] === 4, "a lone call after quiet must fire on its own, once");
+log("lone call after quiet fired once");`,
+    pass:"the burst collapsed to one trailing call carrying the final arguments",
+    takeaway:"Debounce is one line of state (the pending timer) and one rule (every call resets it). If you find yourself checking the timer instead of clearing it, you've drifted into throttle.",
+    hint:"One `timer` variable in the closure. The wrapper does exactly two things, in order: clearTimeout(timer), then arm a new setTimeout that closes over THIS call's args." },
+
+  { id:"w-promiseall", title:"Promise.all — write it", why:"fan out, keep order, first rejection wins", lesson:17,
+    spec:"Resolve with every value at its input index (plain non-promise values allowed), reject as soon as any input rejects, and handle the empty array. Count settlements — don't trust array length.",
+    pre:`function promiseAll(promises) {
+  return new Promise((resolve, reject) => {`,
+    post:`  });
+}`,
+    lines:[
+      "    const results = new Array(promises.length);",
+      "    let remaining = promises.length;",
+      "    if (remaining === 0) return resolve(results);",
+      "    promises.forEach((p, i) => {",
+      "      Promise.resolve(p).then((v) => {",
+      "        results[i] = v;",
+      "        if (--remaining === 0) resolve(results);",
+      "      }, reject);",
+      "    });",
+    ],
+    distractors:[
+      { code:"        results.push(v);",
+        why:"push stores by completion order, not input position — the fastest promise steals slot 0. Write to results[i] so each value lands at its own index." },
+      { code:"      p.then((v) => {",
+        why:"Plain values have no .then — Promise.all accepts non-promises too, so normalize each input with Promise.resolve(p) first." },
+      { code:"        if (results.length === promises.length) resolve(results);",
+        why:"new Array(n) already HAS length n — this resolves on the very first settlement, long before the slow inputs land. Count settlements down, don't measure length." },
+    ],
+    test:`const slow = sleep(30).then(() => "slow");
+const fast = sleep(5).then(() => "fast");
+const out = await promiseAll([slow, fast, "plain"]);
+log("mixed inputs resolved to: [" + out.join(", ") + "]");
+assert(out.length === 3 && out[0] === "slow" && out[1] === "fast" && out[2] === "plain",
+  "values must keep INPUT order even when they settle out of order (and plain values pass through)");
+const none = await promiseAll([]);
+assert(Array.isArray(none) && none.length === 0, "an empty array must resolve immediately with []");
+log("empty array resolved immediately");
+let err = null;
+try { await promiseAll([sleep(5).then(() => "ok"), sleep(10).then(() => { throw new Error("boom"); })]); }
+catch (e) { err = e; }
+assert(err && err.message === "boom", "one rejection must reject the whole thing with that error");
+log("first rejection propagated");`,
+    pass:"order preserved under out-of-order completion, empty input handled, rejection propagated",
+    takeaway:"The two load-bearing choices: store by input index (results[i] = v), and count settlements down to zero. Everything that looks simpler — push, length checks — breaks under out-of-order completion.",
+    hint:"Preallocate results and a `remaining` counter (resolve now if it's already 0). For each input: normalize with Promise.resolve, store at its own index, decrement, resolve when the count hits zero — and pass reject as the second .then handler." },
+
+  { id:"w-retry", title:"Retry with backoff — write it", why:"await inside try, or catch sees nothing", lesson:18,
+    spec:"Call fn up to `tries` times. Success returns immediately. Each failure before the last waits baseMs × 2^(attempt−1), then retries; the final failure rethrows the original error.",
+    pre:`async function retry(fn, tries, baseMs) {`,
+    post:`}`,
+    lines:[
+      "  for (let attempt = 1; ; attempt++) {",
+      "    try {",
+      "      return await fn();",
+      "    } catch (err) {",
+      "      if (attempt >= tries) throw err;",
+      "      await sleep(baseMs * 2 ** (attempt - 1));",
+      "    }",
+      "  }",
+    ],
+    distractors:[
+      { code:"      return fn();",
+        why:"Without await, the pending promise is returned before it settles — the catch block never sees the rejection, so a failing call escapes on attempt 1 with zero retries." },
+      { code:"      if (attempt > tries) throw err;",
+        why:"Off-by-one: this lets tries + 1 calls happen. The `tries`-th failure is the last — rethrow when attempt REACHES tries." },
+      { code:"    } catch {",
+        why:"Catching without binding the error throws it away — when retries are exhausted there's nothing left to rethrow. Bind it: catch (err)." },
+    ],
+    test:`let calls = 0;
+const flaky = async () => { calls++; if (calls < 3) throw new Error("flaky #" + calls); return "recovered"; };
+let v = null, unexpected = null;
+try { v = await retry(flaky, 5, 5); } catch (e) { unexpected = e; }
+assert(!unexpected, "a call that eventually succeeds must not reject (retry gave up with: " + (unexpected && unexpected.message) + ")");
+log("flaky call: " + calls + " attempts -> " + v);
+assert(v === "recovered", "must resolve with fn's value once it succeeds");
+assert(calls === 3, "must stop retrying the moment fn succeeds (made " + calls + " calls)");
+calls = 0;
+let err = null;
+try { await retry(async () => { calls++; throw new Error("down"); }, 3, 5); }
+catch (e) { err = e; }
+log("always-failing call: " + calls + " attempts, then threw '" + (err && err.message) + "'");
+assert(calls === 3, "tries = 3 means exactly 3 attempts, no more, no fewer (made " + calls + ")");
+assert(err && err.message === "down", "after the last attempt the ORIGINAL error must surface");`,
+    pass:"retried to success, stopped at the cap, and the original error surfaced at the end",
+    takeaway:"`return await fn()` is the whole exercise: without that await, the rejection settles after you've already left the try block, and your retry loop silently never loops.",
+    hint:"A forever-for loop with attempt starting at 1. Inside: try { return await fn() } catch (err) { rethrow if attempt >= tries, else sleep baseMs × 2^(attempt−1) }." },
+
+  { id:"w-dedupe", title:"In-flight dedup — write it", why:"share the fetch while it's flying, then let go", lesson:19,
+    spec:"Wrap an async fn so concurrent calls with the same key share ONE in-flight promise. When it settles, evict that key — a later call fetches fresh. Other keys are untouched.",
+    pre:`function dedupe(fn) {`,
+    post:`}`,
+    lines:[
+      "  const inflight = new Map();",
+      "  return (key) => {",
+      "    if (inflight.has(key)) return inflight.get(key);",
+      "    const p = fn(key).finally(() => inflight.delete(key));",
+      "    inflight.set(key, p);",
+      "    return p;",
+      "  };",
+    ],
+    distractors:[
+      { code:"    const p = fn(key);",
+        why:"Nothing ever evicts the entry — after the fetch settles, every future call for that key gets the stale first promise forever. That's an unbounded cache, not in-flight dedup." },
+      { code:"    const p = fn(key).finally(() => inflight.clear());",
+        why:"clear() evicts EVERY key when one settles — a concurrent fetch for a different key loses its dedup entry mid-flight and the next caller launches a duplicate." },
+      { code:"    if (inflight.has(key)) return fn(key);",
+        why:"Backwards — on a hit this launches ANOTHER fetch. A hit is exactly when you must return the promise that's already in flight." },
+    ],
+    test:`const gates = {};
+const launches = { a: 0, b: 0 };
+const fetcher = (key) => { launches[key]++; gates[key] = deferred(); return gates[key].promise; };
+const get = dedupe(fetcher);
+const p1 = get("a"), p2 = get("a"), pb = get("b");
+assert(p1 === p2, "two calls for the same key in flight must share ONE promise");
+assert(launches.a === 1, "the underlying fetch for 'a' must launch once (launched " + launches.a + " times)");
+log("concurrent get(a), get(a): one launch, one shared promise");
+gates.a.resolve("A1");
+assert(await p1 === "A1", "callers must receive the fetched value");
+await sleep(1);
+get("a");
+assert(launches.a === 2, "after the fetch settles the entry must be evicted - a new call refetches (launched " + launches.a + " times)");
+log("post-settle get(a) launched a fresh fetch");
+const pb2 = get("b");
+assert(pb === pb2 && launches.b === 1, "evicting 'a' must not touch 'b', still in flight (b launched " + launches.b + " times)");
+log("b's in-flight entry survived a's eviction");
+gates.b.resolve("B1"); gates.a.resolve("A2");`,
+    pass:"one launch per key while in flight, per-key eviction on settle, fresh fetch afterward",
+    takeaway:"The lifetime of a map entry IS the semantics: set on launch, delete-that-key on settle (.finally). Forget the eviction and you built a cache; evict too broadly and you un-dedup everyone else.",
+    hint:"Map hit → return the stored promise. Miss → launch fn(key), chain .finally(() => inflight.delete(key)) BEFORE storing, store it, return it." },
+];
+
+/* ===========================================================
    STATE + PERSISTENCE
    =========================================================== */
-const TOTAL = DRILLS.primitives.length + DRILLS.bank.length + DRILLS.toolkit.length + DRILLS.durable.length + BUGHUNT.length;
+const TOTAL = DRILLS.primitives.length + DRILLS.bank.length + DRILLS.toolkit.length + DRILLS.durable.length + BUGHUNT.length + WRITE.length;
 let state = { module:"learn", solved:{} };
 
 /* one-at-a-time stepping: where we are inside each stepped module */
 let learnIdx = 0;                                          // current lesson chapter
 let modelIdx = 0;                                          // current quiz question
 let bugIdx = 0;                                            // current spot-the-bug card
+let writeIdx = 0;                                          // current write-it exercise
 let test = { on:false, qs:[], idx:0, score:0, answered:false };  // scored test mode
 let drillIdx = { primitives:0, bank:0, toolkit:0, durable:0 };  // current drill per module
 let quizDone = {};                                         // qi -> answered correctly (in-memory)
@@ -1782,6 +2158,7 @@ function loadProgress(){
       if(Number.isInteger(p.learnIdx)) learnIdx=p.learnIdx;
       if(Number.isInteger(p.modelIdx)) modelIdx=p.modelIdx;
       if(Number.isInteger(p.bugIdx)) bugIdx=p.bugIdx;
+      if(Number.isInteger(p.writeIdx)) writeIdx=p.writeIdx;
       if(p.drillIdx && typeof p.drillIdx==="object") Object.assign(drillIdx, p.drillIdx);
       if(p.quizDone && typeof p.quizDone==="object") quizDone=p.quizDone;
     }
@@ -1795,7 +2172,7 @@ function saveProgress(){
 // persist the user's place across lessons + skills so they resume on return
 function savePosition(){
   try{ localStorage.setItem(POSITION_KEY,JSON.stringify({
-    module: state.module, learnIdx, modelIdx, bugIdx, drillIdx, quizDone
+    module: state.module, learnIdx, modelIdx, bugIdx, writeIdx, drillIdx, quizDone
   })); }catch(e){}
 }
 // wipe everything: solved drills, quiz answers, and where the user left off
@@ -1803,7 +2180,7 @@ function resetProgress(){
   if(!confirm("Reset all progress? This clears solved drills, quiz answers, and your place in every module.")) return;
   try{ localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(POSITION_KEY); }catch(e){}
   state.solved={}; quizDone={};
-  learnIdx=0; modelIdx=0; bugIdx=0;
+  learnIdx=0; modelIdx=0; bugIdx=0; writeIdx=0;
   drillIdx={ primitives:0, bank:0, toolkit:0, durable:0 };
   test={ on:false, qs:[], idx:0, score:0, answered:false };
   state.module="learn";
@@ -1846,6 +2223,7 @@ function render(){
   else if(m.type==="sim") renderSim();
   else if(m.type==="cards") renderCards();
   else if(m.type==="bugs") renderBugHunt();
+  else if(m.type==="write") renderWrite();
   else if(m.type==="test") renderTest();
 }
 
@@ -3587,6 +3965,134 @@ function renderCards(){
   next.onclick=()=>{ cardIdx=(cardIdx+1)%CARDS.length; cardFlipped=false; renderCards(); };
   row.append(prev,next);
   main.appendChild(row);
+}
+
+/* ---- write it: assemble the implementation from a shuffled line bank ---- */
+/* The assembled code runs for real, inside a throwaway Web Worker so a
+   deadlock or infinite loop can't freeze the page — the worker is simply
+   terminated after 3s. log/assert/sleep/deferred mirror the demo runners. */
+function sandboxRun(src, testSrc, passMsg){
+  const prog = `"use strict";
+const __lines=[];
+const log=(t)=>__lines.push(String(t));
+const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+function deferred(){ let resolve,reject; const promise=new Promise((res,rej)=>{resolve=res;reject=rej;}); return {promise,resolve,reject}; }
+const assert=(c,m)=>{ if(!c) throw new Error(m); };
+(async()=>{
+  try{
+${src}
+${testSrc}
+    postMessage({lines:__lines,pass:true,verdict:${JSON.stringify(passMsg)}});
+  }catch(e){
+    postMessage({lines:__lines,pass:false,verdict:String((e&&e.message)||e)});
+  }
+})();`;
+  return new Promise((resolve)=>{
+    let url=null, w=null, timer=null, settled=false;
+    const finish=(r)=>{ if(settled) return; settled=true; clearTimeout(timer); if(w) w.terminate(); if(url) URL.revokeObjectURL(url); resolve(r); };
+    try{
+      url=URL.createObjectURL(new Blob([prog],{type:"text/javascript"}));
+      w=new Worker(url);
+    }catch(e){ return finish({lines:[],pass:false,verdict:"couldn't start the sandbox: "+String(e)}); }
+    timer=setTimeout(()=>finish({lines:[],pass:false,verdict:"timed out after 3s — a deadlock, an unreleased lock, or an infinite loop is the usual suspect"}),3000);
+    w.onmessage=(e)=>finish(e.data);
+    w.onerror=(e)=>{ e.preventDefault(); finish({lines:[],pass:false,verdict:"didn't parse/run: "+(e.message||"syntax error")+" — check the structure (method boundaries, braces)"}); };
+  });
+}
+
+function buildWriteCard(w){
+  const card=el(`<div class="card">
+    <h2>${esc(w.title)}</h2>
+    <div class="why">// ${esc(w.why)}</div>
+    <span class="done ${state.solved[w.id]?"":"hidden"}" data-done>✓ solved</span>
+    <p class="scen">${esc(w.spec)}</p>
+  </div>`);
+  if(w.lesson!=null){ const row=conceptLinkRow(w.lesson); if(row) card.querySelector(".why").after(row); }
+
+  card.appendChild(el(`<pre class="code" style="margin:12px 0 4px">${esc(w.pre)}</pre>`));
+  const built=el(`<div class="built"></div>`);
+  card.appendChild(built);
+  card.appendChild(el(`<pre class="code" style="margin:4px 0 2px">${esc(w.post)}</pre>`));
+
+  const bankLabel=el(`<div class="banklabel">line bank — tap to add · ${w.distractors.length} traps hiding in here</div>`);
+  const bankBox=el(`<div class="bankbox"></div>`);
+  card.append(bankLabel, bankBox);
+
+  const runRow=el(`<div class="row"></div>`);
+  const runBtn=el(`<button class="btn go">▶ run tests</button>`);
+  const clearBtn=el(`<button class="btn">↺ clear</button>`);
+  runRow.append(runBtn, clearBtn);
+  card.appendChild(runRow);
+  const cons=el(`<div class="console" style="display:none"></div>`);
+  const notes=el(`<div></div>`);
+  card.append(cons, notes);
+
+  // chips: reference lines + distractor traps, shuffled once per card build
+  const items = w.lines.map((code)=>({code, why:null}))
+    .concat(w.distractors.map((d)=>({code:d.code, why:d.why})));
+  const bankSeq = shuffle(items);
+  let done = !!state.solved[w.id];
+  // revisiting a solved exercise shows the reference body, still runnable
+  let chosen = done ? items.filter(it=>!it.why) : [];
+  let fails = 0;
+
+  function paint(){
+    if(done){ card.querySelector(".scen").style.borderColor="var(--ordered)"; }
+    built.innerHTML="";
+    if(!chosen.length) built.appendChild(el(`<div class="ghost">tap lines from the bank below to build the body — tap a built line to take it back out</div>`));
+    chosen.forEach((it,ci)=>{
+      const b=el(`<button class="wline ${done?"locked":""}"><span class="ln">${ci+1}</span><span class="src">${esc(it.code)}</span></button>`);
+      if(!done) b.onclick=()=>{ chosen.splice(ci,1); paint(); };
+      built.appendChild(b);
+    });
+    bankBox.innerHTML="";
+    bankSeq.filter(it=>!chosen.includes(it)).forEach(it=>{
+      const b=el(`<button class="bankline">${esc(it.code)}</button>`);
+      b.onclick=()=>{ chosen.push(it); paint(); };
+      bankBox.appendChild(b);
+    });
+    bankLabel.style.display = bankBox.style.display = done ? "none" : "";
+    clearBtn.style.display = done ? "none" : "";
+    runBtn.disabled = !done && chosen.length===0;
+  }
+
+  runBtn.onclick=async()=>{
+    runBtn.disabled=true; notes.innerHTML="";
+    cons.style.display="block"; cons.textContent="running your code in a sandbox…";
+    const src=[w.pre, ...chosen.map(it=>it.code), w.post].join("\n");
+    const r=await sandboxRun(src, w.test, w.pass);
+    cons.innerHTML=r.lines.map(l=>esc(l)).join("\n")+(r.lines.length?"\n":"")
+      +`<span class="${r.pass?"pass":"fail"}">${r.pass?"✓ PASS":"✗ FAIL"} — ${esc(r.verdict)}</span>`;
+    if(r.pass){
+      done=true;
+      card.querySelector("[data-done]").classList.remove("hidden");
+      notes.appendChild(el(`<div class="why-line">${esc(w.takeaway)}</div>`));
+      if(!state.solved[w.id]){ state.solved[w.id]=true; saveProgress(); }
+    } else {
+      fails++;
+      // any trap lines sitting in the build explain themselves, like every wrong tap in the app
+      chosen.filter(it=>it.why).forEach(it=>{
+        notes.appendChild(el(`<div class="why-line" style="border-color:var(--race)"><b style="color:var(--race)">trap — ${esc(it.code.trim())}</b><br>${esc(it.why)}</div>`));
+      });
+      if(fails>=2 && w.hint) notes.appendChild(el(`<div class="why-line"><b>hint:</b> ${esc(w.hint)}</div>`));
+    }
+    paint();
+  };
+  clearBtn.onclick=()=>{ if(done) return; chosen=[]; fails=0; cons.style.display="none"; notes.innerHTML=""; paint(); };
+
+  paint();
+  return card;
+}
+
+function renderWrite(){
+  main.appendChild(el(`<div>
+    <div class="eyebrow">module 08</div><h1>Write it</h1>
+    <p class="lead">No options to lean on. You get a spec, a scaffold, and a shuffled pile of lines — some belong, some are traps. Tap lines into place to write the implementation, then <b style="color:var(--text)">run the tests</b>: your assembled code actually executes against real assertions, so any arrangement that behaves correctly passes.</p>
+    <p class="sub">This is the whiteboard round, phone-sized. Say the invariant out loud, build to it, and let the tests argue back. Deadlocks just time out — the sandbox can't freeze the page.</p>
+  </div>`));
+  writeIdx=Math.max(0,Math.min(writeIdx,WRITE.length-1));
+  main.appendChild(buildWriteCard(WRITE[writeIdx]));
+  main.appendChild(stepperRow(writeIdx, WRITE.length, (i)=>{ writeIdx=i; render(); window.scrollTo({top:0}); }));
 }
 
 /* ---- test mode: randomized, shuffled options, scored, no hints until you answer ---- */
