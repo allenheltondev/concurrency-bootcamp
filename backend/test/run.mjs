@@ -4,15 +4,18 @@
    against the in-memory DynamoDB fake registered by test/register.mjs.
    Run from backend/: npm test */
 
-// Environment must be set before the app modules are imported.
+// Environment must be set before the app modules are imported. Logs stay ON
+// (INFO) — they're part of the contract under test — but every invocation
+// captures stdout, so test output stays readable and log lines are
+// assertable via lastLogs().
 process.env.TABLE_NAME = "test-table";
-process.env.POWERTOOLS_LOG_LEVEL = "SILENT";
+process.env.POWERTOOLS_LOG_LEVEL = "INFO";
 process.env.POWERTOOLS_TRACE_ENABLED = "false";
 process.env.POWERTOOLS_METRICS_DISABLED = "true";
 process.env.POWERTOOLS_SERVICE_NAME = "test";
 process.env.POWERTOOLS_METRICS_NAMESPACE = "Test";
 
-const { store } = await import("@aws-sdk/lib-dynamodb");
+const { store, failNextCall } = await import("@aws-sdk/lib-dynamodb");
 const { handler } = await import("../src/api.mjs");
 
 let failures = 0;
@@ -46,8 +49,27 @@ const lambdaCtx = {
   memoryLimitInMB: "256", logGroupName: "g", logStreamName: "s",
   getRemainingTimeInMillis: () => 10_000
 };
-const invoke = (method, path, body, extraHeaders = {}) => {
+let capturedLogs = [];
+const lastLogs = () => capturedLogs.join("");
+
+const invoke = async (method, path, body, extraHeaders = {}) => {
   const raw = body === undefined ? undefined : JSON.stringify(body);
+  // Powertools logs info to stdout and warn/error to stderr — capture both.
+  capturedLogs = [];
+  const capture = (chunk) => { capturedLogs.push(String(chunk)); return true; };
+  const originalStdout = process.stdout.write;
+  const originalStderr = process.stderr.write;
+  process.stdout.write = capture;
+  process.stderr.write = capture;
+  try {
+    return await doInvoke(method, path, raw, extraHeaders);
+  } finally {
+    process.stdout.write = originalStdout;
+    process.stderr.write = originalStderr;
+  }
+};
+
+const doInvoke = (method, path, raw, extraHeaders) => {
   return handler({
     version: "2.0",
     routeKey: "ANY /api/{proxy+}",
@@ -72,6 +94,10 @@ const putBody = (detail, version) => ({ detail, ...(version !== undefined && { v
 /* ---- health + catalogs ---- */
 let r = await invoke("GET", "/api/health");
 check("health 200 with caller identity", r.statusCode === 200 && parse(r).sub === "u1", r.body);
+check("access log: request handled with route/status/sub",
+  lastLogs().includes('"request handled"') && lastLogs().includes('"status":200')
+  && lastLogs().includes('"route":') && lastLogs().includes('"sub":"u1"'), lastLogs().slice(0, 400));
+check("access log carries correlation id", lastLogs().includes('"correlation_id":"req-1"'));
 r = await invoke("GET", "/api/courses");
 check("course catalog lists 1", parse(r).courses.length === 1 && parse(r).courses[0].pk === undefined);
 r = await invoke("GET", "/api/courses/js-concurrency");
@@ -82,6 +108,17 @@ r = await invoke("GET", "/api/badges");
 check("badge catalog lists 5", parse(r).badges.length === 5);
 r = await invoke("GET", "/api/nope");
 check("unknown route 404", r.statusCode === 404);
+check("route miss logged as warn", lastLogs().includes('"no route matched"') && lastLogs().includes('"/api/nope"'), lastLogs().slice(0, 400));
+
+/* ---- unexpected errors: full details to logs, generic body to clients ---- */
+failNextCall(new Error("secret db detail: connection string"));
+r = await invoke("GET", "/api/courses");
+check("storage failure -> 500", r.statusCode === 500, r.statusCode);
+check("500 body is generic", parse(r).message === "Internal Server Error", r.body);
+check("500 body leaks no internals", !r.body.includes("secret"));
+check("500 log has error + stack + route context",
+  lastLogs().includes('"unhandled error"') && lastLogs().includes("secret db detail")
+  && lastLogs().includes('"stack"') && lastLogs().includes('"/api/courses"'), lastLogs().slice(0, 600));
 
 /* ---- progress write path ---- */
 r = await invoke("PUT", "/api/me/courses/js-concurrency", putBody({ solved: { a: true }, position: { module: "learn" }, misses: [] }));

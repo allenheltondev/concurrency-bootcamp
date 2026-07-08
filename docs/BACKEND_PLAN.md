@@ -67,7 +67,13 @@ Browser ──(later)──► CloudFront ──► API Gateway HTTP API ──�
   - **Event Handler (http)**: routing, validation middleware, structured
     4xx/5xx error bodies, body-size-limit middleware (`413`)
   - **Logger**: structured JSON logs, Lambda context + API Gateway request id
-    as correlation id (via middy)
+    as correlation id (via middy). Every request logs one access line
+    (method, path, matched route, status, duration, sub); route misses log a
+    `no route matched` warn; rejected requests (validation, body limit) log
+    a warn with the failure details; unexpected errors log at error level
+    with name/message/stack. **Responses never carry internals**: unexpected
+    failures return a generic 500 body — the details live only in the logs
+    (asserted by tests, including a leak check).
   - **Tracer**: X-Ray handler segment (middy) + per-route subsegments and
     ColdStart annotation (router middleware) + captured DynamoDB client
   - **Metrics** (EMF): per-request latency/error/fault dimensioned by matched

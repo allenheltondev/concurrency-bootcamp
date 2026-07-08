@@ -47,6 +47,28 @@ const bodyLimit = async ({ reqCtx, next }) => {
   await next();
 };
 
+/* Structured access log for every request. Successful requests log one info
+   line with the matched route, status, and duration. Errors propagate to the
+   handlers in adapters/http/errors.mjs, which own the detailed error logging
+   — here they only get a debug breadcrumb so the timeline stays readable. */
+const accessLog = async ({ reqCtx, next }) => {
+  const request = {
+    method: reqCtx.req.method,
+    path: new URL(reqCtx.req.url).pathname,
+    route: reqCtx.route,
+    sub: reqCtx.event?.requestContext?.authorizer?.jwt?.claims?.sub
+  };
+  const started = Date.now();
+  logger.debug("request received", request);
+  try {
+    await next();
+    logger.info("request handled", { ...request, status: reqCtx.res?.status, durationMs: Date.now() - started });
+  } catch (error) {
+    logger.debug("request failed, mapping error", { ...request, error: error.name, durationMs: Date.now() - started });
+    throw error;
+  }
+};
+
 // ---- wire the hexagon: repositories -> services -> routes ----
 const catalogRepository = createCatalogRepository();
 const userRepository = createUserRepository();
@@ -54,6 +76,7 @@ const catalogService = createCatalogService({ catalogRepository });
 const progressService = createProgressService({ catalogRepository, userRepository });
 
 const app = new Router({ prefix: "/api", logger });
+app.use(accessLog);
 app.use(tracerMiddleware(tracer));
 app.use(metricsMiddleware(metrics));
 app.use(bodyLimit);

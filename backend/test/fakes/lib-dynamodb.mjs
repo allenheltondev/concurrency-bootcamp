@@ -6,6 +6,11 @@
 export const store = new Map();
 const key = (k) => `${k.pk}|${k.sk}`;
 
+/* Arm a one-shot failure: the next send() throws this error. Lets tests
+   prove that unexpected storage failures surface as sanitized 500s. */
+let nextError = null;
+export const failNextCall = (err) => { nextError = err; };
+
 class Cmd { constructor(input) { this.input = input; } }
 export class GetCommand extends Cmd {}
 export class PutCommand extends Cmd {}
@@ -20,6 +25,11 @@ class CondFail extends Error {
 export class DynamoDBDocumentClient {
   static from() { return new DynamoDBDocumentClient(); }
   async send(cmd) {
+    if (nextError) {
+      const err = nextError;
+      nextError = null;
+      throw err;
+    }
     const i = cmd.input;
     if (cmd instanceof GetCommand) {
       const item = store.get(key(i.Key));
