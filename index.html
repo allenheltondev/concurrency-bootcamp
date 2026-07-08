@@ -1945,6 +1945,32 @@ let n = 0;
     <p class="big">Here's the twist: single-threaded does <b class="hl">not</b> mean race-free. When a function <code>await</code>s in the middle of a read-modify-write, another task can run in the gap and move the data underneath it.</p>
     <div class="diagram anim" style="--step:.85s">
       <div class="dlabel">two tasks share balance = 100, each withdraws 30</div>
+      <svg class="estage" viewBox="0 0 340 156" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
+        <text x="170" y="19" fill="#57e0b0" font-size="9" text-anchor="middle">SHARED &middot; balance</text>
+        <rect x="143" y="25" width="54" height="40" rx="8" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
+        <text x="170" y="51" font-size="15" text-anchor="middle" fill="#e7e9f3">100
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.57;0.58;1" values="1;1;0;0"/></text>
+        <text x="170" y="51" font-size="15" text-anchor="middle" fill="#e7e9f3" opacity="0">70
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.57;0.58;0.83;0.84;1" values="0;0;1;1;0;0"/></text>
+        <text x="170" y="51" font-size="15" text-anchor="middle" fill="#ff9a6b" opacity="0">70
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.83;0.84;1" values="0;0;1;1"/></text>
+        <text x="170" y="86" fill="#ff9a6b" font-size="8.5" text-anchor="middle" opacity="0">&#10007; B's write lost
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.84;0.9;1" values="0;0;1;1"/></text>
+        <line x1="150" y1="59" x2="66" y2="104" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <line x1="190" y1="59" x2="274" y2="104" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <rect x="10" y="104" width="96" height="44" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
+        <text x="58" y="122" fill="#8e86f0" font-size="9" text-anchor="middle">TASK A</text>
+        <text x="58" y="137" fill="#8b90ab" font-size="8.5" text-anchor="middle">read, await, write</text>
+        <rect x="234" y="104" width="96" height="44" rx="9" fill="#11131c" stroke="#ff9a6b" stroke-width="1.5"/>
+        <text x="282" y="122" fill="#ff9a6b" font-size="9" text-anchor="middle">TASK B</text>
+        <text x="282" y="137" fill="#8b90ab" font-size="8.5" text-anchor="middle">read, write</text>
+        <circle r="6.5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
+            keyTimes="0;0.12;0.72;0.84;1" keyPoints="0;1;1;0;0" path="M 150 59 L 66 104"/></circle>
+        <circle r="6.5" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
+            keyTimes="0;0.20;0.34;0.46;0.58;1" keyPoints="0;0;1;1;0;0" path="M 190 59 L 274 104"/></circle>
+      </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">Task A</div><div class="lstep seq" style="--i:0">read balance &rarr; 100</div>
         <div class="lanehead seq" style="--i:1">Task A</div><div class="lstep wait seq" style="--i:1">await checkLimit() &hellip; yields the thread</div>
@@ -1983,6 +2009,41 @@ async function withdraw(amount) {
     <p class="big">Synchronization primitives are small tools that control <b class="hl">who runs when</b>. Nearly all of them are the same idea: a queue of parked promises, plus a rule for whose <code>resolve()</code> fires next.</p>
     <p><b class="hl">Mutex</b> — one holder at a time; wraps a critical section so it can't interleave. <b class="hl">Semaphore</b> — N permits (a mutex is N=1); caps concurrency. <b class="hl">Latch / barrier</b> — make tasks wait for an event, or for each other. <b class="hl">Queue</b> — hand work from producers to consumers without busy-waiting.</p>
     <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">one lock, handed on &middot; N permits, taken &amp; returned</div>
+      <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
+        <text x="83" y="16" fill="#8e86f0" font-size="9" text-anchor="middle">MUTEX &middot; 1 holder</text>
+        <line x1="14" y1="58" x2="152" y2="58" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <rect x="66" y="40" width="34" height="36" rx="7" fill="none" stroke="#57e0b0" stroke-width="1.5"/>
+        <path d="M 76 40 v -6 a 7 7 0 0 1 14 0 v 6" fill="none" stroke="#57e0b0" stroke-width="1.5"/>
+        <text x="83" y="92" fill="#8b90ab" font-size="8" text-anchor="middle">the lock</text>
+        <text x="24" y="112" fill="#6a7090" font-size="8" text-anchor="middle">queue</text>
+        <text x="140" y="112" fill="#6a7090" font-size="8" text-anchor="middle">done</text>
+        <circle r="6.5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
+            keyTimes="0;0.16;0.30;0.34;1" keyPoints="0;0.5;0.5;1;1" path="M 14 58 L 83 58 L 152 58"/></circle>
+        <circle r="6.5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" begin="-2s" repeatCount="indefinite" calcMode="linear"
+            keyTimes="0;0.16;0.30;0.34;1" keyPoints="0;0.5;0.5;1;1" path="M 14 58 L 83 58 L 152 58"/></circle>
+        <circle r="6.5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" begin="-4s" repeatCount="indefinite" calcMode="linear"
+            keyTimes="0;0.16;0.30;0.34;1" keyPoints="0;0.5;0.5;1;1" path="M 14 58 L 83 58 L 152 58"/></circle>
+        <line x1="170" y1="26" x2="170" y2="128" stroke="#2c3350" stroke-width="1"/>
+        <text x="256" y="16" fill="#57e0b0" font-size="9" text-anchor="middle">SEMAPHORE &middot; 3 permits</text>
+        <rect x="210" y="30" width="20" height="20" rx="5" fill="#11131c" stroke="#57e0b0" stroke-width="1.4">
+          <animate attributeName="fill" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.25;0.5;0.75;1" values="rgba(87,224,176,.28);#11131c;#11131c;rgba(87,224,176,.28);rgba(87,224,176,.28)"/></rect>
+        <rect x="246" y="30" width="20" height="20" rx="5" fill="#11131c" stroke="#57e0b0" stroke-width="1.4">
+          <animate attributeName="fill" dur="4.5s" begin="-1.5s" repeatCount="indefinite" keyTimes="0;0.25;0.5;0.75;1" values="rgba(87,224,176,.28);#11131c;#11131c;rgba(87,224,176,.28);rgba(87,224,176,.28)"/></rect>
+        <rect x="282" y="30" width="20" height="20" rx="5" fill="#11131c" stroke="#57e0b0" stroke-width="1.4">
+          <animate attributeName="fill" dur="4.5s" begin="-3s" repeatCount="indefinite" keyTimes="0;0.25;0.5;0.75;1" values="rgba(87,224,176,.28);#11131c;#11131c;rgba(87,224,176,.28);rgba(87,224,176,.28)"/></rect>
+        <text x="256" y="63" fill="#8b90ab" font-size="8" text-anchor="middle">up to 3 held at once</text>
+        <g>
+          <circle cx="200" cy="118" r="6.5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5"><animate attributeName="opacity" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.05;0.7;0.75;1" values="1;1;1;0.3;0.3"/></circle>
+          <circle cx="230" cy="118" r="6.5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5"><animate attributeName="opacity" dur="4.5s" begin="-1.1s" repeatCount="indefinite" keyTimes="0;0.05;0.7;0.75;1" values="1;1;1;0.3;0.3"/></circle>
+          <circle cx="260" cy="118" r="6.5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5"><animate attributeName="opacity" dur="4.5s" begin="-2.2s" repeatCount="indefinite" keyTimes="0;0.05;0.7;0.75;1" values="1;1;1;0.3;0.3"/></circle>
+          <circle cx="290" cy="118" r="6.5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5"><animate attributeName="opacity" dur="4.5s" begin="-3.3s" repeatCount="indefinite" keyTimes="0;0.05;0.7;0.75;1" values="1;1;1;0.3;0.3"/></circle>
+        </g>
+        <text x="256" y="138" fill="#6a7090" font-size="8" text-anchor="middle">4 tasks &middot; one always waiting</text>
+      </svg>
       <div class="dcols">
         <div class="dcol seq" style="--i:0">
           <div class="dlabel">mutex &middot; 1 permit</div>
@@ -2028,6 +2089,23 @@ async function withdraw(amount) {
     <p class="big">Two coordination gates. A <b class="hl">latch</b> opens once and lets everyone through (a start signal). A <b class="hl">barrier</b> holds N parties until the last one arrives, then releases them together (a rendezvous).</p>
     <div class="diagram anim" style="--step:.8s">
       <div class="dlabel">latch &middot; open once, all waiters go</div>
+      <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
+        <line x1="24" y1="45" x2="24" y2="123" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <line x1="316" y1="45" x2="316" y2="123" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <text x="60" y="30" fill="#8b90ab" font-size="8.5" text-anchor="middle">parked</text>
+        <text x="286" y="30" fill="#57e0b0" font-size="8.5" text-anchor="middle">released</text>
+        <text x="170" y="22" fill="#8e86f0" font-size="9" text-anchor="middle">open()</text>
+        <rect x="164" y="42" width="10" height="82" rx="3" fill="#8e86f0" opacity="0.9">
+          <animateTransform attributeName="transform" type="translate" dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.40;0.52;0.90;1" values="0 0;0 0;0 -46;0 -46;0 0"/>
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.40;0.52;0.90;1" values="0.9;0.9;0.25;0.25;0.9"/></rect>
+        <text x="169" y="138" fill="#6a7090" font-size="8" text-anchor="middle">the gate lifts once &rarr; stays open</text>
+        <circle r="6.5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.50;0.66;1" keyPoints="0;0;1;1" path="M 60 60 L 280 60"/></circle>
+        <circle r="6.5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.50;0.66;1" keyPoints="0;0;1;1" path="M 60 84 L 280 84"/></circle>
+        <circle r="6.5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.50;0.66;1" keyPoints="0;0;1;1" path="M 60 108 L 280 108"/></circle>
+      </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">w1</div><div class="lstep wait seq" style="--i:0">await latch &hellip; parked</div>
         <div class="lanehead seq" style="--i:1">w2</div><div class="lstep wait seq" style="--i:1">await latch &hellip; parked</div>
@@ -2070,6 +2148,27 @@ class Barrier {                        <span class="cm">// releases N together</
     <p class="big">A <b class="hl">condition variable</b> parks a task until a predicate becomes true, and a producer <b class="hl">signals</b> when the state it depends on changes. The waiter re-checks on every wake — so a stale or spurious wake just parks it again.</p>
     <div class="diagram anim" style="--step:.8s">
       <div class="dlabel">consumer waits for items &gt; 0</div>
+      <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
+        <text x="170" y="16" fill="#8b90ab" font-size="8.5" text-anchor="middle">items</text>
+        <rect x="152" y="20" width="36" height="26" rx="6" fill="#11131c" stroke="#57e0b0" stroke-width="1.4"/>
+        <text x="170" y="38" font-size="13" text-anchor="middle" fill="#e7e9f3">0
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.55;0.56;1" values="1;1;0;0"/></text>
+        <text x="170" y="38" font-size="13" text-anchor="middle" fill="#57e0b0" opacity="0">1
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.55;0.56;1" values="0;0;1;1"/></text>
+        <rect x="138" y="58" width="64" height="40" rx="8" fill="none" stroke="#8e86f0" stroke-width="1.4"/>
+        <text x="170" y="76" fill="#8e86f0" font-size="8.5" text-anchor="middle">items &gt; 0 ?</text>
+        <text x="170" y="88" fill="#6a7090" font-size="7.5" text-anchor="middle">re-check on wake</text>
+        <text x="40" y="120" fill="#ff9a6b" font-size="8" text-anchor="middle">wait()</text>
+        <text x="300" y="120" fill="#57e0b0" font-size="8" text-anchor="middle">consume</text>
+        <text x="170" y="120" font-size="8" text-anchor="middle" fill="#ff9a6b" opacity="0">spurious &rarr; re-park
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.18;0.34;0.4;1" values="0;1;1;0;0"/></text>
+        <text x="170" y="120" font-size="8" text-anchor="middle" fill="#57e0b0" opacity="0">true &rarr; go
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.62;0.78;1" values="0;0;1;1"/></text>
+        <circle r="6.5" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
+            keyTimes="0;0.12;0.22;0.30;0.58;0.74;1" keyPoints="0;0;0.234;0.468;0.468;1;1"
+            path="M 40 78 L 150 78 L 40 78 L 290 78"/></circle>
+      </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">consumer</div><div class="lstep wait seq" style="--i:0">items &gt; 0? no &rarr; park</div>
         <div class="lanehead seq" style="--i:1">producer</div><div class="lstep seq" style="--i:1">spurious signal (items still 0)</div>
@@ -2106,7 +2205,28 @@ await cv.wait(() =&gt; buffer.length &gt; 0);</pre>
     <p class="big">Locks aren't magic — they're built from one <b class="hl">atomic</b> instruction: <b class="hl">compare-and-swap</b>. CAS tests "is this cell 0?" and sets it to 1 in a single indivisible step, and tells you whether you won.</p>
     <div class="diagram anim" style="--step:.85s">
       <div class="dlabel">one shared cell &middot; 0 = free, 1 = held</div>
-      <div style="text-align:center;margin:4px 0 10px">lock cell &nbsp;<span class="memcell seq pop" style="--i:2">1</span></div>
+      <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
+        <text x="170" y="24" fill="#8b90ab" font-size="8.5" text-anchor="middle">lock cell</text>
+        <rect x="150" y="60" width="40" height="36" rx="7" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
+        <text x="170" y="84" font-size="15" text-anchor="middle" fill="#e7e9f3">0
+          <animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.34;0.35;1" values="1;1;0;0"/></text>
+        <text x="170" y="84" font-size="15" text-anchor="middle" fill="#57e0b0" opacity="0">1
+          <animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.34;0.35;1" values="0;0;1;1"/></text>
+        <rect x="10" y="56" width="92" height="44" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
+        <text x="56" y="74" fill="#8e86f0" font-size="9" text-anchor="middle">THREAD 1</text>
+        <text x="56" y="89" fill="#8b90ab" font-size="8" text-anchor="middle">CAS 0&rarr;1</text>
+        <rect x="238" y="56" width="92" height="44" rx="9" fill="#11131c" stroke="#ff9a6b" stroke-width="1.5"/>
+        <text x="284" y="74" fill="#ff9a6b" font-size="9" text-anchor="middle">THREAD 2</text>
+        <text x="284" y="89" fill="#8b90ab" font-size="8" text-anchor="middle">CAS 0&rarr;1</text>
+        <text x="56" y="122" fill="#57e0b0" font-size="8" text-anchor="middle" opacity="0">&#10003; won &mdash; holds it
+          <animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.36;0.46;1" values="0;0;1;1"/></text>
+        <text x="284" y="122" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">&#10007; was 1 &mdash; must wait
+          <animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.54;0.64;1" values="0;0;1;1"/></text>
+        <circle r="6.5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.15;0.34;1" keyPoints="0;0;1;1" path="M 102 78 L 150 78"/></circle>
+        <circle r="6.5" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.15;0.37;0.52;1" keyPoints="0;0;0.5;1;1" path="M 238 78 L 190 78 L 238 78"/></circle>
+      </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">Thread 1</div><div class="lstep good seq" style="--i:0">CAS 0&rarr;1 &nbsp;&#10003; won &mdash; holds the lock</div>
         <div class="lanehead seq" style="--i:1">Thread 2</div><div class="lstep bad seq" style="--i:1">CAS 0&rarr;1 &nbsp;&#10007; cell was 1 &mdash; must wait</div>
@@ -2136,6 +2256,25 @@ function release() {
     <p class="big">When reads vastly outnumber writes, a plain mutex is wasteful — readers don't conflict with each other. A <b class="hl">read/write lock</b> lets <b class="hl">many readers</b> in at once, but a <b class="hl">writer</b> gets it alone.</p>
     <div class="diagram anim" style="--step:.8s">
       <div class="dlabel">many readers OR one exclusive writer</div>
+      <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
+        <text x="170" y="18" fill="#8b90ab" font-size="8.5" text-anchor="middle">SHARED DATA</text>
+        <rect x="116" y="26" width="108" height="82" rx="10" fill="#11131c" stroke="#57e0b0" stroke-width="1.6">
+          <animate attributeName="stroke" dur="6s" repeatCount="indefinite" keyTimes="0;0.48;0.52;0.92;1" values="#57e0b0;#57e0b0;#ff9a6b;#ff9a6b;#57e0b0"/></rect>
+        <text x="30" y="128" fill="#57e0b0" font-size="8" text-anchor="middle">readers</text>
+        <text x="310" y="128" fill="#8b90ab" font-size="8" text-anchor="middle">done</text>
+        <text x="170" y="128" font-size="8.5" text-anchor="middle" fill="#57e0b0" opacity="0">3 readers &middot; shared
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.12;0.44;0.48;1" values="0;1;1;0;0"/></text>
+        <text x="170" y="128" font-size="8.5" text-anchor="middle" fill="#ff9a6b" opacity="0">1 writer &middot; exclusive
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.56;0.62;0.88;0.92;1" values="0;0;1;1;0;0"/></text>
+        <circle r="6" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.04;0.16;0.40;0.50;1" keyPoints="0;0;0.5;0.5;1;1" path="M 22 50 L 318 50"/></circle>
+        <circle r="6" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.04;0.16;0.40;0.50;1" keyPoints="0;0;0.5;0.5;1;1" path="M 22 67 L 318 67"/></circle>
+        <circle r="6" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.04;0.16;0.40;0.50;1" keyPoints="0;0;0.5;0.5;1;1" path="M 22 84 L 318 84"/></circle>
+        <circle r="6.5" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.50;0.62;0.86;0.96;1" keyPoints="0;0;0.5;0.5;1;1" path="M 22 99 L 318 99"/></circle>
+      </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">readers</div><div class="lstep good seq pop" style="--i:0">R1 R2 R3 &mdash; all reading together</div>
         <div class="lanehead seq" style="--i:1">writer</div><div class="lstep wait seq" style="--i:1">waits for readers to drain</div>
@@ -2184,6 +2323,42 @@ function release() {
     <p class="big">Initialize something <b class="hl">exactly once</b>, even when many callers ask for it at the same time — a lazy singleton (open the DB pool, load config). The trick: cache the in-flight <b class="hl">promise</b>, not the value.</p>
     <div class="diagram anim" style="--step:.8s">
       <div class="dlabel">4 concurrent callers, one initializer</div>
+      <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
+        <line x1="62" y1="29" x2="134" y2="74" stroke="#2c3350" stroke-width="1" stroke-dasharray="3 4"/>
+        <line x1="62" y1="61" x2="134" y2="74" stroke="#2c3350" stroke-width="1" stroke-dasharray="3 4"/>
+        <line x1="62" y1="93" x2="134" y2="74" stroke="#2c3350" stroke-width="1" stroke-dasharray="3 4"/>
+        <line x1="62" y1="125" x2="134" y2="74" stroke="#2c3350" stroke-width="1" stroke-dasharray="3 4"/>
+        <line x1="206" y1="74" x2="252" y2="74" stroke="#2c3350" stroke-width="1" stroke-dasharray="3 4"/>
+        <g font-size="8.5" text-anchor="middle">
+          <rect x="8" y="16" width="54" height="26" rx="6" fill="#11131c" stroke="#8e86f0" stroke-width="1.3"><animate attributeName="stroke" dur="6s" repeatCount="indefinite" keyTimes="0;0.80;0.86;1" values="#8e86f0;#8e86f0;#57e0b0;#57e0b0"/></rect><text x="35" y="33" fill="#cdd2e6">c1</text>
+          <rect x="8" y="48" width="54" height="26" rx="6" fill="#11131c" stroke="#8e86f0" stroke-width="1.3"><animate attributeName="stroke" dur="6s" repeatCount="indefinite" keyTimes="0;0.80;0.86;1" values="#8e86f0;#8e86f0;#57e0b0;#57e0b0"/></rect><text x="35" y="65" fill="#cdd2e6">c2</text>
+          <rect x="8" y="80" width="54" height="26" rx="6" fill="#11131c" stroke="#8e86f0" stroke-width="1.3"><animate attributeName="stroke" dur="6s" repeatCount="indefinite" keyTimes="0;0.80;0.86;1" values="#8e86f0;#8e86f0;#57e0b0;#57e0b0"/></rect><text x="35" y="97" fill="#cdd2e6">c3</text>
+          <rect x="8" y="112" width="54" height="26" rx="6" fill="#11131c" stroke="#8e86f0" stroke-width="1.3"><animate attributeName="stroke" dur="6s" repeatCount="indefinite" keyTimes="0;0.80;0.86;1" values="#8e86f0;#8e86f0;#57e0b0;#57e0b0"/></rect><text x="35" y="129" fill="#cdd2e6">c4</text>
+        </g>
+        <rect x="134" y="52" width="72" height="44" rx="10" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
+        <text x="170" y="72" fill="#57e0b0" font-size="8.5" text-anchor="middle">promise</text>
+        <text x="170" y="86" font-size="7.5" text-anchor="middle" fill="#6a7090">pending
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.62;0.63;1" values="1;1;0;0"/></text>
+        <text x="170" y="86" font-size="7.5" text-anchor="middle" fill="#57e0b0" opacity="0">resolved
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.62;0.63;1" values="0;0;1;1"/></text>
+        <rect x="252" y="52" width="80" height="44" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
+        <text x="292" y="72" fill="#8e86f0" font-size="9" text-anchor="middle">init()</text>
+        <text x="292" y="86" font-size="7.5" text-anchor="middle" fill="#6a7090">runs once</text>
+        <circle r="5.5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.06;0.30;1" keyPoints="0;0;1;1" path="M 62 29 L 134 74 L 252 74"/></circle>
+        <circle r="5.5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5" opacity="0">
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.64;0.65;0.9;1" values="0;0;1;1;0"/>
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.64;0.86;1" keyPoints="0;0;1;1" path="M 134 74 L 62 29"/></circle>
+        <circle r="5.5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5" opacity="0">
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.64;0.65;0.9;1" values="0;0;1;1;0"/>
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.64;0.86;1" keyPoints="0;0;1;1" path="M 134 74 L 62 61"/></circle>
+        <circle r="5.5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5" opacity="0">
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.64;0.65;0.9;1" values="0;0;1;1;0"/>
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.64;0.86;1" keyPoints="0;0;1;1" path="M 134 74 L 62 93"/></circle>
+        <circle r="5.5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5" opacity="0">
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.64;0.65;0.9;1" values="0;0;1;1;0"/>
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.64;0.86;1" keyPoints="0;0;1;1" path="M 134 74 L 62 125"/></circle>
+      </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">c1</div><div class="lstep good seq" style="--i:0">no promise yet &rarr; start init() &middot; store it</div>
         <div class="lanehead seq" style="--i:1">c2</div><div class="lstep seq" style="--i:1">promise exists &rarr; await it</div>
@@ -2213,7 +2388,30 @@ getPool(); getPool(); getPool();               <span class="cm">// 3 callers -> 
     <p class="big">For genuine parallelism — CPU-bound work — JS uses <b class="hl">Workers</b>, separate OS threads. They don't share variables; they message-pass. The one exception is a <code>SharedArrayBuffer</code>, where threads touch the <b class="hl">same memory</b> — and that's where true data races appear.</p>
     <div class="diagram anim" style="--step:.85s">
       <div class="dlabel">two threads, one shared counter (starts at 5), each does counter++</div>
-      <div style="text-align:center;margin:4px 0 10px">shared cell &nbsp;<span class="memcell seq pop" style="--i:5">6</span></div>
+      <svg class="estage" viewBox="0 0 340 156" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
+        <text x="170" y="19" fill="#57e0b0" font-size="9" text-anchor="middle">SHARED &middot; counter</text>
+        <rect x="143" y="25" width="54" height="40" rx="8" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
+        <text x="170" y="51" font-size="15" text-anchor="middle" fill="#e7e9f3">5
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.41;0.42;1" values="1;1;0;0"/></text>
+        <text x="170" y="51" font-size="15" text-anchor="middle" fill="#e7e9f3" opacity="0">6
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.41;0.42;0.61;0.62;1" values="0;0;1;1;0;0"/></text>
+        <text x="170" y="51" font-size="15" text-anchor="middle" fill="#ff9a6b" opacity="0">6
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.61;0.62;1" values="0;0;1;1"/></text>
+        <text x="170" y="86" fill="#ff9a6b" font-size="8.5" text-anchor="middle" opacity="0">&#10007; rose by 1, should be 7
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.62;0.7;1" values="0;0;1;1"/></text>
+        <line x1="150" y1="59" x2="66" y2="104" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <line x1="190" y1="59" x2="274" y2="104" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <rect x="10" y="104" width="96" height="44" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
+        <text x="58" y="122" fill="#8e86f0" font-size="9" text-anchor="middle">THREAD 1</text>
+        <text x="58" y="137" fill="#8b90ab" font-size="8.5" text-anchor="middle">read 5 &middot; write 6</text>
+        <rect x="234" y="104" width="96" height="44" rx="9" fill="#11131c" stroke="#ff9a6b" stroke-width="1.5"/>
+        <text x="282" y="122" fill="#ff9a6b" font-size="9" text-anchor="middle">THREAD 2</text>
+        <text x="282" y="137" fill="#8b90ab" font-size="8.5" text-anchor="middle">read 5 &middot; write 6</text>
+        <circle r="6.5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.05;0.15;0.30;0.42;1" keyPoints="0;0;1;1;0;0" path="M 150 59 L 66 104"/></circle>
+        <circle r="6.5" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.05;0.20;0.50;0.62;1" keyPoints="0;0;1;1;0;0" path="M 190 59 L 274 104"/></circle>
+      </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">Thread 1</div><div class="lstep seq" style="--i:0">read counter &rarr; 5</div>
         <div class="lanehead seq" style="--i:1">Thread 2</div><div class="lstep seq" style="--i:1">read counter &rarr; 5</div>
