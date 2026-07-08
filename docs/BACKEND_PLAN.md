@@ -63,8 +63,14 @@ Identity is the Cognito `sub` (stable per user in the shared pool).
 | Entity | pk | sk | Notes |
 | --- | --- | --- | --- |
 | Course catalog entry | `COURSE#<courseId>` | `METADATA` | title, description, `totalItems`, `contentVersion`, `status` (active/draft/retired) |
-| User profile | `USER#<sub>` | `PROFILE` | createdAt, lastSeenAt, display prefs later |
+| Badge catalog entry | `BADGE#<badgeId>` | `METADATA` | name, description, icon, `scope` (global / per-course), declarative `criteria` (below) |
+| User profile | `USER#<sub>` | `PROFILE` | createdAt, lastSeenAt, plus gamification stats: `xp`, `currentStreak`, `longestStreak`, `lastActivityDate` |
 | Course progress | `USER#<sub>` | `COURSE#<courseId>` | summary **and** detail in one item, below |
+| Earned badge | `USER#<sub>` | `BADGE#<badgeId>` | `earnedAt`, `courseId` if course-scoped; write is conditional on `attribute_not_exists(pk)` so awards are idempotent and `earnedAt` never moves |
+
+Everything about a user shares one partition on purpose: profile, per-course
+summaries, and earned badges all come back from a single
+`Query pk = USER#<sub>` — the whole "me" screen in one round trip.
 
 The course-progress item carries both granularities the requirements ask for:
 
@@ -83,9 +89,12 @@ Access patterns, all satisfied without a GSI:
 
 | Question | Operation |
 | --- | --- |
-| What courses exist? | `Query pk begins_with COURSE#` — no. Catalog is small: `Scan` with a filter now, or a `GSI1: type=course` if/when the table grows. Start with the simple thing. |
+| What courses / badges exist? | Catalogs are small: `Scan` with a type filter now, or a `GSI1: type` if/when the table grows. Start with the simple thing. |
 | All my courses + status ("what have I done?") | `Query pk = USER#<sub>, sk begins_with COURSE#` |
 | My progress in one course | `GetItem (USER#<sub>, COURSE#<courseId>)` |
+| My badges | `Query pk = USER#<sub>, sk begins_with BADGE#` |
+| My profile + stats | `GetItem (USER#<sub>, PROFILE)` |
+| Everything about me at once | `Query pk = USER#<sub>` |
 | Course metadata | `GetItem (COURSE#<courseId>, METADATA)` |
 
 **Write concurrency** (fitting, for this app): `PUT` progress uses optimistic
@@ -95,6 +104,46 @@ with the current item so the client can merge and retry. Last-write-wins is
 what silently eats progress when the same account has the app open on a phone
 and a laptop; a conditional write is one expression and makes a great future
 lesson anecdote.
+
+## Gamification
+
+Design rule: **the server computes everything, on the progress write path.**
+The client never says "give me a badge" or "add 50 XP" — it only submits
+progress, and the `PUT` handler derives the rest. That keeps gamification
+tamper-resistant (to the degree the progress data itself is honest — this is
+a learning tool, not a competition, so client-reported `solved` is an
+acceptable trust root) and means the UI phase gets badge/XP moments for free
+in the `PUT` response.
+
+- **XP**: derived, not accumulated — recomputed from summary counts (solved
+  items, completed courses, completed modules) on every write and stored on
+  the profile item. Derived XP can't drift, survives progress resets
+  coherently, and lets us re-balance point values later by changing the
+  formula, not the data.
+- **Streaks**: on every progress write, compare `lastActivityDate` (UTC day)
+  on the profile: same day → no-op, yesterday → `currentStreak+1`, older →
+  reset to 1; maintain `longestStreak`. UTC-day granularity is a known
+  simplification; a timezone preference on the profile can refine it later
+  without a model change.
+- **Badges**: the catalog entry carries a small declarative `criteria`
+  object rather than code — e.g. `{type: "course-completed"}`,
+  `{type: "percent-complete", courseId, threshold}`,
+  `{type: "total-solved", count}`, `{type: "streak", days}`,
+  `{type: "courses-completed", count}`. The `PUT` handler evaluates all
+  active criteria against the fresh summary + profile stats and
+  conditionally writes any newly earned badge items. Adding a badge type =
+  one evaluator function; adding a badge = a JSON entry.
+- **Awards are permanent**: resetting or deleting course progress never
+  claws back an earned badge (the `attribute_not_exists` write plus never
+  deleting `BADGE#` items on `DELETE /api/me/courses/...`).
+- **Future escape hatch**: if criteria ever get expensive or we want awards
+  to trigger side effects (emails, notifications), the `PUT` handler starts
+  emitting a `progress.updated` EventBridge event and evaluation moves to an
+  async awarder Lambda. The data model doesn't change — only where the
+  evaluator runs.
+- **Explicitly out of scope for v1**: leaderboards and any cross-user
+  visibility (needs a GSI on XP plus privacy decisions — the model above
+  doesn't block it), daily quests, and badge revocation.
 
 ## API surface (v1)
 
@@ -109,8 +158,11 @@ they're also the HTTP API route keys).
 | `GET /api/courses/{courseId}` | One course's metadata |
 | `GET /api/me/courses` | My cross-course summary list (the "what have I done" view) |
 | `GET /api/me/courses/{courseId}` | Full progress doc (summary + detail + version) for one course |
-| `PUT /api/me/courses/{courseId}` | Upsert progress: body is `{ detail, version }`; server recomputes summary, bumps version, sets timestamps; `409` on version conflict |
-| `DELETE /api/me/courses/{courseId}` | Reset my progress in a course (the backend twin of the footer's Reset button) |
+| `PUT /api/me/courses/{courseId}` | Upsert progress: body is `{ detail, version }`; server recomputes summary, bumps version, sets timestamps, updates XP/streak, evaluates badges; `409` on version conflict. Response includes `newBadges` + updated stats so a future UI can toast them |
+| `DELETE /api/me/courses/{courseId}` | Reset my progress in a course (the backend twin of the footer's Reset button). Earned badges stay |
+| `GET /api/badges` | Badge catalog (name, description, icon, criteria) |
+| `GET /api/me` | My profile + gamification stats (XP, streaks) |
+| `GET /api/me/badges` | Badges I've earned, with `earnedAt` |
 
 Deliberately **not** in v1: per-item progress endpoints (the detail blob
 covers it), admin/course-authoring endpoints (catalog is seeded at deploy),
@@ -120,10 +172,12 @@ and any content delivery (course content stays static in `js/content.js` /
 ## Catalog seeding
 
 Courses are declared in `backend/data/courses.json` (starting with the single
-`js-concurrency` entry — `totalItems` matches the app's `TOTAL`). A small
-idempotent script (`backend/tools/seed-courses.mjs`, plain `PutItem`s) runs as
-a post-deploy step in the workflow. Editing the JSON and merging is how a new
-course appears. No console clicking, no custom resource.
+`js-concurrency` entry — `totalItems` matches the app's `TOTAL`) and badges
+in `backend/data/badges.json` (launch set: first drill solved, course
+started, course 50% / completed, N-day streaks, first course completed). A
+small idempotent script (`backend/tools/seed-catalog.mjs`, plain `PutItem`s)
+runs as a post-deploy step in the workflow. Editing the JSON and merging is
+how a new course or badge appears. No console clicking, no custom resource.
 
 ## Deployment & config changes
 
@@ -155,14 +209,20 @@ test. *Proves end-to-end: `bootcamp.readysetcloud.io/api/*` reaches the API,
 a real token from the shared pool passes the authorizer, and no token gets
 401.*
 
-**Phase 2 — Courses.** `courses.json` + seed script + seed step;
-`GET /courses`, `GET /courses/{courseId}`. Small, mostly mechanical.
+**Phase 2 — Catalogs.** `courses.json` + `badges.json` + seed script + seed
+step; `GET /api/courses`, `GET /api/courses/{courseId}`, `GET /api/badges`.
+Small, mostly mechanical.
 
-**Phase 3 — Progress.** The core: `GET/PUT/DELETE /me/courses*`, summary
-computation from `detail.solved`, versioned conditional writes with `409`
-merge semantics, profile item upsert on first write.
+**Phase 3 — Progress.** The core: `GET/PUT/DELETE /api/me/courses*`,
+`GET /api/me`, summary computation from `detail.solved`, versioned
+conditional writes with `409` merge semantics, profile item upsert on first
+write with XP + streak updates.
 
-**Phase 4 — Tests & hardening.** Handler unit tests (mocked DynamoDB client)
+**Phase 4 — Badges.** Criteria evaluators, award writes in the `PUT` path,
+`newBadges` in the response, `GET /api/me/badges`. Depends on phase 3's
+write path.
+
+**Phase 5 — Tests & hardening.** Handler unit tests (mocked DynamoDB client)
 wired into CI; an integration smoke script that exercises the deployed API
 with a real test-user token; request validation (payload size cap, shape
 check on `detail`); structured logs + basic alarms (4xx/5xx, throttles).
@@ -170,7 +230,7 @@ check on `detail`); structured logs + basic alarms (4xx/5xx, throttles).
 Phases 2 and 3 can proceed in parallel once phase 1 merges — they share
 nothing but the table.
 
-**Phase 5 — UI integration (explicitly out of scope for now).** Parked until
+**Phase 6 — UI integration (explicitly out of scope for now).** Parked until
 you're done using the app for learning. The design above pre-decides the hard
 parts so this phase is purely client work: Hosted UI login (client id comes
 from stack outputs), `localStorage` remains the write-through cache and
@@ -187,6 +247,7 @@ Signed-out users keep today's experience forever — accounts stay optional.
 3. App client: this stack creates its **own app client** in the shared pool
    (dedicated `aud`, so the JWT authorizer rejects tokens minted for other
    Ready Set Cloud apps; own callback URLs and token lifetimes; same users
-   and same `sub` everywhere). If you'd rather reuse an existing client, the
-   client id becomes a second deployment variable and the authorizer's
-   audience points at it instead — everything else in this plan is unchanged.
+   and same `sub` everywhere). ✅
+4. Gamification (badges, XP, streaks) is in scope for the data model and API
+   from day one: server-computed on the progress write path, catalogs seeded
+   from JSON, awards permanent. Leaderboards deferred. ✅
