@@ -12,12 +12,40 @@ let learnIdx = 0;                                          // current lesson cha
 let modelIdx = 0;                                          // current quiz question
 let bugIdx = 0;                                            // current spot-the-bug card
 let writeIdx = 0;                                          // current write-it exercise
-let test = { on:false, qs:[], idx:0, score:0, answered:false, build:null };  // scored test mode
+// scored test mode. mode: "normal" | "review" | "sim". deadline/expired only for sim.
+let test = { on:false, mode:"normal", qs:[], idx:0, score:0, answered:false, build:null, deadline:0, expired:false, cleared:0 };
 let drillIdx = { primitives:0, bank:0, toolkit:0, durable:0 };  // current drill per module
 let quizDone = {};                                         // qi -> answered correctly (in-memory)
+let simTimer = null;                                       // the ONE interview-sim countdown interval (cleared before re-arm)
+let examBuildRunning = false;                              // a scored build-round sandbox is mid-run — don't rip it out on expiry
 
 const STORAGE_KEY="cbootcamp:solved";
 const POSITION_KEY="cbootcamp:position";   // where the user left off (lessons + skills)
+const MISS_KEY="cbootcamp:misses";         // persisted snapshots of missed questions + failed builds, for review mode
+
+/* ---- miss store: dedupe by stable key, cap 50, evict oldest, defensive like every storage helper ---- */
+function loadMisses(){
+  try{ const raw=localStorage.getItem(MISS_KEY); if(raw){ const a=JSON.parse(raw); if(Array.isArray(a)) return a; } }catch(e){}
+  return [];
+}
+function saveMisses(a){ try{ localStorage.setItem(MISS_KEY,JSON.stringify(a)); }catch(e){} }
+function recordMiss(entry){
+  if(!entry||!entry.key) return;
+  try{
+    const a=loadMisses().filter(m=>m&&m.key!==entry.key);  // dedupe: drop any prior with this key
+    a.push(entry);                                         // most-recent lands at the end
+    while(a.length>50) a.shift();                          // cap 50, evict oldest
+    saveMisses(a);
+  }catch(e){}
+}
+function removeMiss(key){
+  try{ const a=loadMisses(); const b=a.filter(m=>m&&m.key!==key);
+    if(b.length!==a.length){ saveMisses(b); return true; } }catch(e){}
+  return false;
+}
+function missCount(){ return loadMisses().length; }
+function mcMisses(){ return loadMisses().filter(m=>m&&!m.buildId); }
+function buildMisses(){ return loadMisses().filter(m=>m&&m.buildId); }
 function loadProgress(){
   // skills pieces: which drills are solved
   try{ const raw=localStorage.getItem(STORAGE_KEY); if(raw) state.solved=JSON.parse(raw); }
@@ -50,12 +78,13 @@ function savePosition(){
 }
 // wipe everything: solved drills, quiz answers, and where the user left off
 function resetProgress(){
-  if(!confirm("Reset all progress? This clears solved drills, quiz answers, and your place in every module.")) return;
-  try{ localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(POSITION_KEY); }catch(e){}
+  if(!confirm("Reset all progress? This clears solved drills, quiz answers, missed questions, and your place in every module.")) return;
+  try{ localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(POSITION_KEY); localStorage.removeItem(MISS_KEY); }catch(e){}
   state.solved={}; quizDone={};
   learnIdx=0; modelIdx=0; bugIdx=0; writeIdx=0;
   drillIdx={ primitives:0, bank:0, toolkit:0, durable:0 };
-  test={ on:false, qs:[], idx:0, score:0, answered:false, build:null };
+  clearSimTimer();
+  test={ on:false, mode:"normal", qs:[], idx:0, score:0, answered:false, build:null, deadline:0, expired:false, cleared:0 };
   for(const k in writeMem) delete writeMem[k];
   state.module="learn";
   renderProgress(); render(); window.scrollTo({top:0});
@@ -87,6 +116,7 @@ function renderNav(){
 function el(html){ const d=document.createElement("div"); d.innerHTML=html.trim(); return d.firstElementChild; }
 
 function render(){
+  clearSimTimer();          // the app fully rebuilds #main below — never let a countdown interval outlive its DOM
   savePosition();
   renderNav();
   main.innerHTML="";
@@ -675,9 +705,11 @@ function buildWriteCard(w, opts={}){
 
   runBtn.onclick=async()=>{
     runBtn.disabled=true; notes.innerHTML="";
+    if(exam) examBuildRunning=true;          // so a sim expiry lets this run finish before scoring
     cons.style.display="block"; cons.textContent="running your code in a sandbox…";
     const src=[w.pre, ...chosen.map(ii=>items[ii].code), w.post].join("\n");
     const r=await sandboxRun(src, w.test, w.pass);
+    if(exam) examBuildRunning=false;
     cons.innerHTML=r.lines.map(l=>esc(l)).join("\n")+(r.lines.length?"\n":"")
       +`<span class="${r.pass?"pass":"fail"}">${r.pass?"✓ PASS":"✗ FAIL"} — ${esc(r.verdict)}</span>`;
     if(exam){
@@ -728,58 +760,126 @@ function shuffleOptions(q){
   const order=shuffle(q.options.map((_,i)=>i));
   return { ...q, options:order.map(i=>q.options[i]), whys:q.whys?order.map(i=>q.whys[i]):null, answer:order.indexOf(q.answer) };
 }
+// a stable snapshot of a missed MC question, for the review store
+function mcSnapshot(q){
+  return { title:q.title, context:q.context, question:q.question,
+           options:q.options, answer:q.answer, whys:q.whys||null,
+           key:q.title+"|"+q.question };
+}
 function startTest(n){
   let pool=shuffle(testPool());
   if(n!=="all") pool=pool.slice(0,n);
   // every test ends with a build round: one write-it exercise, first run counts
-  test={ on:true, qs:pool.map(shuffleOptions), idx:0, score:0, answered:false,
-         build:{ ex:WRITE[rnd(WRITE.length)], done:false, pass:false } };
+  test={ on:true, mode:"normal", qs:pool.map(shuffleOptions), idx:0, score:0, answered:false,
+         build:{ ex:WRITE[rnd(WRITE.length)], done:false, pass:false }, deadline:0, expired:false, cleared:0 };
   render(); window.scrollTo({top:0});
+}
+const SIM_MC=12, SIM_MS=25*60*1000;                        // interview sim: 12 questions + build, 25 minutes
+function startSim(){
+  const pool=shuffle(testPool()).slice(0,SIM_MC);           // dynamic pool: never more than exists
+  test={ on:true, mode:"sim", qs:pool.map(shuffleOptions), idx:0, score:0, answered:false,
+         build:{ ex:WRITE[rnd(WRITE.length)], done:false, pass:false },
+         deadline:Date.now()+SIM_MS, expired:false, cleared:0 };
+  render(); window.scrollTo({top:0});
+}
+// review only the questions/build the user has missed. correct clears; wrong keeps. no NEW snapshots recorded here.
+function startReview(){
+  const qs=mcMisses().map(m=>shuffleOptions({
+    title:m.title, context:m.context, question:m.question,
+    options:m.options, answer:m.answer, whys:m.whys||null, key:m.key }));
+  let build=null;
+  const bm=buildMisses();
+  if(bm.length){ const ex=WRITE.find(w=>w.id===bm[0].buildId); if(ex) build={ ex, done:false, pass:false }; }
+  test={ on:true, mode:"review", qs, idx:0, score:0, answered:false, build, deadline:0, expired:false, cleared:0 };
+  render(); window.scrollTo({top:0});
+}
+
+/* ---- interview-sim countdown: exactly one interval, cleaned up on every render/module switch ---- */
+function clearSimTimer(){ if(simTimer){ clearInterval(simTimer); simTimer=null; } }
+function fmtClock(ms){
+  ms=Math.max(0,ms); const s=Math.round(ms/1000);
+  return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+}
+function simClockHtml(){
+  return test.mode==="sim" ? ` · <span class="clock" data-clock>${fmtClock(test.deadline-Date.now())}</span>` : "";
+}
+function armSimClock(){
+  clearSimTimer();
+  if(!test.on || test.mode!=="sim" || test.expired) return;   // no clock once time's already handled
+  const tick=()=>{
+    const rem=test.deadline-Date.now();
+    const clock=main.querySelector("[data-clock]");
+    if(clock){ clock.textContent=fmtClock(rem); clock.classList.toggle("low", rem<=5*60*1000); }
+    if(rem<=0) expireSim();
+  };
+  tick();
+  simTimer=setInterval(tick,1000);
+}
+// time's up: unanswered MC count wrong, an unrun build counts failed. don't interrupt a running sandbox.
+function expireSim(){
+  if(!test.on || test.mode!=="sim" || test.expired) return;
+  if(test.idx<test.qs.length){                 // still in multiple choice — abandon the rest
+    test.expired=true; clearSimTimer(); render(); window.scrollTo({top:0}); return;
+  }
+  if(test.build && !test.build.done){          // build round, not yet scored
+    if(examBuildRunning){ test.expired=true; return; }  // a run is in flight: let it finish, its onScored will finalize
+    test.build.done=true; test.build.pass=false;
+  }
+  test.expired=true; clearSimTimer(); render(); window.scrollTo({top:0});
 }
 function renderTest(){
   if(!test.on){
+    const total=testPool().length, misses=missCount();
     main.appendChild(el(`<div>
       <div class="eyebrow">test yourself</div><h1>Test mode</h1>
       <p class="lead">No hints. First answer counts, and the options are shuffled — so you can't lean on "it's usually the first one." Random questions, then a <b style="color:var(--text)">build round</b> to finish: assemble one implementation from its line bank and run it — the first run is the one that counts.</p>
       <p class="sub">Prep tip: once you can pass these cold, rebuild each pattern in a blank file while talking it through out loud — that's the skill the interview actually grades.</p>
     </div>`));
-    const row=el(`<div class="row"></div>`);
-    [["10 + build",10],["20 + build",20],["all "+testPool().length+" + build","all"]].forEach(([label,n])=>{
-      const b=el(`<button class="btn go">${label}</button>`); b.onclick=()=>startTest(n); row.appendChild(b);
-    });
-    main.appendChild(row);
+    // three tiers, single column, one thumb
+    const col=el(`<div class="row" style="flex-direction:column;align-items:stretch"></div>`);
+    const tiers=[
+      ["quick test · 10 + build", ()=>startTest(10)],
+      ["full test · "+total+" + build", ()=>startTest("all")],
+      ["interview sim · 25 min", ()=>startSim()],
+    ];
+    tiers.forEach(([label,fn])=>{ const b=el(`<button class="btn go">${label}</button>`); b.onclick=fn; col.appendChild(b); });
+    main.appendChild(col);
+    if(misses){
+      const rev=el(`<div class="row" style="margin-top:12px"></div>`);
+      const b=el(`<button class="btn review">↻ review ${misses} miss${misses===1?"":"es"}</button>`);
+      b.onclick=()=>startReview(); rev.appendChild(b);
+      main.appendChild(rev);
+    }
     return;
+  }
+  // score screen when MC + build are exhausted, or when the sim clock expired
+  const buildPending = test.build && !test.build.done && !test.expired;
+  if((test.idx>=test.qs.length && !buildPending) || (test.expired && !buildPending)){
+    return renderTestScore();
   }
   if(test.idx>=test.qs.length){
     // build round: multiple choice is done — now write one, first run counts
-    if(test.build && !test.build.done){
-      main.appendChild(el(`<div class="eyebrow">build round · ${test.score} correct so far</div>`));
-      main.appendChild(el(`<div><h1>Now write one</h1><p class="lead">Multiple choice is over. Assemble this implementation from its line bank, then run it — <b style="color:var(--text)">your first run is the one that counts</b>, pass or fail.</p></div>`));
-      const card=buildWriteCard(test.build.ex,{ exam:true, onScored:(pass)=>{
-        test.build.done=true; test.build.pass=pass;
-        if(pass) test.score++;
-        const nrow=el(`<div class="row"></div>`);
-        const nb=el(`<button class="btn go">see score ›</button>`);
-        nb.onclick=()=>{ render(); window.scrollTo({top:0}); };
-        nrow.appendChild(nb); card.appendChild(nrow);
-      }});
-      main.appendChild(card);
-      return;
-    }
-    const n=test.qs.length+(test.build?1:0), s=test.score, pct=Math.round(100*s/n);
-    const msg = pct>=90?"Sharp — you're ready." : pct>=70?"Solid. Patch the misses and you're close." : "Worth another pass through the drills.";
-    const mc = s-(test.build&&test.build.pass?1:0);
-    const buildLine = test.build
-      ? `<p class="sub">${mc} / ${test.qs.length} multiple choice · build round (${esc(test.build.ex.title.replace(/ — write it$/,""))}): ${test.build.pass?'<span style="color:var(--ordered)">✓ passed</span>':'<span style="color:var(--race)">✗ failed</span>'}</p>`
-      : "";
-    main.appendChild(el(`<div><div class="eyebrow">result</div><h1>${s} / ${n} <span class="sub" style="font-size:17px">· ${pct}%</span></h1><p class="lead">${msg}</p>${buildLine}</div>`));
-    const row=el(`<div class="row"></div>`);
-    const again=el(`<button class="btn go">▶ retake</button>`); again.onclick=()=>{ test.on=false; render(); window.scrollTo({top:0}); };
-    row.appendChild(again); main.appendChild(row);
+    const isReview=test.mode==="review";
+    main.appendChild(el(`<div class="eyebrow">build round · ${test.score} correct so far${simClockHtml()}</div>`));
+    main.appendChild(el(`<div><h1>Now write one</h1><p class="lead">${isReview?"A build you missed. ":"Multiple choice is over. "}Assemble this implementation from its line bank, then run it — <b style="color:var(--text)">your first run is the one that counts</b>, pass or fail.</p></div>`));
+    const card=buildWriteCard(test.build.ex,{ exam:true, onScored:(pass)=>{
+      test.build.done=true; test.build.pass=pass;
+      if(pass) test.score++;
+      const bkey="build|"+test.build.ex.id;
+      if(test.mode==="review"){ if(pass && removeMiss(bkey)) test.cleared++; }   // pass clears it; fail keeps it
+      else if(!pass) recordMiss({ buildId:test.build.ex.id, key:bkey });          // normal/sim: a failed build is reviewable
+      if(test.mode==="sim" && test.expired){ clearSimTimer(); render(); window.scrollTo({top:0}); return; }  // finished after expiry
+      const nrow=el(`<div class="row"></div>`);
+      const nb=el(`<button class="btn go">see score ›</button>`);
+      nb.onclick=()=>{ render(); window.scrollTo({top:0}); };
+      nrow.appendChild(nb); card.appendChild(nrow);
+    }});
+    main.appendChild(card);
+    armSimClock();
     return;
   }
   const q=test.qs[test.idx];
-  main.appendChild(el(`<div class="eyebrow">question ${test.idx+1} / ${test.qs.length} · ${test.score} correct</div>`));
+  main.appendChild(el(`<div class="eyebrow">question ${test.idx+1} / ${test.qs.length} · ${test.score} correct${simClockHtml()}</div>`));
   const card=el(`<div class="card"><h2>${esc(q.title)}</h2><pre class="code">${esc(q.context)}</pre></div>`);
   const blank=el(`<div class="blank"><div class="q">${esc(q.question)}</div></div>`);
   q.options.forEach((opt,oi)=>{
@@ -788,7 +888,12 @@ function renderTest(){
       if(test.answered) return;
       test.answered=true;
       const correct=oi===q.answer;
-      if(correct) test.score++;
+      if(correct){
+        test.score++;
+        if(test.mode==="review" && q.key && removeMiss(q.key)) test.cleared++;   // got it right this time — off the list
+      } else if(test.mode!=="review"){
+        recordMiss(mcSnapshot(q));                                               // review never ADDS; other modes do
+      }                                                                          // review + wrong: keep it, no double-add
       blank.querySelectorAll(".opt").forEach((x,xi)=>{
         if(xi===q.answer) x.classList.add("correct");
         if(xi===oi && !correct) x.classList.add("wrong");
@@ -804,6 +909,28 @@ function renderTest(){
   });
   card.appendChild(blank);
   main.appendChild(card);
+  armSimClock();
+}
+
+function renderTestScore(){
+  const nq=test.qs.length, n=nq+(test.build?1:0), s=test.score, pct=n?Math.round(100*s/n):0;
+  const msg = pct>=90?"Sharp — you're ready." : pct>=70?"Solid. Patch the misses and you're close." : "Worth another pass through the drills.";
+  const mc = s-(test.build&&test.build.pass?1:0);
+  const buildLine = test.build
+    ? `<p class="sub">${mc} / ${nq} multiple choice · build round (${esc(test.build.ex.title.replace(/ — write it$/,""))}): ${test.build.pass?'<span style="color:var(--ordered)">✓ passed</span>':'<span style="color:var(--race)">✗ failed</span>'}</p>`
+    : `<p class="sub">${mc} / ${nq} multiple choice</p>`;
+  let eyebrow="result", extra="";
+  if(test.mode==="sim"){
+    eyebrow="interview sim result";
+    if(test.expired) extra=`<p class="sub" style="color:var(--race)">time expired — unanswered questions counted wrong</p>`;
+  } else if(test.mode==="review"){
+    eyebrow="review result";
+    extra=`<p class="sub">${test.cleared} cleared, ${missCount()} still on the list</p>`;
+  }
+  main.appendChild(el(`<div><div class="eyebrow">${eyebrow}</div><h1>${s} / ${n} <span class="sub" style="font-size:17px">· ${pct}%</span></h1><p class="lead">${msg}</p>${buildLine}${extra}</div>`));
+  const row=el(`<div class="row"></div>`);
+  const again=el(`<button class="btn go">▶ back to test menu</button>`); again.onclick=()=>{ test.on=false; render(); window.scrollTo({top:0}); };
+  row.appendChild(again); main.appendChild(row);
 }
 
 function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }

@@ -134,8 +134,12 @@
     background:var(--surface2);color:var(--text);cursor:pointer;min-height:44px;
   }
   .btn.go{background:var(--accent);border-color:var(--accent);color:#11131c;font-weight:600}
+  .btn.review{background:transparent;border-color:var(--accent);color:var(--accent);font-weight:600}
   .btn:disabled{opacity:.4;cursor:default}
   .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  /* interview-sim countdown in the question eyebrow */
+  .eyebrow .clock{font-weight:600}
+  .eyebrow .clock.low{color:var(--race)}
 
   /* console */
   .console{
@@ -266,4 +270,5 @@
 <script src="js/core.js"></script>
 <script src="js/content.js"></script>
 <!-- content packs: each pushes its lessons/drills/exercises before the app boots -->
+<script src="js/packs/temporal-map.js"></script>
 <script src="js/app.js"></script>
