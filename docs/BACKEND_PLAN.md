@@ -303,7 +303,10 @@ check on `detail`); structured logs + basic alarms (4xx/5xx, throttles).
 Phases 2 and 3 can proceed in parallel once phase 1 merges — they share
 nothing but the table.
 
-**Phase 6 — UI integration (explicitly out of scope for now).** Parked until
+**Phase 6 — UI integration (explicitly out of scope for now).** First task
+when it opens: add an `/api/` bypass to `sw.js`'s fetch handler — today it
+applies stale-while-revalidate to every same-origin GET and would serve
+stale (or `index.html`-fallback) responses for API calls. Parked until
 you're done using the app for learning. The design above pre-decides the hard
 parts so this phase is purely client work: Hosted UI login (client id comes
 from stack outputs), `localStorage` remains the write-through cache and
