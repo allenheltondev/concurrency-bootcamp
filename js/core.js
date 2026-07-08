@@ -265,7 +265,7 @@ async function demoRetry(){
   const t0=Date.now();
   const r=await retry(flaky,{tries:5,base:8});
   const ms=Date.now()-t0;
-  const pass=r==="ok@3"&&n===3&&ms>=24;          // backed off 8ms + 16ms before the 3rd try
+  const pass=r==="ok@3"&&n===3&&ms>=18;          // backed off 8ms + 16ms before the 3rd try (loose floor: timers can fire ~1ms early and Date.now() truncates)
   return {lines:[{t:`fn fails twice, succeeds on attempt 3`},{t:`got "${r}" after ${n} tries, ~${ms}ms`}], pass, verdict:pass?"backed off 8ms→16ms, then succeeded":`r=${r} n=${n} ${ms}ms`};
 }
 async function demoReplay(){
