@@ -1,7 +1,7 @@
 # Concurrency Bootcamp
 
 A mobile-first, dependency-free web app for learning and practicing JavaScript
-concurrency. It opens with an illustrated **Lessons** primer (23 stepped
+concurrency. It opens with an illustrated **Lessons** primer (32 stepped
 chapters with animated HTML/CSS diagrams — tap ▶ replay to watch each sequence
 step through — one animated lesson for **every** concept the drills test: the
 event loop and task ordering, the await-race hazard, each primitive (mutex,
@@ -9,8 +9,14 @@ semaphore, latch/barrier, condition variable, atomic/CAS lock, read-write lock,
 run-once), workers/atomics, the problem patterns (producer-consumer &
 backpressure, ordering, bounded concurrency, deadlock & lock ordering, rate
 limiting, select), the async toolkit (debounce/throttle, Promise.all, retry,
-memoize, cancellation), durable replay, and blocking vs non-blocking vs async),
-then eight hands-on modules: the event-loop model
+memoize, cancellation), durable replay, blocking vs non-blocking vs async,
+the **ordered-merge capstone** (the watermark rule for merging logs from many
+producers, and the reorder buffer for out-of-order arrival with gaps), async
+iterators & generators (pull vs push, merging async iterables), cooperative
+cancellation with AbortController and the two caller-side lock hazards
+(holding a lock across a foreign await; reentrant acquire), Node's event-loop
+phases and the promise-combinator family, and testing concurrency without
+flakes), then the hands-on modules: the event-loop model
 (predict-output quiz), building
 synchronization primitives — mutex, semaphore, latch, barrier, async queue,
 sequencer, condition variable, atomic lock (CAS), read/write lock, run-once
@@ -19,8 +25,10 @@ data-race demo, trade-off flashcards, a problem bank (print-in-order,
 concurrency pool, dining philosophers, token bucket, bounded blocking queue,
 select / first-ready, and the concurrent log processor with fault tolerance),
 an interview kit (debounce, throttle, `Promise.all` from scratch,
-retry-with-backoff, async memoize / dedup, cancel-the-loser timeout, and
-cancel-on-first-error / errgroup), and a durable-execution module modeling
+retry-with-backoff, async memoize / dedup, cancel-the-loser timeout,
+cancel-on-first-error / errgroup, async-iterable channels and first-ready
+merge, `allSettled`/`any` from scratch, and signal threading), and a
+durable-execution module modeling
 workflow-engine (Temporal-style) concurrency hazards: deterministic replay,
 durable timeouts, serializing concurrent signals, and waiting on a signal
 predicate. A **Spot-the-bug** module then flips the drills around: a full
@@ -32,20 +40,34 @@ the buggy line(s), and check.
 A **Write it** module then takes the options away entirely — the writing half
 of mastery, still one-thumb tap-driven: a spec, a scaffold, and a shuffled
 bank of code lines (some belong, some are traps) that you tap into place to
-assemble the real implementation — mutex, async queue, concurrency pool,
-token bucket, debounce, `Promise.all` from scratch, retry with backoff, and
-in-flight dedup. Grading is honest: your assembled code actually executes
+assemble the real implementation — fourteen of them, from the mutex and the
+concurrency pool up through the watermark ordered-merge, the reorder buffer,
+an abortable semaphore, and a cancellable retry. Grading is honest: your assembled code actually executes
 against real assertions in a sandboxed Web Worker, so any arrangement that
 behaves correctly passes, every failing run explains itself (trap lines
 included), and a deadlock or infinite loop just times out — it can never
 freeze the page.
-A **Test mode** then quizzes you across everything — shuffled options, first
-answer counts, scored — as a real readiness check, and every test finishes
+A **Temporal map** reference sheet translates every primitive in the app into
+its durable twin — twelve concurrency-concept → Temporal-construct mappings,
+each with a bridge line you can say out loud in an interview.
+**Test mode** then quizzes you across everything — shuffled options, first
+answer counts, scored — in three tiers: a quick test, a full test, and a
+25-minute **interview sim** against a countdown clock. Every test finishes
 with a **build round**: one write-it exercise assembled from its line bank
 and graded by actually running it, where the first run is the one that
-counts. Throughout the drills and
-quiz, the answer choices are permuted on every load, so nothing can be solved
-by "it's usually the first option."
+counts. Missed questions and failed builds persist to a review list, and a
+**review your misses** mode replays exactly those — clearing each one only
+when you get it right. Throughout the drills and quiz, the answer choices are
+permuted on every load, so nothing can be solved by "it's usually the first
+option."
+
+Finally, `practice/` takes it off the phone and into your editor: thirteen
+blank-file pattern skeletons (the write-it patterns plus the ordered merge,
+reorder buffer, abortable semaphore, throttle, and `Promise.any`) with
+runnable Node tests and reference solutions —
+`node practice/mutex.test.mjs`, implement until green, diff against the
+solution, redo from blank tomorrow. That rep protocol is the interview
+transfer layer; the app is the warm-up and review loop around it.
 
 Drill and quiz modules step one card at a time (prev · n/total · next) for
 one-handed mobile use; every tapped answer — right or wrong — explains itself.
@@ -57,7 +79,13 @@ backend, no third-party scripts, no tracking.
 
 | File            | What it is                                                                 |
 | --------------- | ------------------------------------------------------------------------- |
-| `index.html`        | The whole app — inline CSS + JS, no build step.                        |
+| `index.html`        | Markup + all CSS; loads the scripts below. No build step.              |
+| `js/core.js`        | Helpers, reference implementations, and the demo runners.              |
+| `js/content.js`     | All authored content: lessons, drills, cards, bugs, write-it.          |
+| `js/packs/*.js`     | Content packs — self-contained additions loaded before the app boots.  |
+| `js/app.js`         | State, persistence, rendering, the write-it sandbox, test mode.        |
+| `practice/`         | Blank-file pattern reps with runnable Node tests (see above).          |
+| `tools/validate-content.mjs` | Executes every exercise's reference against its own tests; runs in CI. |
 | `worker.js`         | Same-origin Web Worker for the real SharedArrayBuffer data race.       |
 | `sw.js`             | Service worker — precaches the app shell so it runs fully offline.     |
 | `manifest.webmanifest`| Web app manifest — makes the site installable to a home screen.      |
