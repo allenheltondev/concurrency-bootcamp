@@ -71,6 +71,12 @@ jobs:
         run: npm ci
         working-directory: backend
 
+      - name: Lint the backend
+        # @eslint/js recommended rules, plus a boundary rule: src/domain (the
+        # hexagonal core) may not import the AWS SDK, Powertools, or adapters.
+        run: npm run lint
+        working-directory: backend
+
       - name: Test the backend API
         # Drives the exported lambdalith handler with synthetic API Gateway
         # events — the full middy -> Powertools -> router -> handler chain —

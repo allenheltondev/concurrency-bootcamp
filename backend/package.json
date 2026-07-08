@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "Lambdalith API for the Concurrency Bootcamp backend",
   "scripts": {
-    "test": "node --import ./test/register.mjs test/run.mjs"
+    "test": "node --import ./test/register.mjs test/run.mjs",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@aws-lambda-powertools/event-handler": "^2.33.1",
@@ -17,7 +18,10 @@
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "^3.1082.0",
     "@aws-sdk/lib-dynamodb": "^3.1082.0",
-    "esbuild": "^0.28.1"
+    "@eslint/js": "^10.0.1",
+    "esbuild": "^0.28.1",
+    "eslint": "^10.6.0",
+    "globals": "^17.7.0"
   },
   "private": true,
   "type": "module"

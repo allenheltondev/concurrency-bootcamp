@@ -52,6 +52,17 @@ Browser ──(later)──► CloudFront ──► API Gateway HTTP API ──�
   function means one cold-start profile, one set of alarms, and adding a
   route is code, not infrastructure. esbuild-bundled by `sam build`; the AWS
   SDK stays external because the runtime ships it.
+- **Hexagonal layout** with `api.mjs` as the composition root:
+  - `src/adapters/http/` — driving adapter: routes, request schemas, and the
+    only place domain errors meet status codes
+  - `src/domain/` — the core: progress/catalog services, gamification rules,
+    domain errors. Imports nothing from AWS, HTTP, or Powertools;
+    repositories and the clock are injected as ports. **Enforced by lint**:
+    an ESLint boundary rule fails CI if `src/domain` imports infrastructure.
+  - `src/adapters/dynamodb/` — driven adapter (the DAL): owns the key
+    scheme, item mapping (pk/sk/type never leak out), and conditional-write
+    expressions; storage failures surface as domain errors
+    (`OptimisticLockError`), never AWS exception types.
 - **Powertools for AWS Lambda** everywhere it earns its keep:
   - **Event Handler (http)**: routing, validation middleware, structured
     4xx/5xx error bodies, body-size-limit middleware (`413`)
@@ -294,3 +305,8 @@ Signed-out users keep today's experience forever — accounts stay optional.
 6. **Powertools** is the observability and routing backbone (Logger, Tracer,
    Metrics, Event Handler); utilities that don't fit yet (Idempotency,
    Parameters, Batch, Parser) are consciously skipped, not forgotten. ✅
+7. **Hexagonal architecture** with a proper DAL: http adapter → domain
+   services (pure, ports-injected) → DynamoDB repositories. The
+   domain-purity boundary is lint-enforced in CI. ✅
+8. **ESLint** (default `@eslint/js` recommended rules) runs in CI for the
+   backend, alongside the tests. ✅
