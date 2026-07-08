@@ -60,7 +60,8 @@
     padding-top:env(safe-area-inset-top);
   }
   .hbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 0 10px}
-  .brand{display:flex;align-items:baseline;gap:8px;min-width:0}
+  .brand{display:flex;align-items:baseline;gap:8px;min-width:0;background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+  .brand:active{transform:scale(.98)}
   .brand b{font-size:17px;letter-spacing:-.01em;white-space:nowrap}
   .brand .tick{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.12em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .prog{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;flex:0 0 auto}
@@ -270,6 +271,15 @@
 
   footer{color:var(--faint);font-size:12px;text-align:center;padding:34px 0 46px;font-family:var(--mono)}
   footer .credit{display:block;margin-bottom:14px}
+  footer .credit a{color:var(--accent);text-decoration:none}
+  footer .credit a:hover,footer .credit a:active{text-decoration:underline}
+  .installbtn{
+    font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--accent);
+    background:transparent;border:1px solid var(--accent);border-radius:9px;
+    padding:8px 13px;margin-right:8px;cursor:pointer;min-height:36px;transition:background .2s;
+  }
+  .installbtn:hover,.installbtn:active{background:rgba(142,134,240,.12)}
+  .installbtn[hidden]{display:none}
   .resetbtn{
     font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--faint);
     background:transparent;border:1px solid var(--line);border-radius:9px;
@@ -390,7 +400,7 @@
 <header>
   <div class="wrap">
     <div class="hbar">
-      <div class="brand"><b>Concurrency Bootcamp</b><span class="tick">// single thread, many turns</span></div>
+      <button class="brand" id="homebtn" type="button" aria-label="Concurrency Bootcamp — back to lessons"><b>Concurrency Bootcamp</b><span class="tick">// single thread, many turns</span></button>
       <div class="prog">drills&nbsp;<span class="n" id="pn">0</span>/<span id="pt">8</span></div>
     </div>
     <div class="bar"><i id="progbar"></i></div>
@@ -401,6 +411,8 @@
 <main class="wrap" id="main"></main>
 <footer>
   <span class="credit">built for thumb-driving on a phone · every drill runs real JS in your browser</span>
+  <span class="credit">a <a href="https://readysetcloud.io" target="_blank" rel="noopener">Ready, Set, Cloud!</a> project</span>
+  <button class="installbtn" id="installbtn" type="button" hidden>⤓ install app</button>
   <button class="resetbtn" id="resetbtn" type="button">reset progress</button>
 </footer>
 
