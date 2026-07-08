@@ -37,11 +37,20 @@ function load(rel) {
 
 load("js/core.js");
 load("js/content.js");
+// --only js/packs/foo.js  → validate a single pack in isolation (authoring aid,
+// so a work-in-progress sibling pack can't fail your run). Default: all packs.
+const onlyArg = process.argv.indexOf("--only");
 const packsDir = path.join(root, "js/packs");
-const packs = fs.existsSync(packsDir)
-  ? fs.readdirSync(packsDir).filter((f) => f.endsWith(".js")).sort()
-  : [];
-for (const p of packs) load("js/packs/" + p);
+let packs;
+if (onlyArg !== -1) {
+  packs = [path.relative(path.join(root, "js/packs"), path.resolve(process.argv[onlyArg + 1]))];
+  for (const p of packs) load("js/packs/" + p);
+} else {
+  packs = fs.existsSync(packsDir)
+    ? fs.readdirSync(packsDir).filter((f) => f.endsWith(".js")).sort()
+    : [];
+  for (const p of packs) load("js/packs/" + p);
+}
 
 const errors = [];
 const err = (m) => errors.push(m);
