@@ -1,5 +1,10 @@
 # Backend Plan — Accounts, Courses, and Progress
 
+> **Status: complete** (phases 1–6 merged; only CloudWatch alarms remain,
+> deferred by choice). The next effort — the React platform surface (hub +
+> profile) — is planned in `docs/PLATFORM_PLAN.md` with its architectural
+> decision in `docs/adr/0002-react-platform-surface.md`.
+
 Turn the bootcamp from a single static PWA into the first course of a
 multi-course learning platform. All of this work is **backend only**: the API
 gets built, tested, and deployed dark, while the live site keeps working
