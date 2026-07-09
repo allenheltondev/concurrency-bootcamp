@@ -108,6 +108,17 @@
     <p class="big">A distributed-systems test that "passes most of the time" tests nothing. The fix is the same discipline this whole course runs on: <b class="hl">simulate the physics deterministically</b> — make time, loss, and ordering script-controlled instead of weather.</p>
 
     <p>The enemy: your assertions fire at a moment picked by real timers and a real network. Every technique below seizes one of those inputs back. All five are already in this app's own tests.</p>
+    <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">the same test &middot; two relationships with time</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">flaky</div><div class="lstep bad seq" style="--i:0">sleep(30) &hellip; hope the failover happened &hellip; assert &mdash; passes on your laptop, dies in CI</div>
+        <div class="lanehead seq" style="--i:1">flaky</div><div class="lstep wait seq" style="--i:1">rerun &times; 3 until green &mdash; the race you were hunting is now hidden in the retry</div>
+        <div class="lanehead seq" style="--i:2">scripted</div><div class="lstep good seq pop" style="--i:2">fd.status("n2", <b>60</b>) &mdash; the test SETS the clock; the timeline can't drift</div>
+        <div class="lanehead seq" style="--i:3">scripted</div><div class="lstep good seq" style="--i:3">reps[1].up = false &mdash; the lost message is a fixture, not luck</div>
+      </div>
+      <div class="dnote seq" style="--i:4">Same assertions, opposite epistemics: one test <b style="color:var(--race)">samples</b> the race, the other <b style="color:var(--ordered)">constructs</b> it.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
 
     <div class="impl">
       <div class="dlabel">1 &middot; manual clocks &mdash; time is a parameter, not a fact</div>

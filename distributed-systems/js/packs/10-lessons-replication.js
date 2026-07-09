@@ -145,6 +145,40 @@ async get(key) {
     <p><b class="hl">Read repair</b> is the cheap one: a quorum read already collected versions from R replicas, so the moment it sees v2 and v1 side by side, it has <i>proof</i> a replica is behind — and it writes the newest record back before returning. Crucially it re-asserts the <b class="hl">same version</b>: bumping it would mint a brand-new write that races any concurrent real write. A repair restores history; it never adds to it.</p>
     <div class="diagram anim" style="--step:.75s">
       <div class="dlabel">the read that noticed &mdash; and healed the replica it caught</div>
+      <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
+        <rect x="10" y="56" width="72" height="40" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
+        <text x="46" y="73" fill="#8e86f0" font-size="9" text-anchor="middle">READER</text>
+        <text x="46" y="87" fill="#8b90ab" font-size="8" text-anchor="middle">quorum read</text>
+        <rect x="248" y="8" width="82" height="30" rx="8" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
+        <text x="289" y="27" fill="#57e0b0" font-size="9" text-anchor="middle">A &middot; v2</text>
+        <rect x="248" y="60" width="82" height="30" rx="8" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
+        <text x="289" y="79" fill="#57e0b0" font-size="9" text-anchor="middle">B &middot; v2</text>
+        <rect x="248" y="112" width="82" height="30" rx="8" fill="#11131c" stroke="#ff9a6b" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <text x="289" y="131" fill="#ff9a6b" font-size="9" text-anchor="middle" opacity="1">C &middot; v1 (stale)
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.78;0.8;1" values="1;1;0;0"/></text>
+        <text x="289" y="131" fill="#57e0b0" font-size="9" text-anchor="middle" opacity="0">C &middot; v2 &#10003; healed
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.78;0.8;1" values="0;0;1;1"/></text>
+        <line x1="82" y1="66" x2="248" y2="23" stroke="#2c3350" stroke-width="1.2"/>
+        <line x1="82" y1="76" x2="248" y2="75" stroke="#2c3350" stroke-width="1.2"/>
+        <line x1="82" y1="88" x2="248" y2="127" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <circle r="5.5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
+            keyTimes="0;0.05;0.25;1" keyPoints="1;1;0;0" path="M 82 66 L 248 23"/>
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.05;0.25;0.3;1" values="0;1;1;0;0"/>
+        </circle>
+        <circle r="5.5" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
+            keyTimes="0;0.08;0.32;1" keyPoints="1;1;0;0" path="M 82 88 L 248 127"/>
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.08;0.32;0.37;1" values="0;1;1;0;0"/>
+        </circle>
+        <text x="150" y="112" fill="#8b90ab" font-size="8" text-anchor="middle" opacity="0">v2 vs v1 &rarr; newest wins &middot; C is provably behind
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.36;0.4;0.62;0.66;1" values="0;0;1;1;0;0"/></text>
+        <circle r="5.5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
+            keyTimes="0;0.55;0.78;1" keyPoints="0;0;1;1" path="M 82 88 L 248 127"/>
+          <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.55;0.57;0.78;0.82;1" values="0;0;1;1;0;0"/>
+        </circle>
+      </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">read</div><div class="lstep seq" style="--i:0">quorum read "profile" &rarr; A: v2 &middot; B: v2 &middot; C: <b>v1</b></div>
         <div class="lanehead seq" style="--i:1">compare</div><div class="lstep seq" style="--i:1">newest version wins &rarr; return v2 to the caller</div>
@@ -214,6 +248,12 @@ async antiEntropySweep() {
         <div class="dlabel">match the app to the rung</div>
         <p style="margin:4px 0 0">A <b class="hl">like counter</b> shrugs at staleness — eventual is free performance. A <b class="hl">bank balance</b> can read a little behind, but the order of deposits and withdrawals must never scramble. A <b class="hl">seat map</b> selling the last seat needs linearizable — two buyers must not both see "available". Pay for the rung the <i>data</i> needs, not the rung that sounds safest.</p>
       </div>
+      <div class="histtape">
+        <span class="chip2 sync seq pop" style="--i:7">read-your-writes</span>
+        <span class="chip2 sync seq pop" style="--i:8">monotonic reads</span>
+        <span class="chip2 sync seq pop" style="--i:9">consistent prefix</span>
+      </div>
+      <div class="dnote seq" style="--i:10">Between the rungs live the <b style="color:var(--accent)">session guarantees</b>: <i>your own</i> writes stay visible, your reads never travel back in time, and you never see an answer before its question. Cheap to provide per-session (pin, or track log positions) — and they eliminate the anomalies users actually notice.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
     <p>Notice what the top rung really buys: not "fresher data" but the right to treat the distributed store <b class="hl">like a single variable</b> — compare-and-set, unique-username checks, "exactly one winner" logic all silently assume it. And notice the workhorse in the middle: <b class="hl">causal</b> is the strongest rung that stays available during a partition, which is why "you always see your own writes, and replies never precede the messages they answer" is what most collaborative apps actually ship.</p>
@@ -372,14 +412,18 @@ async function reliableSend(msg) {
         <div class="lanehead seq" style="--i:1">guard</div><div class="lstep good seq" style="--i:1">record "chg-1" FIRST &rarr; apply the charge &rarr; cache the response</div>
         <div class="lanehead seq" style="--i:2">msg 2</div><div class="lstep seq" style="--i:2">chg-1 again (its ack was lost) &rarr; seen? YES</div>
         <div class="lanehead seq" style="--i:3">guard</div><div class="lstep good seq pop" style="--i:3">bounce &mdash; no effect, return the SAME recorded answer &#10003;</div>
+        <div class="lanehead seq" style="--i:4">bad key</div><div class="lstep bad seq" style="--i:4">key = timestamp or random-per-attempt &rarr; every retry looks NEW &rarr; duplicates sail through</div>
+        <div class="lanehead seq" style="--i:5">bad key</div><div class="lstep bad seq" style="--i:5">key = the payload ("$50 charge") &rarr; two REAL $50 orders collide &rarr; one silently dropped</div>
       </div>
       <div class="histtape">
-        <span class="chip2 sync seq pop" style="--i:4">set x=5 &middot; safe</span>
-        <span class="chip2 sync seq pop" style="--i:5">upsert &middot; safe</span>
-        <span class="chip2 macro seq pop" style="--i:6">x++ &middot; needs a key</span>
-        <span class="chip2 macro seq pop" style="--i:7">append &middot; needs a key</span>
+        <span class="chip2 sync seq pop" style="--i:6">set x=5 &middot; safe</span>
+        <span class="chip2 sync seq pop" style="--i:7">upsert &middot; safe</span>
+        <span class="chip2 sync seq pop" style="--i:8">delete by id &middot; safe</span>
+        <span class="chip2 macro seq pop" style="--i:9">x++ &middot; needs a key</span>
+        <span class="chip2 macro seq pop" style="--i:10">append &middot; needs a key</span>
+        <span class="chip2 macro seq pop" style="--i:11">charge $50 &middot; needs a key</span>
       </div>
-      <div class="dnote seq" style="--i:8">Some operations are <b style="color:var(--ordered)">naturally idempotent</b> — set x=5 twice is still 5, an upsert converges. <b style="color:var(--race)">Increment, append, charge</b> are not: each replay adds. Those are the ones the key must guard.</div>
+      <div class="dnote seq" style="--i:12">Some operations are <b style="color:var(--ordered)">naturally idempotent</b> — set x=5 twice is still 5, an upsert converges. <b style="color:var(--race)">Increment, append, charge</b> are not: each replay adds. Those are the ones the key must guard.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
     <p>One more piece pros remember: cache the <b class="hl">response</b>, not just the fact of application. A retry whose original succeeded should get back the <i>same</i> 200 and the same payment id — returning "duplicate!" as an error just teaches the client to retry harder. The retry is a legitimate question; answer it with the recorded answer.</p>
@@ -394,8 +438,24 @@ async function reliableSend(msg) {
     this.applied++;                            <span class="cm">// close the gap a concurrent</span>
     return true;                               <span class="cm">// redelivery would slip through</span>
   }
-}</pre>
+}
+
+<span class="cm">// the endpoint version: replay the recorded RESPONSE</span>
+async handleRequest(key, op) {
+  if (this.done.has(key))
+    <span class="ok">return this.done.get(key);</span>    <span class="cm">// same answer the original got</span>
+  this.done.set(key, "pending");  <span class="cm">// claim the key before the await</span>
+  const res = await op();         <span class="cm">// the side effect, once</span>
+  this.done.set(key, res);        <span class="cm">// (on FAILURE: delete the claim,</span>
+  return res;                     <span class="cm">// or every retry bounces forever)</span>
+}
+
+<span class="cm">// durable, multi-instance version: the dedupe set is a UNIQUE</span>
+<span class="cm">// constraint — INSERT INTO processed(key) inside the same txn as</span>
+<span class="cm">// the effect. a second insert violates it ATOMICALLY, across</span>
+<span class="cm">// every consumer instance, and survives restarts.</span></pre>
     </div>
+    <p>Notice what an in-memory <code>Set</code> quietly assumes: one consumer instance, no restarts. Production dedupe lives where the effect lives — a unique constraint in the same database, checked by the same transaction — and it expires: keys carry a TTL long enough to outlast any plausible retry storm, because "seen forever" is an unbounded table.</p>
     <p><b class="hl">Why it matters:</b> every payments API worth its uptime demands an idempotency key header for exactly this reason. The invariant to say in the interview: <b class="hl">retries are safe when the receiver can tell "the same operation, again" from "a new operation that looks the same" — and only the caller's key can tell it that.</b></p>` });
 
   /* ---- 14 · the dual-write problem & the outbox ---- */
@@ -406,13 +466,13 @@ async function reliableSend(msg) {
       <div class="dcols">
         <div class="dcol seq" style="--i:0">
           <div class="dlabel">DB first, then publish</div>
-          <div class="lstep">db.insert(order) &#10003; committed</div>
+          <div class="lstep">insert(order) &#10003; committed</div>
           <div class="lstep bad">CRASH &mdash; publish never runs</div>
           <div class="dnote">the order exists; the event never happens. downstream is never told — silently.</div>
         </div>
         <div class="dcol seq" style="--i:1">
           <div class="dlabel">publish inside the txn</div>
-          <div class="lstep">bus.publish(OrderCreated) &#10003; sent</div>
+          <div class="lstep">publish(event) &#10003; sent</div>
           <div class="lstep bad">the txn rolls back a line later</div>
           <div class="dnote">a ghost event — the bus doesn't roll back. the world reacts to an order that doesn't exist.</div>
         </div>
@@ -422,11 +482,18 @@ async function reliableSend(msg) {
         <div class="lanehead seq" style="--i:3">txn</div><div class="lstep good seq" style="--i:3">INSERT orders + INSERT outbox &mdash; one commit: both facts, or neither</div>
         <div class="lanehead seq" style="--i:4">relay</div><div class="lstep seq" style="--i:4">polls the outbox (or tails the commit log via CDC) &rarr; publishes &rarr; marks sent</div>
         <div class="lanehead seq" style="--i:5">crash?</div><div class="lstep good seq pop" style="--i:5">anywhere &mdash; unsent rows survive in the DB; the relay retries on restart</div>
+        <div class="lanehead seq" style="--i:6">ghost?</div><div class="lstep good seq" style="--i:6">impossible &mdash; if the txn rolls back, the event row rolls back WITH it</div>
+        <div class="lanehead seq" style="--i:7">lost?</div><div class="lstep good seq" style="--i:7">impossible &mdash; a committed order implies a committed outbox row the relay WILL find</div>
       </div>
-      <div class="dnote seq" style="--i:6">The relay is <b style="color:var(--accent)">at-least-once</b> — a crash between publish and mark-sent republishes — which is fine, because consumers dedupe on the event id (lesson 14). The outbox trades "maybe never" for "maybe twice", and twice is the solvable one.</div>
+      <div class="dnote seq" style="--i:8">The relay is <b style="color:var(--accent)">at-least-once</b> — a crash between publish and mark-sent republishes — which is fine, because consumers dedupe on the event id (lesson 14). The outbox trades "maybe never" for "maybe twice", and twice is the solvable one.</div>
+      <div class="qbox macro seq" style="--i:9">
+        <div class="dlabel">the smell in code review</div>
+        <p style="margin:4px 0 0"><code>db.save(order)</code> on one line, <code>bus.publish(event)</code> on the next, no outbox in sight. The question that exposes it: <b class="hl">"what happens if the pod dies between these two lines?"</b> If the answer involves the word "unlikely", the pattern is missing.</p>
+      </div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
     <p>This is the <b class="hl">transactional outbox</b>: the event stops being a network call and becomes <b class="hl">data</b>, committed atomically with the state change it announces. The single-system transaction you already trust does the coordination; the relay's only job is moving committed truth onto the bus. Log tailing (CDC) is the same pattern with the database's own replication log as the outbox — lower latency, no polling.</p>
+    <p>The instinctive counter — "just run a distributed transaction across the database and the broker" — mostly isn't on the menu: brokers rarely speak 2PC, and where they do you've bought coordinator recovery and participants blocked on locks (lesson 22) to solve a problem one extra table solves locally. The outbox keeps the atomicity where atomicity is cheap: <b class="hl">inside one database</b>.</p>
     <div class="impl">
       <div class="dlabel">reference &middot; one atomic truth, then a relay that can't lose it</div>
       <pre class="code">await db.transaction(async (tx) =&gt; {
@@ -437,10 +504,15 @@ async function reliableSend(msg) {
 
 <span class="cm">// the relay, forever:</span>
 for (const e of await db.query("outbox WHERE sent = false")) {
-  await bus.publish(e.event, e.payload);   <span class="cm">// at-least-once</span>
-  await db.update(e, { sent: true });      <span class="cm">// crash between these two?</span>
-}                                          <span class="cm">// republished — consumers dedupe</span></pre>
+  <span class="ok">await bus.publish(e.event, e.payload);</span>   <span class="cm">// publish FIRST —</span>
+  await db.update(e, { sent: true });      <span class="cm">// then mark. crash between?</span>
+}                                          <span class="cm">// republished — consumers dedupe</span>
+
+<span class="cm">// mark-then-publish is the same dual-write bug reborn: a crash</span>
+<span class="cm">// between them loses the event with "sent" smugly set to true.</span>
+<span class="cm">// (scaling the relay? lock polled rows — extra dupes drop downstream)</span></pre>
     </div>
+    <p>One honesty note on what the outbox does — and doesn't — fix: it guarantees the event <b class="hl">happens</b>, at-least-once, roughly in commit order. It doesn't make delivery exactly-once (the relay can republish) and it doesn't order events across aggregates. Atomicity is the outbox's job; dedupe and ordering stay with the consumer and the bus.</p>
     <p><b class="hl">Why it matters:</b> "how do you keep the database and the event stream in sync?" is a top-five system-design question, and dual-write is the trap answer. Name the crash window, then name the outbox — state changes and their events must commit <b class="hl">in the same transaction</b>, and everything downstream follows from that one move.</p>` });
 
   /* ---- 15 · queues, backpressure & poison messages ---- */
