@@ -276,10 +276,10 @@ deliberately deferred. Phase 5 delivered:
 
 Remaining from phase 5: CloudWatch alarms (deferred by choice — the metrics
 they'd alarm on are already emitted). Phase 6 (UI integration) is
-implemented — see its section below. Going live now takes three repo
-settings: `COGNITO_USER_POOL_ID` (materializes the backend),
-`COGNITO_HOSTED_UI_DOMAIN` (publishes the auth config that wakes the UI's
-account layer), and optionally the smoke-test user secrets.
+implemented — see its section below. Going live now takes exactly one repo
+setting: `COGNITO_USER_POOL_ID`. The deploy derives everything else (the
+auth config ships client id + region from stack outputs), plus optionally
+the smoke-test user secrets.
 
 **Phase 1 — Infra skeleton. ✅** Template additions: DynamoDB table, user-pool
 client against the shared pool, HTTP API + JWT authorizer, the CloudFront
@@ -314,14 +314,20 @@ nothing but the table.
 layer (`js/account.js`), loaded after the engine by every course page:
 
 - **Dormant by default**: activates only if `/auth-config.json` exists —
-  published by the deploy pipeline from stack outputs once the backend and
-  the `COGNITO_HOSTED_UI_DOMAIN` repo variable are configured. Local dev,
-  file://, and backend-less deploys keep today's exact experience; signed-out
-  users keep it forever.
-- **Auth**: OAuth2 authorization-code + PKCE against the shared pool's
-  Hosted UI, dependency-free (Web Crypto). Tokens are origin-wide (one
-  sign-in covers every course), id token refreshed via the refresh grant,
-  sign-out clears the Hosted UI session too.
+  published by the deploy pipeline (client id + region, straight from stack
+  outputs) once the backend is enabled. Local dev, file://, and backend-less
+  deploys keep today's exact experience; signed-out users keep it forever.
+- **Auth**: fully custom, in-app screens — sign in, sign up (first/last
+  name + email, matching the shared pool's required attributes), 6-digit
+  email verification with resend cooldown, forgot password, and the
+  NEW_PASSWORD_REQUIRED challenge — calling the Cognito user pool API
+  directly (`USER_PASSWORD_AUTH` over TLS, dependency-free). No Hosted UI,
+  no domain, no redirects: the modal matches the RSC newsletter dashboard's
+  auth styling (surface card, primary-600 buttons, ring focus states,
+  error-50 alert boxes, light + dark via `prefers-color-scheme`). Cognito
+  exception types translate to friendly copy; tokens are origin-wide (one
+  sign-in covers every course); the id token refreshes via the refresh
+  grant; sign-out revokes the refresh token.
 - **Sync**: localStorage stays the source of truth; the engine dispatches
   `course:progress-changed` / `course:progress-reset` events and knows
   nothing else. Debounced `PUT` per course, version tracked per course,
@@ -371,3 +377,10 @@ Signed-out users keep today's experience forever — accounts stay optional.
    on CloudFront); the API is progress-only. Scaling plan is per-course
    lazy-loaded packs, not a platform change. Full rationale, consequences,
    and revisit triggers: `docs/adr/0001-static-course-content.md`. ✅
+10. **Custom auth UI, no Hosted UI**: sign in / sign up / verify / forgot
+    password / new-password challenge are in-app screens styled after the
+    RSC newsletter dashboard, calling the Cognito user pool API directly.
+    Sign-up sends the shared pool's required attributes (`given_name`,
+    `family_name`, `email`); its PostConfirmation triggers (newsletter
+    onboarding pipeline) fire for bootcamp sign-ups too — accepted, one RSC
+    account is the point. ✅

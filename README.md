@@ -108,7 +108,7 @@ and earns badges, but signed-out users get the complete experience forever.
 | `js/sim.js`         | This course's workers/atomics module (registered via `MODULES[].renderFn`). |
 | `js/packs/*.js`     | Content packs — self-contained additions loaded before the app boots.  |
 | `js/app.js`         | The **shared, course-agnostic engine**: state, persistence, rendering, the write-it sandbox, test mode. Also loaded by `distributed-systems/`. |
-| `js/account.js`     | Optional, shared sign-in + cloud progress sync (Cognito Hosted UI + the `/api` backend). Dormant unless the deploy publishes `/auth-config.json`; signed-out users keep the exact localStorage-only experience. |
+| `js/account.js`     | Optional, shared sign-in + cloud progress sync: fully custom in-app auth screens (sign up, verify, forgot password) against the shared Cognito pool, plus the `/api` sync layer. Dormant unless the deploy publishes `/auth-config.json`; signed-out users keep the exact localStorage-only experience. |
 | `distributed-systems/` | A second course built from the same pattern — see `docs/COURSE_PATTERN.md`. |
 | `practice/`         | Blank-file pattern reps with runnable Node tests (see above).          |
 | `tools/validate-content.mjs` | Executes every exercise's reference against its own tests; runs in CI. |

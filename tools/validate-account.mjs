@@ -60,5 +60,27 @@ check("missing fields tolerated", (() => {
 check("empty detail detected", acct.isEmptyDetail({ solved: {}, position: {}, misses: [] }));
 check("one solve is not empty", !acct.isEmptyDetail({ solved: { a: 1 }, position: {}, misses: [] }));
 
+/* ---- form validation (mirrors the shared pool's requirements) ---- */
+const good = { firstName: "Allen", lastName: "H", email: "a@b.co", password: "Passw0rd", confirmPassword: "Passw0rd" };
+check("signup: valid input passes", Object.keys(acct.validate("signup", good)).length === 0,
+  JSON.stringify(acct.validate("signup", good)));
+check("signup: names required", !!acct.validate("signup", { ...good, firstName: " " }).firstName);
+check("signup: pool password policy enforced (upper+lower+digit, 8+)",
+  !!acct.validate("signup", { ...good, password: "alllowercase1", confirmPassword: "alllowercase1" }).password &&
+  !!acct.validate("signup", { ...good, password: "Short1a", confirmPassword: "Short1a" }).password);
+check("signup: confirm must match", !!acct.validate("signup", { ...good, confirmPassword: "Other0ne" }).confirmPassword);
+check("signin: email format checked", !!acct.validate("signin", { email: "nope", password: "Passw0rd" }).email);
+check("confirm: 6-digit code required",
+  !!acct.validate("confirm", { code: "12345" }).code && !acct.validate("confirm", { code: "123456" }).code);
+check("forgotConfirm: code + new password validated",
+  !!acct.validate("forgotConfirm", { code: "123456", password: "weak", confirmPassword: "weak" }).password);
+
+/* ---- Cognito error translation (no raw exception types reach users) ---- */
+check("friendly auth errors",
+  acct.errorMessage({ __type: "com.amazon...#NotAuthorizedException" }) === "Incorrect email or password." &&
+  acct.errorMessage({ __type: "UsernameExistsException" }).includes("already exists") &&
+  acct.errorMessage({ __type: "CodeMismatchException" }).includes("code") &&
+  acct.errorMessage({}).includes("try again"));
+
 if (errors.length) { console.error(`\n${errors.length} FAILED`); process.exit(1); }
 console.log("\naccount layer OK");

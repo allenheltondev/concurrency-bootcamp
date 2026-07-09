@@ -194,19 +194,13 @@ jobs:
 
       - name: Publish auth config
         # The switch that wakes the UI's account layer (js/account.js): it
-        # stays dormant until this file exists at the site root. Requires the
-        # backend (COGNITO_USER_POOL_ID) and the shared pool's Hosted UI
-        # domain (COGNITO_HOSTED_UI_DOMAIN repo variable). If the domain
-        # isn't configured yet, skip quietly — accounts simply stay hidden.
+        # stays dormant until this file exists at the site root. The custom
+        # auth screens call the Cognito user pool API directly, so all they
+        # need is the app client id and the region — no Hosted UI domain.
         if: ${{ vars.COGNITO_USER_POOL_ID != '' }}
         run: |
-          DOMAIN="${{ vars.COGNITO_HOSTED_UI_DOMAIN }}"
-          if [ -z "$DOMAIN" ]; then
-            echo "COGNITO_HOSTED_UI_DOMAIN not set — skipping auth config; accounts stay hidden."
-            exit 0
-          fi
           CLIENT_ID="${{ steps.outputs.outputs.user-pool-client-id }}"
-          printf '{"clientId":"%s","domain":"%s","apiBase":"/api"}' "$CLIENT_ID" "$DOMAIN" > auth-config.json
+          printf '{"clientId":"%s","region":"%s","apiBase":"/api"}' "$CLIENT_ID" "${{ env.AWS_REGION }}" > auth-config.json
           aws s3 cp auth-config.json "s3://${{ steps.outputs.outputs.bucket }}/auth-config.json" \
             --content-type "application/json" \
             --cache-control "public, max-age=0, must-revalidate"
