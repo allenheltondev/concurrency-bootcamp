@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Concurrency Bootcamp">
+  <rect width="512" height="512" fill="#14161f"/>
+  <!-- the event loop -->
+  <circle cx="256" cy="256" r="130" fill="none" stroke="#8e86f0" stroke-width="30"/>
+  <!-- tasks riding the loop: ordered (green) and racing (orange) -->
+  <circle cx="256" cy="126" r="30" fill="#57e0b0"/>
+  <circle cx="356" cy="340" r="30" fill="#ff9a6b"/>
+</svg>

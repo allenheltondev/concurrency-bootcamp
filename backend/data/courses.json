@@ -6,7 +6,7 @@
     "status": "active",
     "contentVersion": 1,
     "totalItems": "auto",
-    "contentRoot": "."
+    "contentRoot": "js-concurrency"
   },
   {
     "id": "distributed-systems",

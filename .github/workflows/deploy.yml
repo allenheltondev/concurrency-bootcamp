@@ -158,28 +158,49 @@ jobs:
         # below covers the window in between.
         run: |
           BUCKET="${{ steps.outputs.outputs.bucket }}"
-          aws s3 cp index.html "s3://${BUCKET}/index.html" \
-            --content-type "text/html; charset=utf-8" \
-            --cache-control "public, max-age=300"
-          aws s3 cp worker.js "s3://${BUCKET}/worker.js" \
-            --content-type "text/javascript; charset=utf-8" \
-            --cache-control "public, max-age=300"
-          # App scripts (core/content/packs/app) — everything under js/.
-          # sync --delete so a renamed or removed pack doesn't linger in the
-          # bucket serving stale code forever.
-          aws s3 sync js/ "s3://${BUCKET}/js/" --delete \
-            --content-type "text/javascript; charset=utf-8" \
-            --cache-control "public, max-age=300"
-          # PWA assets. The service worker must not be cached long, or
-          # clients stay pinned to a stale build.
+          # Root kill-switch service worker (see docs/PLATFORM_PLAN.md "URL
+          # strategy"). Same filename as the old course worker so installed
+          # clients fetch it, delete their old caches, and unregister —
+          # freeing the root scope for the hub. max-age=0 so it lands fast.
           aws s3 cp sw.js "s3://${BUCKET}/sw.js" \
             --content-type "text/javascript; charset=utf-8" \
             --cache-control "public, max-age=0, must-revalidate"
-          aws s3 cp manifest.webmanifest "s3://${BUCKET}/manifest.webmanifest" \
-            --content-type "application/manifest+json; charset=utf-8" \
-            --cache-control "public, max-age=300"
+          # Root icon: the hub's favicon (no root index.html here — that
+          # workstream owns uploading the hub's build output).
           aws s3 cp icon.svg "s3://${BUCKET}/icon.svg" \
             --content-type "image/svg+xml" \
+            --cache-control "public, max-age=300"
+          # Shared engine + account layer — the only two files left under
+          # js/ locally after the JS Concurrency course relocated to
+          # js-concurrency/. sync --delete on purpose: it clears out the
+          # old core.js/content.js/sim.js/packs/ objects left in the
+          # bucket's js/ prefix by the previous root-course layout; those
+          # now live under js-concurrency/js/, uploaded below.
+          aws s3 sync js/ "s3://${BUCKET}/js/" --delete \
+            --content-type "text/javascript; charset=utf-8" \
+            --cache-control "public, max-age=300"
+          # JS Concurrency course — relocated from the repo root to its own
+          # sibling directory with the same internal layout as
+          # distributed-systems/ (see docs/COURSE_PATTERN.md). Its pages
+          # reuse the shared engine at /js/app.js + /js/account.js uploaded
+          # above.
+          aws s3 cp js-concurrency/index.html "s3://${BUCKET}/js-concurrency/index.html" \
+            --content-type "text/html; charset=utf-8" \
+            --cache-control "public, max-age=300"
+          aws s3 sync js-concurrency/js/ "s3://${BUCKET}/js-concurrency/js/" --delete \
+            --content-type "text/javascript; charset=utf-8" \
+            --cache-control "public, max-age=300"
+          aws s3 cp js-concurrency/sw.js "s3://${BUCKET}/js-concurrency/sw.js" \
+            --content-type "text/javascript; charset=utf-8" \
+            --cache-control "public, max-age=0, must-revalidate"
+          aws s3 cp js-concurrency/manifest.webmanifest "s3://${BUCKET}/js-concurrency/manifest.webmanifest" \
+            --content-type "application/manifest+json; charset=utf-8" \
+            --cache-control "public, max-age=300"
+          aws s3 cp js-concurrency/icon.svg "s3://${BUCKET}/js-concurrency/icon.svg" \
+            --content-type "image/svg+xml" \
+            --cache-control "public, max-age=300"
+          aws s3 cp js-concurrency/worker.js "s3://${BUCKET}/js-concurrency/worker.js" \
+            --content-type "text/javascript; charset=utf-8" \
             --cache-control "public, max-age=300"
           # Distributed Systems course — a sibling directory with the same
           # internal layout (see docs/COURSE_PATTERN.md). Its pages reuse the
