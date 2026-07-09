@@ -12,7 +12,9 @@
 
    A test or solution edit that breaks the pair cannot merge.
 
-   Usage: node tools/test-solutions.mjs
+   Usage: node tools/test-solutions.mjs [--root <courseDir>]
+   --root points at a course directory containing practice/ (default: the
+   repo root course), e.g.  node tools/test-solutions.mjs --root distributed-systems
    Exits non-zero with a report if anything fails. */
 
 import fs from "node:fs";
@@ -21,7 +23,9 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const rootArg = process.argv.indexOf("--root");
+const root = rootArg !== -1 ? path.resolve(repoRoot, process.argv[rootArg + 1]) : repoRoot;
 const practice = path.join(root, "practice");
 const solutions = path.join(practice, "solutions");
 

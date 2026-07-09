@@ -45,6 +45,10 @@ for (const c of courses) {
   courseIds.add(c.id);
   if (!c.title || !c.description) die(`course ${c.id} needs title + description`);
   if (c.totalItems !== "auto" && !Number.isInteger(c.totalItems)) die(`course ${c.id}: totalItems must be an integer or "auto"`);
+  if (c.totalItems === "auto") {
+    const dir = path.join(root, c.contentRoot || ".");
+    if (!fs.existsSync(path.join(dir, "js/content.js"))) die(`course ${c.id}: contentRoot ${c.contentRoot || "."} has no js/content.js`);
+  }
 }
 const badgeIds = new Set();
 for (const b of badges) {
@@ -57,23 +61,25 @@ for (const b of badges) {
 }
 
 /* ---- totalItems: "auto" — same loading strategy as tools/validate-content.mjs,
-   same formula as js/app.js ---- */
-function computedTotal() {
+   same formula as js/app.js. Each course names its content directory with
+   contentRoot (default "." = the repo-root course). ---- */
+function computedTotal(contentRoot = ".") {
+  const courseDir = path.join(root, contentRoot);
   const ctx = vm.createContext({
     console, setTimeout, clearTimeout, setInterval, clearInterval,
     queueMicrotask, performance,
     AbortController, AbortSignal, Event, EventTarget, structuredClone,
   });
-  const load = (rel) => new vm.Script(fs.readFileSync(path.join(root, rel), "utf8"), { filename: rel }).runInContext(ctx);
+  const load = (rel) => new vm.Script(fs.readFileSync(path.join(courseDir, rel), "utf8"), { filename: path.join(contentRoot, rel) }).runInContext(ctx);
   load("js/core.js");
   load("js/content.js");
-  const packsDir = path.join(root, "js/packs");
+  const packsDir = path.join(courseDir, "js/packs");
   const packs = fs.existsSync(packsDir)
     ? fs.readdirSync(packsDir).filter((f) => f.endsWith(".js")).sort()
     : [];
   for (const p of packs) load("js/packs/" + p);
   return vm.runInContext(
-    "DRILLS.primitives.length + DRILLS.bank.length + DRILLS.toolkit.length + DRILLS.durable.length + BUGHUNT.length + WRITE.length",
+    "Object.values(DRILLS).reduce((n, l) => n + l.length, 0) + BUGHUNT.length + WRITE.length",
     ctx
   );
 }
@@ -92,10 +98,10 @@ function marshal(v) {
 }
 
 const items = [
-  ...courses.map((c) => ({
+  ...courses.map(({ contentRoot, ...c }) => ({
     pk: "COURSES", sk: `COURSE#${c.id}`, type: "course",
     ...c,
-    totalItems: c.totalItems === "auto" ? computedTotal() : c.totalItems
+    totalItems: c.totalItems === "auto" ? computedTotal(contentRoot) : c.totalItems
   })),
   ...badges.map((b) => ({ pk: "BADGES", sk: `BADGE#${b.id}`, type: "badge", ...b }))
 ];

@@ -172,6 +172,24 @@ jobs:
           aws s3 cp icon.svg "s3://${BUCKET}/icon.svg" \
             --content-type "image/svg+xml" \
             --cache-control "public, max-age=300"
+          # Distributed Systems course — a sibling directory with the same
+          # internal layout (see docs/COURSE_PATTERN.md). Its pages reuse the
+          # shared engine at /js/app.js uploaded above.
+          aws s3 cp distributed-systems/index.html "s3://${BUCKET}/distributed-systems/index.html" \
+            --content-type "text/html; charset=utf-8" \
+            --cache-control "public, max-age=300"
+          aws s3 sync distributed-systems/js/ "s3://${BUCKET}/distributed-systems/js/" --delete \
+            --content-type "text/javascript; charset=utf-8" \
+            --cache-control "public, max-age=300"
+          aws s3 cp distributed-systems/sw.js "s3://${BUCKET}/distributed-systems/sw.js" \
+            --content-type "text/javascript; charset=utf-8" \
+            --cache-control "public, max-age=0, must-revalidate"
+          aws s3 cp distributed-systems/manifest.webmanifest "s3://${BUCKET}/distributed-systems/manifest.webmanifest" \
+            --content-type "application/manifest+json; charset=utf-8" \
+            --cache-control "public, max-age=300"
+          aws s3 cp distributed-systems/icon.svg "s3://${BUCKET}/distributed-systems/icon.svg" \
+            --content-type "image/svg+xml" \
+            --cache-control "public, max-age=300"
 
       - name: Invalidate CloudFront and wait for completion
         # Waiting (instead of fire-and-forget) means the smoke test below
@@ -199,7 +217,8 @@ jobs:
 
           # `|| true` on the curls: a connection failure should show up as a
           # ✗ line in the report below, not abort the step (bash -e) opaquely.
-          for p in / /worker.js /sw.js /manifest.webmanifest /js/app.js /js/core.js /js/content.js; do
+          for p in / /worker.js /sw.js /manifest.webmanifest /js/app.js /js/core.js /js/content.js \
+                   /distributed-systems/ /distributed-systems/sw.js /distributed-systems/js/content.js; do
             code=$(curl -sS -o /dev/null -w "%{http_code}" "${URL}${p}" || true)
             if [ "$code" = "200" ]; then
               echo "✓ ${p} -> ${code}"
@@ -221,6 +240,15 @@ jobs:
             echo "✓ served index.html matches this commit"
           else
             echo "✗ served index.html (${served}) != repo index.html (${local_hash}) — CDN is serving a stale build"
+            fail=1
+          fi
+
+          served_ds=$(curl -sS "${URL}/distributed-systems/" 2>/dev/null | sha256sum | cut -d' ' -f1)
+          local_ds=$(sha256sum distributed-systems/index.html | cut -d' ' -f1)
+          if [ "$served_ds" = "$local_ds" ]; then
+            echo "✓ served distributed-systems/index.html matches this commit"
+          else
+            echo "✗ served distributed-systems/index.html (${served_ds}) != repo copy (${local_ds}) — stale build or directory rewrite broken"
             fail=1
           fi
 

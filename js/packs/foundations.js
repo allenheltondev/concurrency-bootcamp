@@ -296,6 +296,8 @@ UPDATE orders SET stock = stock - 1 WHERE id = ? AND stock &gt; 0;
     delete LESSON_PRACTICE[k];
     LESSON_PRACTICE[+k + shift] = v;
   }
+  // MODULES metadata holds lesson backlinks too (model/race/tradeoffs) — same shift.
+  for (const m of MODULES) if (m.conceptLesson != null) m.conceptLesson += shift;
 
   // 3. cross-links for the four new lessons (now at indices 0..3).
   LESSON_PRACTICE[0] = { mod: "model" };

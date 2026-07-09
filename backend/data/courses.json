@@ -5,6 +5,16 @@
     "description": "Learn and practice JavaScript concurrency from the event loop up: animated lessons, tap-driven drills for every primitive, spot-the-bug and write-it modules, durable-execution hazards, and a scored test mode.",
     "status": "active",
     "contentVersion": 1,
-    "totalItems": "auto"
+    "totalItems": "auto",
+    "contentRoot": "."
+  },
+  {
+    "id": "distributed-systems",
+    "title": "Distributed Systems Bootcamp",
+    "description": "Learn and practice distributed systems from the unreliable network up: animated lessons on clocks, quorums, consensus, and delivery guarantees; tap-driven drills that run a simulated cluster; spot-the-bug and write-it modules; and a scored test mode.",
+    "status": "active",
+    "contentVersion": 1,
+    "totalItems": "auto",
+    "contentRoot": "distributed-systems"
   }
 ]
