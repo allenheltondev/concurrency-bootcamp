@@ -105,9 +105,15 @@ CloudFront directory-index function gained the `/platform/*` SPA rewrite.
 Ships dark at `/platform/` — deployed but unlinked; `vite.config.ts` flips
 `base` to `/` in P3.
 
-**Phase P1 — Public catalog.** The backend per-route auth override +
-integration-smoke/unit-test updates (public 200 signed-out, `/api/me` still
-401). Small and independent.
+**Phase P1 — Public catalog. ✅** Added per-route `Auth: { Authorizer: NONE }`
+overrides on `GET /api/courses`, `GET /api/courses/{courseId}`, and
+`GET /api/badges` (explicit HttpApi events beat the `ANY /api/{proxy+}`
+catch-all's default JWT authorizer); no handler changes needed since those
+routes never read caller identity. `integration-smoke.mjs` now checks
+signed-out 200s for `/courses` and `/badges` and confirms `/me` still 401s;
+the unit suite adds a no-authorizer-block invocation of the same three
+routes to prove the handler doesn't assume `requestContext.authorizer`
+exists. Small and independent.
 
 **Phase P2 — Profile.** `/profile`: auth screens (React ports of the
 newsletter forms), the session contract in `lib/auth.ts`, then XP/streak
