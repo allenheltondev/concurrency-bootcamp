@@ -390,15 +390,6 @@ Resources:
             Auth:
               Authorizer: NONE
 
-  # ---- Explicit log group: without this, Lambda auto-creates one that
-  # retains logs forever. ----
-  ApiFunctionLogGroup:
-    Type: AWS::Logs::LogGroup
-    Condition: BackendEnabled
-    Properties:
-      LogGroupName: !Sub "/aws/lambda/${ApiFunction}"
-      RetentionInDays: 30
-
 Outputs:
   SiteUrl:
     Description: Live HTTPS URL.
