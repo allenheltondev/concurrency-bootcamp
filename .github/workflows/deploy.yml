@@ -71,6 +71,7 @@ jobs:
         # The React hub/profile surface (docs/PLATFORM_PLAN.md). Built here,
         # uploaded alongside the site below.
         run: |
+          npm install -g esbuild
           npm ci
           npm run build
         working-directory: platform
