@@ -1,18 +1,20 @@
 import { useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Alert, Button, CodeInput, Input, PasswordInput } from "@readysetcloud/ui";
 import {
   AuthCard,
-  CodeField,
-  Field,
-  FormAlert,
-  PasswordField,
   PasswordRequirements,
   ResendCodeButton,
-  SubmitButton
-} from "../components/forms";
-import { useAuth } from "../context/AuthContext";
-import { confirmSignUp, resendConfirmationCode, signIn, signUp } from "../lib/auth";
-import { validate, type FieldErrors } from "../lib/validate";
+  confirmSignUp,
+  signIn,
+  signUp,
+  useAuth,
+  validateCode,
+  validateEmail,
+  validateName,
+  validatePassword
+} from "@readysetcloud/ui/auth";
+import { useConfigured } from "../lib/useConfigured";
 
 /* Two-step wizard: the sign-up form, then the emailed 6-digit confirmation
    code. Login also routes unconfirmed accounts here (location.state.confirm)
@@ -23,8 +25,18 @@ interface RouteState {
   from?: string;
 }
 
+interface FieldErrors {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  password?: string;
+  confirmPassword?: string;
+  code?: string;
+}
+
 export default function Signup() {
-  const { signedIn, configured } = useAuth();
+  const { signedIn } = useAuth();
+  const configured = useConfigured();
   const navigate = useNavigate();
   const location = useLocation();
   const routeState = (location.state as RouteState | null) ?? {};
@@ -47,9 +59,15 @@ export default function Signup() {
   async function submitForm(e: FormEvent) {
     e.preventDefault();
     setAlert(null);
-    const errs = validate("signup", { firstName, lastName, email, password, confirmPassword });
+    const errs: FieldErrors = {
+      firstName: validateName(firstName, "first name"),
+      lastName: validateName(lastName, "last name"),
+      email: validateEmail(email),
+      password: validatePassword(password),
+      confirmPassword: password === confirmPassword ? undefined : "Passwords don't match."
+    };
     setErrors(errs);
-    if (Object.keys(errs).length) return;
+    if (Object.values(errs).some(Boolean)) return;
     setBusy(true);
     try {
       await signUp(firstName, lastName, email, password);
@@ -65,9 +83,9 @@ export default function Signup() {
   async function submitConfirm(e: FormEvent) {
     e.preventDefault();
     setAlert(null);
-    const errs = validate("confirm", { code });
+    const errs: FieldErrors = { code: validateCode(code) };
     setErrors(errs);
-    if (Object.keys(errs).length) return;
+    if (errs.code) return;
     setBusy(true);
     try {
       await confirmSignUp(email, code);
@@ -86,106 +104,96 @@ export default function Signup() {
 
   if (step === "confirm") {
     return (
-      <AuthCard
-        title="Verify Your Email"
-        subtitle={
-          <>
-            We&apos;ve sent a confirmation code to <b className="font-medium text-foreground">{email}</b>
-          </>
-        }
-      >
-        <form className="flex flex-col gap-4" noValidate onSubmit={submitConfirm}>
-          <FormAlert message={alert} />
-          <CodeField label="Confirmation code" value={code} onChange={setCode} error={errors.code} />
-          <SubmitButton busy={busy} label="Verify" busyLabel="Verifying…" />
-          <div className="flex items-center justify-between">
-            <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground">
-              ← Back to sign in
-            </Link>
-            <ResendCodeButton
-              onResend={async () => {
-                try {
-                  await resendConfirmationCode(email);
-                  setAlert(null);
-                  return true;
-                } catch (err) {
-                  setAlert(err instanceof Error ? err.message : "Couldn't resend the code.");
-                  return false;
-                }
-              }}
+      <main className="px-4 py-12 sm:py-16">
+        <AuthCard
+          title="Verify Your Email"
+          subtitle={
+            <>
+              We&apos;ve sent a confirmation code to <b className="font-medium text-foreground">{email}</b>
+            </>
+          }
+        >
+          <form className="flex flex-col gap-4" noValidate onSubmit={submitConfirm}>
+            {alert && <Alert variant="error">{alert}</Alert>}
+            <CodeInput
+              label="Confirmation code"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              error={errors.code}
             />
-          </div>
-        </form>
-      </AuthCard>
+            <Button type="submit" block loading={busy} loadingLabel="Verifying…">
+              Verify
+            </Button>
+            <div className="flex items-center justify-between">
+              <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground">
+                ← Back to sign in
+              </Link>
+              <ResendCodeButton email={email} onError={setAlert} />
+            </div>
+          </form>
+        </AuthCard>
+      </main>
     );
   }
 
   return (
-    <AuthCard
-      title="Create Account"
-      subtitle="One Ready, Set, Cloud account for every course"
-      footer={
-        <>
-          Already have an account?{" "}
-          <Link to="/login" className="font-medium text-primary-600 hover:text-primary-700">
-            Sign in
-          </Link>
-        </>
-      }
-    >
-      {configured === false && (
-        <div className="mb-4">
-          <FormAlert message="Accounts aren't enabled on this deployment." />
-        </div>
-      )}
-      <form className="flex flex-col gap-4" noValidate onSubmit={submitForm}>
-        <FormAlert message={alert} />
-        <div className="grid grid-cols-2 gap-3">
-          <Field
-            id="firstName"
-            label="First name"
-            autoComplete="given-name"
-            value={firstName}
-            onChange={setFirstName}
-            error={errors.firstName}
+    <main className="px-4 py-12 sm:py-16">
+      <AuthCard
+        title="Create Account"
+        subtitle="One Ready, Set, Cloud account for every course"
+        footer={
+          <>
+            Already have an account? <Link to="/login">Sign in</Link>
+          </>
+        }
+      >
+        {configured === false && <Alert variant="error">Accounts aren&apos;t enabled on this deployment.</Alert>}
+        <form className="flex flex-col gap-4" noValidate onSubmit={submitForm}>
+          {alert && <Alert variant="error">{alert}</Alert>}
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="First name"
+              autoComplete="given-name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              error={errors.firstName}
+            />
+            <Input
+              label="Last name"
+              autoComplete="family-name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              error={errors.lastName}
+            />
+          </div>
+          <Input
+            label="Email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            error={errors.email}
           />
-          <Field
-            id="lastName"
-            label="Last name"
-            autoComplete="family-name"
-            value={lastName}
-            onChange={setLastName}
-            error={errors.lastName}
+          <PasswordInput
+            label="Password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            error={errors.password}
           />
-        </div>
-        <Field
-          id="email"
-          label="Email"
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={setEmail}
-          error={errors.email}
-        />
-        <PasswordField
-          id="password"
-          label="Password"
-          autoComplete="new-password"
-          value={password}
-          onChange={setPassword}
-          error={errors.password}
-        />
-        <PasswordField
-          id="confirmPassword"
-          label="Confirm password"
-          autoComplete="new-password"
-          value={confirmPassword}
-          onChange={setConfirmPassword}
-          error={errors.confirmPassword}
-        />
-        <SubmitButton busy={busy} label="Create Account" busyLabel="Creating Account…" />
-      </form>
-      <PasswordRequirements />
-    </AuthCard>
+          <PasswordInput
+            label="Confirm password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            error={errors.confirmPassword}
+          />
+          <PasswordRequirements />
+          <Button type="submit" block loading={busy} loadingLabel="Creating Account…">
+            Create Account
+          </Button>
+        </form>
+      </AuthCard>
+    </main>
   );
 }

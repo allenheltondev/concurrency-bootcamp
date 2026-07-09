@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "@readysetcloud/ui/auth";
 import {
   get,
   type BadgeCatalogResponse,
@@ -14,6 +14,7 @@ import {
   type MyCoursesResponse
 } from "../lib/api";
 import { courseHref } from "../lib/courses";
+import { useConfigured } from "../lib/useConfigured";
 
 /* /profile — the signed-in gradebook: XP/streak stat tiles, per-course
    progress cards (GET /me/courses joined with the public catalog), and the
@@ -59,7 +60,8 @@ async function loadProfile(): Promise<ProfileData> {
 }
 
 export default function Profile() {
-  const { user, configured, signOut } = useAuth();
+  const { user, signOut } = useAuth();
+  const configured = useConfigured();
   const navigate = useNavigate();
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
