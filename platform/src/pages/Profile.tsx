@@ -13,17 +13,13 @@ import {
   type MyCourse,
   type MyCoursesResponse
 } from "../lib/api";
+import { courseHref } from "../lib/courses";
 
 /* /profile — the signed-in gradebook: XP/streak stat tiles, per-course
    progress cards (GET /me/courses joined with the public catalog), and the
    badge case (GET /badges joined with GET /me/badges: earned in full color,
    the rest locked with their description as the hint). */
 
-const COURSE_LINKS: Record<string, string> = {
-  "js-concurrency": "/js-concurrency/",
-  "distributed-systems": "/distributed-systems/"
-};
-const courseHref = (courseId: string) => COURSE_LINKS[courseId] ?? `/${courseId}/`;
 
 const fmtDate = (iso: string) => {
   const d = new Date(iso);

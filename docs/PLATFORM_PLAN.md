@@ -129,15 +129,22 @@ locked from the two badge endpoints), per-course progress cards from
 error, and empty states. Course pages' account menus gained the
 "view profile" link — the one (additive) course-page touch in this plan.
 
-**Phase P3 — Hub + root migration.** The hub page; the URL-strategy
-migration checklist above; course headers link back to the hub. The
-riskiest phase, shipped last on purpose — P0–P2 deliver value even if P3
-waits.
+**Phase P3 — Hub + root migration. ✅** The real hub at the root: live
+catalog from the public API (static fallback when the backend is dark),
+the visitor's progress woven into course cards when signed in, and a
+sign-in / profile chip. The course relocated to `/js-concurrency/`
+(migration checklist above executed: kill-switch root worker, v10
+course worker, storage untouched); the CloudFront function now serves
+course directories classically and everything else as the SPA shell;
+deploy uploads the hub build to the root and the smoke test verifies
+status codes, COOP/COEP on course pages, SPA deep-link fallback, and
+byte-identical index.html for the hub and both courses.
 
-**Phase P4 — Polish + hardening.** Loading/empty/error states everywhere,
-Playwright end-to-end pass (signed-out hub, sign-in, profile renders real
-API shapes, course round-trip), Lighthouse/a11y sweep, docs (README,
-COURSE_PATTERN pointer to the hub).
+**Phase P4 — Polish + hardening (mostly done).** Loading/empty/error
+states shipped with P2/P3; the Chromium end-to-end pass covers the
+signed-out hub with live catalog, the relocated course booting, the
+deep-link → login → profile round trip, signed-in progress weaving, and
+the dark-backend fallback. Remaining: a Lighthouse/a11y sweep.
 
 ## Verification bar (matching the repo's standard)
 

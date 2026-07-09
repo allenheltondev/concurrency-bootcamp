@@ -2,10 +2,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// P0 ships dark at /platform/ (unlinked). Phase P3 of docs/PLATFORM_PLAN.md
-// moves the hub to the root URL — flip base to "/" there.
+// The hub owns the root URL (docs/PLATFORM_PLAN.md phase P3); the course
+// apps live as static siblings at /js-concurrency/ and /distributed-systems/.
 export default defineConfig({
-  base: "/platform/",
+  base: "/",
   plugins: [react()],
   test: {
     environment: "jsdom",
