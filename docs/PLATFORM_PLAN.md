@@ -54,10 +54,11 @@ catalog data only — nothing user-scoped — and CloudFront's `CachingDisabled`
 on `/api/*` can graduate to a short-TTL cache policy for these paths later
 if traffic ever warrants it. Everything under `/api/me` stays authenticated.
 
-## URL strategy (the one decision to confirm before phase 3)
+## URL strategy (decided ✅)
 
-**Recommendation: the hub takes the root URL, and the JS concurrency course
-relocates to `/js-concurrency/` — one deliberate migration, done once.**
+**The hub takes the root URL** — the site's home page, where you pick a
+course — **and the JS concurrency course relocates to `/js-concurrency/`**:
+one deliberate migration, done once.
 `/distributed-systems/` already proves the subdirectory-course pattern; the
 relocation makes the root course a peer rather than a special case, and
 `bootcamp.readysetcloud.io` becomes the platform's front door.
@@ -80,9 +81,7 @@ The migration is the sensitive part, owned by phase 3 as a checklist:
 - Old hash-routed links keep working (`/#...` has no deep paths to break);
   the CloudFront function already rewrites directory URIs.
 
-If that trade feels wrong when we get there, the fallback is a hub at
-`/courses/` with the root course left in place — everything else in this
-plan is placement-agnostic.
+
 
 ## Design system
 
@@ -98,10 +97,13 @@ obligation) until the modal retires.
 
 ## Work breakdown (each phase = one PR, courses untouched throughout)
 
-**Phase P0 — Scaffold + pipeline.** `platform/` app (Vite, React, TS,
+**Phase P0 — Scaffold + pipeline. ✅** `platform/` app (Vite, React, TS,
 Tailwind, vitest, ESLint) with the ported token system and a placeholder
-page; CI job (lint, test, build); deploy uploads the build; CloudFront SPA
-rewrite. Ships dark — deployed but unlinked.
+hub page; CI steps (lint, test, `tsc --noEmit` + build); deploy builds and
+uploads (`/platform/assets/` immutable, index.html revalidating); the
+CloudFront directory-index function gained the `/platform/*` SPA rewrite.
+Ships dark at `/platform/` — deployed but unlinked; `vite.config.ts` flips
+`base` to `/` in P3.
 
 **Phase P1 — Public catalog.** The backend per-route auth override +
 integration-smoke/unit-test updates (public 200 signed-out, `/api/me` still
@@ -138,10 +140,8 @@ COURSE_PATTERN pointer to the hub).
 
 ## Open items
 
-1. Confirm the URL strategy (root hub + course relocation) before P3 —
-   P0–P2 proceed regardless.
-2. Badge art direction for the profile badge case (emoji-as-icon is the
+1. Badge art direction for the profile badge case (emoji-as-icon is the
    current catalog format; fine to ship, easy to upgrade later).
-3. Whether the course pages' `js/account.js` modal eventually retires in
+2. Whether the course pages' `js/account.js` modal eventually retires in
    favor of linking to the platform's auth pages (ADR 0002 revisit trigger;
    no rush — it works and is tested).

@@ -111,6 +111,13 @@ Resources:
         function handler(event) {
           var request = event.request;
           var uri = request.uri;
+          // The platform app (docs/PLATFORM_PLAN.md) is an SPA: every
+          // non-file path under its prefix serves its index.html so client
+          // routes deep-link. P3 moves this handling to the root URL.
+          if (uri === '/platform' || uri.startsWith('/platform/')) {
+            if (!uri.split('/').pop().includes('.')) request.uri = '/platform/index.html';
+            return request;
+          }
           if (uri.endsWith('/')) {
             request.uri = uri + 'index.html';
           } else if (!uri.split('/').pop().includes('.')) {

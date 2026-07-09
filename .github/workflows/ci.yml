@@ -76,6 +76,23 @@ jobs:
         # the real app content — a bad catalog entry cannot merge.
         run: node backend/tools/seed-catalog.mjs ci-dry-run > /dev/null
 
+      - name: Install platform dependencies
+        run: npm ci
+        working-directory: platform
+
+      - name: Lint the platform app
+        run: npm run lint
+        working-directory: platform
+
+      - name: Test the platform app
+        run: npm test
+        working-directory: platform
+
+      - name: Build the platform app
+        # tsc --noEmit + vite build — a type error or broken import cannot merge.
+        run: npm run build
+        working-directory: platform
+
       - name: Install backend dependencies
         run: npm ci
         working-directory: backend

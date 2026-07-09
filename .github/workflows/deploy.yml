@@ -67,6 +67,14 @@ jobs:
         run: npm ci
         working-directory: backend
 
+      - name: Build platform app
+        # The React hub/profile surface (docs/PLATFORM_PLAN.md). Built here,
+        # uploaded alongside the site below.
+        run: |
+          npm ci
+          npm run build
+        working-directory: platform
+
       - name: SAM build
         # esbuild-bundles the lambdalith (backend/src/api.mjs); the AWS SDK
         # stays external because the Lambda runtime ships it.
@@ -182,6 +190,13 @@ jobs:
           aws s3 sync distributed-systems/js/ "s3://${BUCKET}/distributed-systems/js/" --delete \
             --content-type "text/javascript; charset=utf-8" \
             --cache-control "public, max-age=300"
+          # Platform app (React SPA, served dark at /platform/ until P3).
+          # Hashed assets are immutable; only index.html must revalidate.
+          aws s3 sync platform/dist/assets/ "s3://${BUCKET}/platform/assets/" --delete \
+            --cache-control "public, max-age=31536000, immutable"
+          aws s3 cp platform/dist/index.html "s3://${BUCKET}/platform/index.html" \
+            --content-type "text/html; charset=utf-8" \
+            --cache-control "public, max-age=0, must-revalidate"
           aws s3 cp distributed-systems/sw.js "s3://${BUCKET}/distributed-systems/sw.js" \
             --content-type "text/javascript; charset=utf-8" \
             --cache-control "public, max-age=0, must-revalidate"
