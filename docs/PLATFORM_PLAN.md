@@ -115,12 +115,19 @@ the unit suite adds a no-authorizer-block invocation of the same three
 routes to prove the handler doesn't assume `requestContext.authorizer`
 exists. Small and independent.
 
-**Phase P2 — Profile.** `/profile`: auth screens (React ports of the
-newsletter forms), the session contract in `lib/auth.ts`, then XP/streak
-stat tiles, badge case (earned vs locked from the two badge endpoints),
-per-course progress cards from `GET /api/me/courses` joined with the
-catalog. Course pages' account menus gain a "view profile" link — the one
-(additive) course-page touch in this plan.
+**Phase P2 — Profile. ✅** `/profile` plus the full auth surface: `/login`
+(with the new-password challenge inline), `/signup` (two-step wizard with
+the 6-digit confirm), and `/forgot-password` — React ports of the
+newsletter forms, driven by runtime `/auth-config.json` (dormant without
+it, like the modal). The session contract lives in `lib/auth.ts` (same
+`rsc:auth` document + cognito-idp calls as `js/account.js`, with refresh,
+friendly error copy, and cross-tab change notification), the typed `/api`
+client in `lib/api.ts`, and `<RequireAuth>` gates the profile with a
+return-to. The page itself: XP/streak stat tiles, badge case (earned vs
+locked from the two badge endpoints), per-course progress cards from
+`GET /api/me/courses` joined with the catalog — with loading skeletons,
+error, and empty states. Course pages' account menus gained the
+"view profile" link — the one (additive) course-page touch in this plan.
 
 **Phase P3 — Hub + root migration.** The hub page; the URL-strategy
 migration checklist above; course headers link back to the hub. The
