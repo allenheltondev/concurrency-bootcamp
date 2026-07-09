@@ -147,7 +147,11 @@ jobs:
             unprocessed=$(aws dynamodb batch-write-item \
               --request-items file:///tmp/chunk.json \
               --query 'UnprocessedItems' --output json)
-            if [ "$unprocessed" != "{}" ]; then
+            # A fully-processed batch returns an empty UnprocessedItems map,
+            # which the AWS CLI renders as empty output / "null" / "{}"
+            # depending on version — all mean "nothing left". Only a non-empty
+            # map is a real retry-needed failure.
+            if [ -n "$unprocessed" ] && [ "$(jq 'length' <<<"$unprocessed")" != "0" ]; then
               echo "batch $i left unprocessed items: $unprocessed"
               exit 1
             fi
