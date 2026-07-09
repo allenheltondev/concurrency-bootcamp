@@ -67,6 +67,14 @@ jobs:
         run: npm ci
         working-directory: backend
 
+      - name: Build platform app
+        # The React hub/profile surface (docs/PLATFORM_PLAN.md). Built here,
+        # uploaded alongside the site below.
+        run: |
+          npm ci
+          npm run build
+        working-directory: platform
+
       - name: SAM build
         # esbuild-bundles the lambdalith (backend/src/api.mjs); the AWS SDK
         # stays external because the Lambda runtime ships it.
@@ -150,28 +158,49 @@ jobs:
         # below covers the window in between.
         run: |
           BUCKET="${{ steps.outputs.outputs.bucket }}"
-          aws s3 cp index.html "s3://${BUCKET}/index.html" \
-            --content-type "text/html; charset=utf-8" \
-            --cache-control "public, max-age=300"
-          aws s3 cp worker.js "s3://${BUCKET}/worker.js" \
-            --content-type "text/javascript; charset=utf-8" \
-            --cache-control "public, max-age=300"
-          # App scripts (core/content/packs/app) — everything under js/.
-          # sync --delete so a renamed or removed pack doesn't linger in the
-          # bucket serving stale code forever.
-          aws s3 sync js/ "s3://${BUCKET}/js/" --delete \
-            --content-type "text/javascript; charset=utf-8" \
-            --cache-control "public, max-age=300"
-          # PWA assets. The service worker must not be cached long, or
-          # clients stay pinned to a stale build.
+          # Root kill-switch service worker (see docs/PLATFORM_PLAN.md "URL
+          # strategy"). Same filename as the old course worker so installed
+          # clients fetch it, delete their old caches, and unregister —
+          # freeing the root scope for the hub. max-age=0 so it lands fast.
           aws s3 cp sw.js "s3://${BUCKET}/sw.js" \
             --content-type "text/javascript; charset=utf-8" \
             --cache-control "public, max-age=0, must-revalidate"
-          aws s3 cp manifest.webmanifest "s3://${BUCKET}/manifest.webmanifest" \
-            --content-type "application/manifest+json; charset=utf-8" \
-            --cache-control "public, max-age=300"
+          # Root icon: the hub's favicon (no root index.html here — that
+          # workstream owns uploading the hub's build output).
           aws s3 cp icon.svg "s3://${BUCKET}/icon.svg" \
             --content-type "image/svg+xml" \
+            --cache-control "public, max-age=300"
+          # Shared engine + account layer — the only two files left under
+          # js/ locally after the JS Concurrency course relocated to
+          # js-concurrency/. sync --delete on purpose: it clears out the
+          # old core.js/content.js/sim.js/packs/ objects left in the
+          # bucket's js/ prefix by the previous root-course layout; those
+          # now live under js-concurrency/js/, uploaded below.
+          aws s3 sync js/ "s3://${BUCKET}/js/" --delete \
+            --content-type "text/javascript; charset=utf-8" \
+            --cache-control "public, max-age=300"
+          # JS Concurrency course — relocated from the repo root to its own
+          # sibling directory with the same internal layout as
+          # distributed-systems/ (see docs/COURSE_PATTERN.md). Its pages
+          # reuse the shared engine at /js/app.js + /js/account.js uploaded
+          # above.
+          aws s3 cp js-concurrency/index.html "s3://${BUCKET}/js-concurrency/index.html" \
+            --content-type "text/html; charset=utf-8" \
+            --cache-control "public, max-age=300"
+          aws s3 sync js-concurrency/js/ "s3://${BUCKET}/js-concurrency/js/" --delete \
+            --content-type "text/javascript; charset=utf-8" \
+            --cache-control "public, max-age=300"
+          aws s3 cp js-concurrency/sw.js "s3://${BUCKET}/js-concurrency/sw.js" \
+            --content-type "text/javascript; charset=utf-8" \
+            --cache-control "public, max-age=0, must-revalidate"
+          aws s3 cp js-concurrency/manifest.webmanifest "s3://${BUCKET}/js-concurrency/manifest.webmanifest" \
+            --content-type "application/manifest+json; charset=utf-8" \
+            --cache-control "public, max-age=300"
+          aws s3 cp js-concurrency/icon.svg "s3://${BUCKET}/js-concurrency/icon.svg" \
+            --content-type "image/svg+xml" \
+            --cache-control "public, max-age=300"
+          aws s3 cp js-concurrency/worker.js "s3://${BUCKET}/js-concurrency/worker.js" \
+            --content-type "text/javascript; charset=utf-8" \
             --cache-control "public, max-age=300"
           # Distributed Systems course — a sibling directory with the same
           # internal layout (see docs/COURSE_PATTERN.md). Its pages reuse the
@@ -182,6 +211,13 @@ jobs:
           aws s3 sync distributed-systems/js/ "s3://${BUCKET}/distributed-systems/js/" --delete \
             --content-type "text/javascript; charset=utf-8" \
             --cache-control "public, max-age=300"
+          # Platform app (React SPA) — the hub, served at the ROOT URL.
+          # Hashed assets are immutable; only index.html must revalidate.
+          aws s3 sync platform/dist/assets/ "s3://${BUCKET}/assets/" --delete \
+            --cache-control "public, max-age=31536000, immutable"
+          aws s3 cp platform/dist/index.html "s3://${BUCKET}/index.html" \
+            --content-type "text/html; charset=utf-8" \
+            --cache-control "public, max-age=0, must-revalidate"
           aws s3 cp distributed-systems/sw.js "s3://${BUCKET}/distributed-systems/sw.js" \
             --content-type "text/javascript; charset=utf-8" \
             --cache-control "public, max-age=0, must-revalidate"
@@ -224,15 +260,17 @@ jobs:
       - name: Smoke test the live site
         # The deploy isn't done because the AWS calls succeeded — it's done
         # when the site serves the bits we just pushed. Verify status codes,
-        # the COOP/COEP isolation headers the whole app depends on, and that
-        # the served index.html is byte-identical to this commit's.
+        # the COOP/COEP isolation headers the courses depend on, the SPA
+        # fallback for hub routes, and that every served index.html is
+        # byte-identical to this commit's build.
         run: |
           URL="${{ steps.outputs.outputs.site-url }}"
           fail=0
 
           # `|| true` on the curls: a connection failure should show up as a
           # ✗ line in the report below, not abort the step (bash -e) opaquely.
-          for p in / /worker.js /sw.js /manifest.webmanifest /js/app.js /js/core.js /js/content.js \
+          for p in / /sw.js /js/app.js /js/account.js \
+                   /js-concurrency/ /js-concurrency/sw.js /js-concurrency/worker.js /js-concurrency/js/content.js \
                    /distributed-systems/ /distributed-systems/sw.js /distributed-systems/js/content.js; do
             code=$(curl -sS -o /dev/null -w "%{http_code}" "${URL}${p}" || true)
             if [ "$code" = "200" ]; then
@@ -243,29 +281,43 @@ jobs:
             fi
           done
 
-          headers=$(curl -sSI "${URL}/" || true)
+          # cross-origin isolation on the COURSE pages (SharedArrayBuffer)
+          headers=$(curl -sSI "${URL}/js-concurrency/" || true)
           echo "$headers" | grep -qi "^cross-origin-opener-policy: same-origin" \
             && echo "✓ COOP: same-origin" || { echo "✗ missing Cross-Origin-Opener-Policy: same-origin"; fail=1; }
           echo "$headers" | grep -qi "^cross-origin-embedder-policy: require-corp" \
             && echo "✓ COEP: require-corp" || { echo "✗ missing Cross-Origin-Embedder-Policy: require-corp"; fail=1; }
 
+          # the root serves the hub we just built
           served=$(curl -sS "${URL}/" 2>/dev/null | sha256sum | cut -d' ' -f1)
-          local_hash=$(sha256sum index.html | cut -d' ' -f1)
+          local_hash=$(sha256sum platform/dist/index.html | cut -d' ' -f1)
           if [ "$served" = "$local_hash" ]; then
-            echo "✓ served index.html matches this commit"
+            echo "✓ served / matches this commit's hub build"
           else
-            echo "✗ served index.html (${served}) != repo index.html (${local_hash}) — CDN is serving a stale build"
+            echo "✗ served / (${served}) != built hub index.html (${local_hash}) — CDN is serving a stale build"
             fail=1
           fi
 
-          served_ds=$(curl -sS "${URL}/distributed-systems/" 2>/dev/null | sha256sum | cut -d' ' -f1)
-          local_ds=$(sha256sum distributed-systems/index.html | cut -d' ' -f1)
-          if [ "$served_ds" = "$local_ds" ]; then
-            echo "✓ served distributed-systems/index.html matches this commit"
+          # SPA fallback: a hub deep link serves the same app shell
+          deep=$(curl -sS "${URL}/app" 2>/dev/null | sha256sum | cut -d' ' -f1)
+          if [ "$deep" = "$local_hash" ]; then
+            echo "✓ /app serves the SPA shell (deep-link fallback works)"
           else
-            echo "✗ served distributed-systems/index.html (${served_ds}) != repo copy (${local_ds}) — stale build or directory rewrite broken"
+            echo "✗ /app did not serve the SPA shell — CloudFront SPA rewrite broken"
             fail=1
           fi
+
+          # each course serves its own index.html
+          for pair in "js-concurrency" "distributed-systems"; do
+            served_c=$(curl -sS "${URL}/${pair}/" 2>/dev/null | sha256sum | cut -d' ' -f1)
+            local_c=$(sha256sum "${pair}/index.html" | cut -d' ' -f1)
+            if [ "$served_c" = "$local_c" ]; then
+              echo "✓ served ${pair}/index.html matches this commit"
+            else
+              echo "✗ served ${pair}/index.html (${served_c}) != repo copy (${local_c}) — stale build or directory rewrite broken"
+              fail=1
+            fi
+          done
 
           exit $fail
 

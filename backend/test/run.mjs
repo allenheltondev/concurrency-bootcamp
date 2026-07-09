@@ -88,6 +88,21 @@ const doInvoke = (method, path, raw, extraHeaders) => {
     isBase64Encoded: false
   }, lambdaCtx);
 };
+
+// The public catalog routes (template.yaml, Auth: Authorizer: NONE) are
+// invoked by API Gateway with NO authorizer block at all — unlike every
+// other test above, which always carries one. This confirms the handler
+// doesn't assume requestContext.authorizer exists for those routes.
+const invokeNoAuthorizer = (method, path) => handler({
+  version: "2.0",
+  routeKey: "ANY /api/{proxy+}",
+  rawPath: path,
+  rawQueryString: "",
+  headers: { "content-type": "application/json" },
+  requestContext: { requestId: "req-1", apiId: "api", http: { method, path } },
+  body: undefined,
+  isBase64Encoded: false
+}, lambdaCtx);
 const parse = (r) => (r.body ? JSON.parse(r.body) : null);
 const putBody = (detail, version) => ({ detail, ...(version !== undefined && { version }) });
 
@@ -106,6 +121,16 @@ r = await invoke("GET", "/api/courses/unknown-course");
 check("unknown course 404", r.statusCode === 404);
 r = await invoke("GET", "/api/badges");
 check("badge catalog lists 5", parse(r).badges.length === 5);
+
+// ---- public catalog routes must not 500 when API GW omits the authorizer
+// (template.yaml's Auth: Authorizer: NONE means it always will) ----
+r = await invokeNoAuthorizer("GET", "/api/courses");
+check("public /courses works with no authorizer block", r.statusCode === 200 && parse(r).courses.length === 1, r.body);
+r = await invokeNoAuthorizer("GET", "/api/courses/js-concurrency");
+check("public /courses/:id works with no authorizer block", r.statusCode === 200 && parse(r).totalItems === 4, r.body);
+r = await invokeNoAuthorizer("GET", "/api/badges");
+check("public /badges works with no authorizer block", r.statusCode === 200 && parse(r).badges.length === 5, r.body);
+
 r = await invoke("GET", "/api/nope");
 check("unknown route 404", r.statusCode === 404);
 check("route miss logged as warn", lastLogs().includes('"no route matched"') && lastLogs().includes('"/api/nope"'), lastLogs().slice(0, 400));

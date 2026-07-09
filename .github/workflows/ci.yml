@@ -41,16 +41,19 @@ jobs:
         run: sam validate --lint --region us-east-1
 
       - name: Check JavaScript syntax
-        # App scripts live in js/ (engine, core, content, packs) plus each
-        # course directory, the standalone files (worker, Node reference,
-        # service workers) and the backend Lambda handlers. Parse them all so
-        # a typo can't ship a broken page, worker, cache, or API route.
+        # App scripts live in js/ (now just the shared engine + account
+        # layer) plus each course directory (js-concurrency/,
+        # distributed-systems/), the standalone files (worker, Node
+        # reference, service workers) and the backend Lambda handlers. Parse
+        # them all so a typo can't ship a broken page, worker, cache, or API
+        # route.
         run: |
-          node --check worker.js
-          node --check workers-atomics.js
+          node --check js-concurrency/worker.js
+          node --check js-concurrency/workers-atomics.js
           node --check sw.js
+          node --check js-concurrency/sw.js
           node --check distributed-systems/sw.js
-          for f in js/*.js js/packs/*.js distributed-systems/js/*.js distributed-systems/js/packs/*.js backend/src/*.mjs backend/src/*/*.mjs; do
+          for f in js/*.js js-concurrency/js/*.js js-concurrency/js/packs/*.js distributed-systems/js/*.js distributed-systems/js/packs/*.js backend/src/*.mjs backend/src/*/*.mjs; do
             [ -e "$f" ] || continue
             node --check "$f"
           done
@@ -60,7 +63,7 @@ jobs:
         # Executes every write-it exercise's reference solution against its
         # own sandbox tests and runs every drill demo — a broken exercise or
         # a content pack with failing assertions cannot merge.
-        run: node tools/validate-content.mjs
+        run: node tools/validate-content.mjs --root js-concurrency
 
       - name: Validate content (distributed-systems)
         run: node tools/validate-content.mjs --root distributed-systems
@@ -75,6 +78,23 @@ jobs:
         # checks ids/criteria/course references, and computes totalItems from
         # the real app content — a bad catalog entry cannot merge.
         run: node backend/tools/seed-catalog.mjs ci-dry-run > /dev/null
+
+      - name: Install platform dependencies
+        run: npm ci
+        working-directory: platform
+
+      - name: Lint the platform app
+        run: npm run lint
+        working-directory: platform
+
+      - name: Test the platform app
+        run: npm test
+        working-directory: platform
+
+      - name: Build the platform app
+        # tsc --noEmit + vite build — a type error or broken import cannot merge.
+        run: npm run build
+        working-directory: platform
 
       - name: Install backend dependencies
         run: npm ci
@@ -97,22 +117,26 @@ jobs:
         # Stages practice/solutions/*.mjs over the skeleton slots and runs
         # every practice/*.test.mjs suite, so an edit that breaks a test or
         # its reference solution (or orphans either one) cannot merge.
-        run: node tools/test-solutions.mjs
+        run: node tools/test-solutions.mjs --root js-concurrency
 
       - name: Run distributed-systems practice pack tests
         run: node tools/test-solutions.mjs --root distributed-systems
 
       - name: Check service workers precache every app script
         # A js/ file missing from a SHELL list breaks that course offline.
+        # The root sw.js is now a kill-switch (no SHELL) so it's excluded here.
         run: |
           node -e '
             const fs = require("fs");
-            const sw = fs.readFileSync("sw.js", "utf8");
-            const files = ["js/core.js", "js/content.js", "js/sim.js", "js/app.js",
-              ...(fs.existsSync("js/packs") ? fs.readdirSync("js/packs").filter(f => f.endsWith(".js")).map(f => "js/packs/" + f) : [])];
+            const sw = fs.readFileSync("js-concurrency/sw.js", "utf8");
+            const dir = "js-concurrency/js";
+            const files = ["js/core.js", "js/content.js", "js/sim.js",
+              ...(fs.existsSync(dir + "/packs") ? fs.readdirSync(dir + "/packs").filter(f => f.endsWith(".js")).map(f => "js/packs/" + f) : [])];
             const missing = files.filter(f => !sw.includes("./" + f));
-            if (missing.length) { console.error("sw.js SHELL is missing: " + missing.join(", ")); process.exit(1); }
-            console.log("sw.js precaches all " + files.length + " app scripts");
+            if (!sw.includes("../js/app.js")) missing.push("../js/app.js (shared engine)");
+            if (!sw.includes("../js/account.js")) missing.push("../js/account.js (account layer)");
+            if (missing.length) { console.error("js-concurrency/sw.js SHELL is missing: " + missing.join(", ")); process.exit(1); }
+            console.log("js-concurrency/sw.js precaches all " + (files.length + 2) + " app scripts");
           '
           node -e '
             const fs = require("fs");
@@ -122,6 +146,7 @@ jobs:
               ...(fs.existsSync(dir + "/packs") ? fs.readdirSync(dir + "/packs").filter(f => f.endsWith(".js")).map(f => "js/packs/" + f) : [])];
             const missing = files.filter(f => !sw.includes("./" + f));
             if (!sw.includes("../js/app.js")) missing.push("../js/app.js (shared engine)");
+            if (!sw.includes("../js/account.js")) missing.push("../js/account.js (account layer)");
             if (missing.length) { console.error("distributed-systems/sw.js SHELL is missing: " + missing.join(", ")); process.exit(1); }
-            console.log("distributed-systems/sw.js precaches all " + (files.length + 1) + " app scripts");
+            console.log("distributed-systems/sw.js precaches all " + (files.length + 2) + " app scripts");
           '

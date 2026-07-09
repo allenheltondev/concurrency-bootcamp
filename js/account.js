@@ -658,10 +658,13 @@ const CloudAccount = (() => {
     s.innerHTML = stats
       ? `<span><b>${stats.xp}</b> xp</span><span><b>${stats.currentStreak}</b>d streak</span>`
       : "syncing…";
+    const prof = document.createElement("a");
+    prof.className = "acctbtn"; prof.href = "/app/profile"; prof.textContent = "view profile";
+    prof.style.cssText = "display:block;text-align:center;text-decoration:none;margin-bottom:.45rem";
     const out = document.createElement("button");
     out.className = "acctbtn"; out.type = "button"; out.textContent = "sign out";
     out.addEventListener("click", () => { menu.hidden = true; signOut(); });
-    menu.append(w, s, out);
+    menu.append(w, s, prof, out);
   }
 
   async function openMenu() {

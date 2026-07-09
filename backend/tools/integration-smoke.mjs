@@ -69,9 +69,20 @@ const api = async (method, path, { token, body } = {}) => {
   return { status: res.status, json, text };
 };
 
-// ---- auth boundary: no token must be rejected before any handler runs ----
+// ---- auth boundary: no token must be rejected before any handler runs,
+// except the public catalog routes (docs/PLATFORM_PLAN.md P1) which must
+// stay open for the signed-out hub ----
 let r = await api("GET", "/health");
 check("unauthenticated /health -> 401", r.status === 401, `${r.status} ${r.text.slice(0, 120)}`);
+
+r = await api("GET", "/courses");
+check("unauthenticated /courses -> 200 with courses array", r.status === 200 && Array.isArray(r.json?.courses), `${r.status} ${r.text.slice(0, 200)}`);
+
+r = await api("GET", "/badges");
+check("unauthenticated /badges -> 200 with non-empty badges array", r.status === 200 && r.json?.badges?.length > 0, `${r.status} ${r.text.slice(0, 200)}`);
+
+r = await api("GET", "/me");
+check("unauthenticated /me -> 401 (user-scoped routes stay locked)", r.status === 401, `${r.status} ${r.text.slice(0, 120)}`);
 
 const token = await signIn();
 

@@ -1,55 +1,30 @@
-/* Concurrency Bootcamp service worker — offline-first app shell.
-   Bump CACHE on every content change so clients pick up the new build. */
-const CACHE = "cbootcamp-v9";
-const SHELL = [
-  "./", "./index.html", "./worker.js", "./manifest.webmanifest", "./icon.svg",
-  "./js/core.js", "./js/content.js", "./js/sim.js", "./js/app.js", "./js/account.js",
-  "./js/packs/foundations.js",
-  "./js/packs/ordered-merge.js",
-  "./js/packs/async-iterators.js",
-  "./js/packs/cancellation.js",
-  "./js/packs/node-loop.js",
-  "./js/packs/temporal-map.js",
-];
+/* Root kill-switch service worker.
+   The JS Concurrency Bootcamp that used to live at "/" relocated to
+   "/js-concurrency/" (see docs/PLATFORM_PLAN.md "URL strategy" and
+   docs/COURSE_PATTERN.md) so the root URL is free for the React hub.
+   Any browser that already installed the old root-scoped course worker
+   would otherwise keep serving the cached course app at "/" forever —
+   this file replaces it (same filename, still deployed with
+   Cache-Control: max-age=0 so installed clients fetch it promptly),
+   deletes every old course cache, unregisters itself, and hands control
+   back to the network so the hub's real index.html loads.
+   This file must stay deployed at the root indefinitely — there is no
+   way to reach clients that never revisit "/" otherwise. */
 
-// Precache the shell so the app opens with no network.
 self.addEventListener("install", (e) => {
-  e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())
-  );
+  e.waitUntil(self.skipWaiting());
 });
 
-// Drop old caches, take control of open pages immediately.
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(
+        keys.filter((k) => k.startsWith("cbootcamp")).map((k) => caches.delete(k))
+      ))
+      .then(() => self.registration.unregister())
       .then(() => self.clients.claim())
   );
 });
 
-// Stale-while-revalidate: serve from cache instantly, refresh in the background.
-// Caching the real network Response preserves CloudFront's COOP/COEP headers,
-// so cross-origin isolation (SharedArrayBuffer in the workers module) survives offline.
-self.addEventListener("fetch", (e) => {
-  const req = e.request;
-  const url = new URL(req.url);
-  if (req.method !== "GET" || url.origin !== self.location.origin) return;
-  // Never touch the API or the auth config: a stale progress response (or an
-  // index.html offline fallback served as "JSON") would corrupt cloud sync.
-  if (url.pathname.startsWith("/api/") || url.pathname.endsWith("/auth-config.json")) return;
-  e.respondWith(
-    caches.match(req).then((cached) => {
-      const network = fetch(req)
-        .then((res) => {
-          if (res && res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-          }
-          return res;
-        })
-        .catch(() => cached || caches.match("./index.html"));
-      return cached || network;
-    })
-  );
-});
+// No fetch handler: once activated (and unregistered), this worker stops
+// intercepting requests entirely — everything falls through to the network.

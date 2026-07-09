@@ -10,8 +10,9 @@ runnable Node tests.
 
 This document is the extraction. Follow it top to bottom and you get a new
 course that looks, animates, grades, and validates exactly like the original.
-The reference implementation of the pattern is the repo-root course; the first
-reproduction is `distributed-systems/`.
+The reference implementation of the pattern is `js-concurrency/` (the original
+course, relocated from the repo root — see docs/PLATFORM_PLAN.md "URL
+strategy"); the first reproduction is `distributed-systems/`.
 
 ---
 
@@ -37,10 +38,10 @@ reproduction is `distributed-systems/`.
 | `practice/` | Blank-file skeletons + tests + `solutions/` + `_harness.mjs`. |
 | `sw.js`, `manifest.webmanifest`, `icon.svg` | PWA shell (per-course cache name, scope, icon). |
 
-The **root course** keeps its files at the repo root (deployed URLs must not
-change). Every **new course** lives in its own directory (e.g.
-`distributed-systems/`) with the same internal layout, and loads the shared
-engine with `<script src="../js/app.js">`.
+The shared engine (`js/app.js`, `js/account.js`) stays at the repo root. Every
+course — `js-concurrency/` (the original) included — lives in its own sibling
+directory (e.g. `distributed-systems/`) with the same internal layout, and
+loads the shared engine with `<script src="../js/app.js">`.
 
 ## 2. The engine contract
 
@@ -105,7 +106,7 @@ stays completely dormant unless `/auth-config.json` exists at the site root
 gets accounts + cloud sync by including the script tag and adding
 `../js/account.js` to its `sw.js` SHELL — nothing else.
 
-A pack that **prepends** lessons (like the root course's `foundations.js`)
+A pack that **prepends** lessons (like `js-concurrency/js/packs/foundations.js`)
 must load before every other pack and must renumber lesson `eb`s and shift
 `DRILL_LESSON` values, `LESSON_PRACTICE` keys, and `MODULES[].conceptLesson`.
 Packs that **append** number themselves off `LESSONS.length` and need no

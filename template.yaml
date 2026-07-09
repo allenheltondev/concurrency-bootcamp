@@ -111,10 +111,23 @@ Resources:
         function handler(event) {
           var request = event.request;
           var uri = request.uri;
-          if (uri.endsWith('/')) {
-            request.uri = uri + 'index.html';
-          } else if (!uri.split('/').pop().includes('.')) {
-            request.uri = uri + '/index.html';
+          // Course apps are static directories: classic directory-index
+          // rewrites so /js-concurrency/ and extensionless course paths
+          // serve their own index.html.
+          if (uri.startsWith('/js-concurrency') || uri.startsWith('/distributed-systems')) {
+            if (uri.endsWith('/')) {
+              request.uri = uri + 'index.html';
+            } else if (!uri.split('/').pop().includes('.')) {
+              request.uri = uri + '/index.html';
+            }
+            return request;
+          }
+          // Everything else is the platform SPA (the hub at the root —
+          // docs/PLATFORM_PLAN.md): any non-file path serves the app shell
+          // so client routes like /profile deep-link. /api/* never reaches
+          // this function (it rides its own cache behavior).
+          if (!uri.split('/').pop().includes('.')) {
+            request.uri = '/index.html';
           }
           return request;
         }
@@ -344,6 +357,40 @@ Resources:
             ApiId: !Ref HttpApi
             Method: ANY
             Path: /api/{proxy+}
+        # ---- Public catalog (docs/PLATFORM_PLAN.md, "Backend prerequisite: a
+        # public catalog"): the hub renders courses/badges for signed-out
+        # visitors, so these three GETs override the HttpApi's
+        # DefaultAuthorizer with NONE. API Gateway matches the most specific
+        # route, so these explicit paths win over the ANY /api/{proxy+}
+        # catch-all above and skip the JWT authorizer just for these reads —
+        # every other path, including everything under /api/me, still falls
+        # through to {proxy+} and stays authenticated. The routes themselves
+        # never read caller identity (see catalog-routes.mjs), so there's
+        # nothing user-scoped to protect here anyway. ----
+        PublicCourses:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /api/courses
+            Auth:
+              Authorizer: NONE
+        PublicCourseById:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /api/courses/{courseId}
+            Auth:
+              Authorizer: NONE
+        PublicBadges:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /api/badges
+            Auth:
+              Authorizer: NONE
 
   # ---- Explicit log group: without this, Lambda auto-creates one that
   # retains logs forever. ----

@@ -4,7 +4,10 @@ A mobile-first, dependency-free web app for learning and practicing JavaScript
 concurrency — and, since the course engine was extracted into a reusable
 pattern, the home of more than one course:
 
-- **`/`** — the original **JavaScript Concurrency Bootcamp** (this README).
+- **`/js-concurrency/`** — the original **JavaScript Concurrency Bootcamp**
+  (this README), relocated from the repo root so the root URL can become the
+  React hub (see `docs/PLATFORM_PLAN.md` "URL strategy"). Progress survives
+  the move untouched — localStorage is origin-scoped, not path-scoped.
 - **`/distributed-systems/`** — the **Distributed Systems Bootcamp**: the same
   styles, animations, drills, sandboxed write-it grading, test mode, and
   practice pack, applied to clocks, quorums, consensus, delivery guarantees,
@@ -13,8 +16,10 @@ pattern, the home of more than one course:
   contract, content schemas, animation conventions, and the checklist for
   reproducing the whole format as a new course.
 
-Both courses share one engine (`js/app.js`); everything below describes the
-original course. It opens with an illustrated **Lessons** primer (36 stepped
+Both courses share one engine (`js/app.js`), still served from the repo root;
+everything below describes the JS Concurrency course, which now lives in
+`js-concurrency/` as a sibling of `distributed-systems/` rather than at the
+site root. It opens with an illustrated **Lessons** primer (36 stepped
 chapters with animated HTML/CSS diagrams — tap ▶ replay to watch each sequence
 step through — one animated lesson for **every** concept the drills test),
 starting with a four-lesson **foundations** prerequisite that answers the
@@ -82,13 +87,13 @@ when you get it right. Throughout the drills and quiz, the answer choices are
 permuted on every load, so nothing can be solved by "it's usually the first
 option."
 
-Finally, `practice/` takes it off the phone and into your editor: thirteen
-blank-file pattern skeletons (the write-it patterns plus the ordered merge,
-reorder buffer, abortable semaphore, throttle, and `Promise.any`) with
-runnable Node tests and reference solutions —
-`node practice/mutex.test.mjs`, implement until green, diff against the
-solution, redo from blank tomorrow. That rep protocol is the interview
-transfer layer; the app is the warm-up and review loop around it.
+Finally, `js-concurrency/practice/` takes it off the phone and into your
+editor: thirteen blank-file pattern skeletons (the write-it patterns plus the
+ordered merge, reorder buffer, abortable semaphore, throttle, and
+`Promise.any`) with runnable Node tests and reference solutions —
+`node js-concurrency/practice/mutex.test.mjs`, implement until green, diff
+against the solution, redo from blank tomorrow. That rep protocol is the
+interview transfer layer; the app is the warm-up and review loop around it.
 
 Drill and quiz modules step one card at a time (prev · n/total · next) for
 one-handed mobile use; every tapped answer — right or wrong — explains itself.
@@ -102,22 +107,24 @@ and earns badges, but signed-out users get the complete experience forever.
 
 | File            | What it is                                                                 |
 | --------------- | ------------------------------------------------------------------------- |
-| `index.html`        | Markup + all CSS; loads the scripts below. No build step.              |
-| `js/core.js`        | Helpers, reference implementations, and the demo runners.              |
-| `js/content.js`     | All authored content: course config, lessons, drills, cards, bugs, write-it. |
-| `js/sim.js`         | This course's workers/atomics module (registered via `MODULES[].renderFn`). |
-| `js/packs/*.js`     | Content packs — self-contained additions loaded before the app boots.  |
-| `js/app.js`         | The **shared, course-agnostic engine**: state, persistence, rendering, the write-it sandbox, test mode. Also loaded by `distributed-systems/`. |
-| `js/account.js`     | Optional, shared sign-in + cloud progress sync: fully custom in-app auth screens (sign up, verify, forgot password) against the shared Cognito pool, plus the `/api` sync layer. Dormant unless the deploy publishes `/auth-config.json`; signed-out users keep the exact localStorage-only experience. |
+| `js-concurrency/index.html`        | Markup + all CSS; loads the scripts below. No build step.  |
+| `js-concurrency/js/core.js`        | Helpers, reference implementations, and the demo runners.  |
+| `js-concurrency/js/content.js`     | All authored content: course config, lessons, drills, cards, bugs, write-it. |
+| `js-concurrency/js/sim.js`         | This course's workers/atomics module (registered via `MODULES[].renderFn`). |
+| `js-concurrency/js/packs/*.js`     | Content packs — self-contained additions loaded before the app boots.  |
+| `js/app.js`         | The **shared, course-agnostic engine**: state, persistence, rendering, the write-it sandbox, test mode. Stays at the repo root; loaded by both `js-concurrency/` and `distributed-systems/` as `../js/app.js`. |
+| `js/account.js`     | Optional, shared sign-in + cloud progress sync: fully custom in-app auth screens (sign up, verify, forgot password) against the shared Cognito pool, plus the `/api` sync layer. Dormant unless the deploy publishes `/auth-config.json`; signed-out users keep the exact localStorage-only experience. Also stays at the repo root, loaded as `../js/account.js`. |
+| `js-concurrency/`   | This course's directory — relocated from the repo root; see the note at the top of this README. |
 | `distributed-systems/` | A second course built from the same pattern — see `docs/COURSE_PATTERN.md`. |
-| `practice/`         | Blank-file pattern reps with runnable Node tests (see above).          |
+| `js-concurrency/practice/` | Blank-file pattern reps with runnable Node tests (see above).   |
 | `tools/validate-content.mjs` | Executes every exercise's reference against its own tests; runs in CI. |
 | `tools/test-solutions.mjs` | Runs every `practice/*.test.mjs` suite against its reference solution; runs in CI. |
-| `worker.js`         | Same-origin Web Worker for the real SharedArrayBuffer data race.       |
-| `sw.js`             | Service worker — precaches the app shell so it runs fully offline.     |
-| `manifest.webmanifest`| Web app manifest — makes the site installable to a home screen.      |
-| `icon.svg`          | App / home-screen icon (the event loop, with ordered + racing tasks). |
-| `workers-atomics.js`| Node (`worker_threads`) logic reference — run it to see the race.      |
+| `js-concurrency/worker.js`  | Same-origin Web Worker for the real SharedArrayBuffer data race. |
+| `js-concurrency/sw.js`      | Service worker — precaches this course's app shell so it runs fully offline. |
+| `js-concurrency/manifest.webmanifest`| Web app manifest — makes the course installable to a home screen. |
+| `js-concurrency/icon.svg`   | App / home-screen icon (the event loop, with ordered + racing tasks). |
+| `js-concurrency/workers-atomics.js`| Node (`worker_threads`) logic reference — run it to see the race. |
+| `sw.js`             | **Root kill-switch** service worker: no app shell, no fetch handler. It exists only so browsers that installed the old root-scoped course worker fetch this file, delete their old `cbootcamp*` caches, and unregister — freeing the root scope for the hub. Must stay deployed at the root indefinitely. |
 | `template.yaml`     | SAM/CloudFormation: S3 + CloudFront + OAC + COOP/COEP + ACM + Route53, plus an off-by-default backend (Cognito-authorized API + DynamoDB) that stays dark until a user pool id is configured — see `docs/BACKEND_PLAN.md`. |
 | `backend/`          | The (dark, in-progress) backend API: a single Lambda "lambdalith" routed by the Powertools event handler, plus catalogs, seeder, and tests. The live app doesn't call it yet. |
 
@@ -130,14 +137,14 @@ if you're signed in). Signing in is optional: localStorage stays the source of
 truth, and the account layer (`js/account.js`) mirrors it to the backend —
 debounced pushes, merge-on-conflict, cross-device and cross-course.
 
-The app is an installable PWA. A service worker (`sw.js`) precaches the app shell on
-first visit, so after that it loads instantly and works with **no network** — open
-it on a flight or a subway. It uses stale-while-revalidate, so it's offline-first but
-still pulls the latest build in the background when you're online; caching the real
-CDN responses preserves the COOP/COEP headers, so the workers/atomics module keeps
-its cross-origin isolation even offline. The service worker needs a secure context
-(HTTPS or `localhost`); opening `index.html` from `file://` skips it (the app still
-runs, just without offline caching).
+The app is an installable PWA. A service worker (`js-concurrency/sw.js`) precaches
+the app shell on first visit, so after that it loads instantly and works with **no
+network** — open it on a flight or a subway. It uses stale-while-revalidate, so it's
+offline-first but still pulls the latest build in the background when you're online;
+caching the real CDN responses preserves the COOP/COEP headers, so the
+workers/atomics module keeps its cross-origin isolation even offline. The service
+worker needs a secure context (HTTPS or `localhost`); opening `index.html` from
+`file://` skips it (the app still runs, just without offline caching).
 
 ## The cross-origin-isolation unlock
 
@@ -155,8 +162,8 @@ Cross-Origin-Embedder-Policy: require-corp
 
 S3 object metadata can't set these, so they come from a CloudFront **Response
 Headers Policy** (`IsolationHeadersPolicy` in `template.yaml`). The app has zero
-cross-origin resources, so COEP `require-corp` is painless — `worker.js` is
-same-origin and needs no CORP header.
+cross-origin resources, so COEP `require-corp` is painless — `js-concurrency/worker.js`
+is same-origin and needs no CORP header.
 
 If isolation is unavailable (e.g. opening `index.html` from `file://`), the module
 **falls back** to a stepwise interleaving simulation and shows a note — the page
@@ -178,7 +185,9 @@ workflow — it's the single source of truth for what ships.
 
 ### Architecture
 
-- **S3** bucket, Block Public Access on, no ACLs — holds `index.html` + `worker.js`.
+- **S3** bucket, Block Public Access on, no ACLs — holds every course directory
+  (`js-concurrency/`, `distributed-systems/`) plus the shared `js/app.js` +
+  `js/account.js` and the root kill-switch `sw.js`.
 - **CloudFront** with Origin Access Control (bucket stays private), HTTPS
   redirect, `DefaultRootObject: index.html`, HTTP/2+3.
 - **Response Headers Policy** adds COOP/COEP on every response.
@@ -187,7 +196,9 @@ workflow — it's the single source of truth for what ships.
 
 ## Local development
 
-Open `index.html` directly, or serve the folder. A plain static server is **not**
+Serve the repo root (so `js-concurrency/`'s relative `../js/app.js` and
+`../js/account.js` requests resolve), then open
+`http://localhost:8080/js-concurrency/`. A plain static server is **not**
 cross-origin isolated, so the workers module uses the simulation fallback locally.
 To exercise the real threaded path locally, serve with the two isolation headers,
 e.g.:
@@ -198,10 +209,11 @@ npx http-server -p 8080 \
   --header "Cross-Origin-Embedder-Policy: require-corp"
 ```
 
-(then open http://localhost:8080 — `crossOriginIsolated` should be `true`).
+(then open http://localhost:8080/js-concurrency/ — `crossOriginIsolated` should be
+`true`).
 
 To see the race on the command line (no browser needed):
 
 ```bash
-node workers-atomics.js 4 5   # 4 threads, 5,000,000 increments each
+node js-concurrency/workers-atomics.js 4 5   # 4 threads, 5,000,000 increments each
 ```
