@@ -65,6 +65,11 @@ jobs:
       - name: Validate content (distributed-systems)
         run: node tools/validate-content.mjs --root distributed-systems
 
+      - name: Validate the account layer
+        # Loads js/account.js in a bare VM (proving it stays dormant without
+        # a DOM) and exercises the sync merge rules multi-device depends on.
+        run: node tools/validate-account.mjs
+
       - name: Validate backend catalogs
         # Dry run of the deploy-time seeder: parses backend/data/*.json,
         # checks ids/criteria/course references, and computes totalItems from

@@ -94,7 +94,16 @@ position, not score. Every solvable id must be globally unique.
 <script src="js/sim.js"></script>       <!-- optional custom module(s) -->
 <script src="js/packs/....js"></script> <!-- packs, in dependency order -->
 <script src="../js/app.js"></script>    <!-- the shared engine, ALWAYS last -->
+<script src="../js/account.js"></script><!-- optional sign-in + cloud sync -->
 ```
+
+`../js/account.js` is shared like the engine: it reads `COURSE.id` /
+`COURSE.storagePrefix` for its API calls and storage keys, listens for the
+engine's `course:progress-changed` / `course:progress-reset` events, and
+stays completely dormant unless `/auth-config.json` exists at the site root
+(published by the deploy pipeline once the backend is enabled). A new course
+gets accounts + cloud sync by including the script tag and adding
+`../js/account.js` to its `sw.js` SHELL — nothing else.
 
 A pack that **prepends** lessons (like the root course's `foundations.js`)
 must load before every other pack and must renumber lesson `eb`s and shift
@@ -286,8 +295,10 @@ ships).
 ## 9. Reproduction checklist
 
 1. `mkdir <course>/` → copy `index.html` (rebrand: title, meta, header brand,
-   tagline, progress label), `manifest.webmanifest` (name/scope/start_url),
-   `icon.svg`, `sw.js` (new cache name + SHELL).
+   tagline, progress label; keep the `../js/account.js` script tag),
+   `manifest.webmanifest` (name/scope/start_url), `icon.svg`, `sw.js` (new
+   cache name + SHELL including `../js/account.js`; keep the `/api/` +
+   `auth-config.json` fetch bypass).
 2. Write `js/core.js`: helpers + reference implementations + one `demo*()` per
    drill, every demo returning `{lines, pass:true, verdict}`.
 3. Write `js/content.js`: `COURSE`, `MODULES` (with per-module copy), `QUIZ`,

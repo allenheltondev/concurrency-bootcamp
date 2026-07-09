@@ -93,8 +93,10 @@ transfer layer; the app is the warm-up and review loop around it.
 Drill and quiz modules step one card at a time (prev · n/total · next) for
 one-handed mobile use; every tapped answer — right or wrong — explains itself.
 
-Everything is tap-driven so it works one-handed on a phone. No accounts, no
-backend, no third-party scripts, no tracking.
+Everything is tap-driven so it works one-handed on a phone. No third-party
+scripts, no tracking, and no account required — an **optional** sign-in
+(shared Ready, Set, Cloud account) syncs progress across devices and courses
+and earns badges, but signed-out users get the complete experience forever.
 
 ## Files
 
@@ -106,6 +108,7 @@ backend, no third-party scripts, no tracking.
 | `js/sim.js`         | This course's workers/atomics module (registered via `MODULES[].renderFn`). |
 | `js/packs/*.js`     | Content packs — self-contained additions loaded before the app boots.  |
 | `js/app.js`         | The **shared, course-agnostic engine**: state, persistence, rendering, the write-it sandbox, test mode. Also loaded by `distributed-systems/`. |
+| `js/account.js`     | Optional, shared sign-in + cloud progress sync (Cognito Hosted UI + the `/api` backend). Dormant unless the deploy publishes `/auth-config.json`; signed-out users keep the exact localStorage-only experience. |
 | `distributed-systems/` | A second course built from the same pattern — see `docs/COURSE_PATTERN.md`. |
 | `practice/`         | Blank-file pattern reps with runnable Node tests (see above).          |
 | `tools/validate-content.mjs` | Executes every exercise's reference against its own tests; runs in CI. |
@@ -122,7 +125,10 @@ backend, no third-party scripts, no tracking.
 
 Progress is saved to `localStorage` — solved drills, answered quiz questions, and
 your place in every module (lessons, quizzes, drills) — so you resume exactly where
-you left off. **Reset progress** in the footer clears it all. No accounts, no sync.
+you left off. **Reset progress** in the footer clears it all (and the cloud copy,
+if you're signed in). Signing in is optional: localStorage stays the source of
+truth, and the account layer (`js/account.js`) mirrors it to the backend —
+debounced pushes, merge-on-conflict, cross-device and cross-course.
 
 The app is an installable PWA. A service worker (`sw.js`) precaches the app shell on
 first visit, so after that it loads instantly and works with **no network** — open
