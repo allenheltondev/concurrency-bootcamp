@@ -54,11 +54,17 @@ catalog data only — nothing user-scoped — and CloudFront's `CachingDisabled`
 on `/api/*` can graduate to a short-TTL cache policy for these paths later
 if traffic ever warrants it. Everything under `/api/me` stays authenticated.
 
-## URL strategy (decided ✅)
+## URL strategy (decided ✅, amended)
 
-**The hub takes the root URL** — the site's home page, where you pick a
-course — **and the JS concurrency course relocates to `/js-concurrency/`**:
-one deliberate migration, done once.
+**The root URL is a public marketing site** — the goodwill ethos (free
+forever, no tracking), who the courses are for, the differentiators, and
+the course catalog with direct start links (no account needed). **The
+signed-in experience is gated at `/app`** (the dashboard hub) **and
+`/app/profile`**; auth screens stay public at `/login` etc. The gate is
+UX-level — the SPA shell is public bytes, and the actual data is enforced
+by the API's JWT authorizer as always. Courses remain fully public.
+**The JS concurrency course relocated to `/js-concurrency/`** as part of
+freeing the root: one deliberate migration, done once.
 `/distributed-systems/` already proves the subdirectory-course pattern; the
 relocation makes the root course a peer rather than a special case, and
 `bootcamp.readysetcloud.io` becomes the platform's front door.

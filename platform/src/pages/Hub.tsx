@@ -1,42 +1,12 @@
-/* The hub — the site's front door at the root URL: every course as a card,
-   with the visitor's own progress woven in when signed in. Fully public;
-   the catalog comes from the (unauthenticated) API and falls back to a
-   static list when the backend is dark or unreachable, so the page renders
-   in every deployment mode. */
+/* The hub — the signed-in dashboard at /app: every course as a card with
+   the member's progress woven in. Sits behind RequireAuth; the public
+   front door is the marketing page at the root. */
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { get, getPublic, type CatalogCourse, type CourseCatalogResponse, type MyCourse, type MyCoursesResponse } from "../lib/api";
+import { get, type MyCourse, type MyCoursesResponse } from "../lib/api";
+import { TAGLINES, useCatalog } from "../lib/catalog";
 import { courseHref } from "../lib/courses";
-
-/* Mirrors backend/data/courses.json — the render-something-immediately (and
-   backend-dark) fallback. The taglines are course branding, not catalog
-   data, so they live here either way. */
-const FALLBACK_COURSES: CatalogCourse[] = [
-  {
-    id: "js-concurrency",
-    title: "JavaScript Concurrency Bootcamp",
-    description:
-      "Learn and practice JavaScript concurrency from the event loop up: animated lessons, tap-driven drills for every primitive, spot-the-bug and write-it modules, durable-execution hazards, and a scored test mode.",
-    status: "active",
-    totalItems: 0,
-    contentVersion: 0
-  },
-  {
-    id: "distributed-systems",
-    title: "Distributed Systems Bootcamp",
-    description:
-      "Learn and practice distributed systems from the unreliable network up: animated lessons on clocks, quorums, consensus, and delivery guarantees; tap-driven drills that run a simulated cluster; spot-the-bug and write-it modules; and a scored test mode.",
-    status: "active",
-    totalItems: 0,
-    contentVersion: 0
-  }
-];
-
-const TAGLINES: Record<string, string> = {
-  "js-concurrency": "single thread, many turns",
-  "distributed-systems": "many nodes, no shared clock"
-};
 
 function ProgressStrip({ progress }: { progress: MyCourse }) {
   return (
@@ -64,19 +34,9 @@ function ProgressStrip({ progress }: { progress: MyCourse }) {
 }
 
 export default function Hub() {
-  const { signedIn, user, configured } = useAuth();
-  const [courses, setCourses] = useState<CatalogCourse[]>(FALLBACK_COURSES);
+  const { signedIn, user } = useAuth();
+  const courses = useCatalog();
   const [progress, setProgress] = useState<Record<string, MyCourse>>({});
-
-  useEffect(() => {
-    let live = true;
-    getPublic<CourseCatalogResponse>("/courses")
-      .then((r) => {
-        if (live && r.courses.length) setCourses(r.courses.filter((c) => c.status === "active"));
-      })
-      .catch(() => {}); // dark backend / offline: the fallback list stands
-    return () => { live = false; };
-  }, []);
 
   useEffect(() => {
     if (!signedIn) return; // signed-out progress is derived away at render
@@ -94,27 +54,18 @@ export default function Hub() {
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
       <nav className="mb-12 flex items-center justify-between text-sm">
-        <span className="font-medium uppercase tracking-widest text-primary-600">
+        <Link to="/" className="font-medium uppercase tracking-widest text-primary-600 hover:text-primary-700">
           Ready, Set, Cloud!
-        </span>
-        {configured !== false && (
-          signedIn ? (
-            <Link to="/profile" className="font-medium text-primary-600 hover:text-primary-700">
-              ◉ {firstName ?? "profile"}
-            </Link>
-          ) : (
-            <Link to="/login" className="font-medium text-primary-600 hover:text-primary-700">
-              sign in
-            </Link>
-          )
-        )}
+        </Link>
+        <Link to="/app/profile" className="font-medium text-primary-600 hover:text-primary-700">
+          ◉ {firstName ?? "profile"}
+        </Link>
       </nav>
 
       <header className="mb-10 text-center">
-        <h1 className="text-3xl font-bold text-foreground sm:text-4xl">Courses</h1>
+        <h1 className="text-3xl font-bold text-foreground sm:text-4xl">Your courses</h1>
         <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-          Hands-on, tap-driven bootcamps. Free, offline-friendly, and your
-          progress follows you across devices when you sign in.
+          Pick up where you left off — progress follows you across devices.
         </p>
       </header>
 

@@ -18,7 +18,7 @@ export default function Login() {
   const { signedIn, configured } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from || "/profile";
+  const from = (location.state as { from?: string } | null)?.from || "/app";
 
   const [step, setStep] = useState<Step>({ view: "signin" });
   const [email, setEmail] = useState("");

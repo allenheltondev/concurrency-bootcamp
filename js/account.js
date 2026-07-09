@@ -659,7 +659,7 @@ const CloudAccount = (() => {
       ? `<span><b>${stats.xp}</b> xp</span><span><b>${stats.currentStreak}</b>d streak</span>`
       : "syncing…";
     const prof = document.createElement("a");
-    prof.className = "acctbtn"; prof.href = "/profile"; prof.textContent = "view profile";
+    prof.className = "acctbtn"; prof.href = "/app/profile"; prof.textContent = "view profile";
     prof.style.cssText = "display:block;text-align:center;text-decoration:none;margin-bottom:.45rem";
     const out = document.createElement("button");
     out.className = "acctbtn"; out.type = "button"; out.textContent = "sign out";

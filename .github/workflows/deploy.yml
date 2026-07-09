@@ -299,11 +299,11 @@ jobs:
           fi
 
           # SPA fallback: a hub deep link serves the same app shell
-          deep=$(curl -sS "${URL}/profile" 2>/dev/null | sha256sum | cut -d' ' -f1)
+          deep=$(curl -sS "${URL}/app" 2>/dev/null | sha256sum | cut -d' ' -f1)
           if [ "$deep" = "$local_hash" ]; then
-            echo "✓ /profile serves the SPA shell (deep-link fallback works)"
+            echo "✓ /app serves the SPA shell (deep-link fallback works)"
           else
-            echo "✗ /profile did not serve the hub shell — CloudFront SPA rewrite broken"
+            echo "✗ /app did not serve the SPA shell — CloudFront SPA rewrite broken"
             fail=1
           fi
 
