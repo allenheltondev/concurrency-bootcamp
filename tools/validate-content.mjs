@@ -14,7 +14,10 @@
      - QUIZ:    verifies options/whys parity and answer index.
      - LESSONS / MODULES / cross-links: shape checks, dangling references.
 
-   Usage: node tools/validate-content.mjs
+   Usage: node tools/validate-content.mjs [--root <courseDir>]
+   --root points at a course directory (default: the repo root course).
+   Every course built on the shared engine validates with the same script,
+   e.g.  node tools/validate-content.mjs --root distributed-systems
    Exits non-zero with a report if anything fails. Run it before committing
    any content change or new pack. */
 
@@ -23,7 +26,9 @@ import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 
-const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const rootArg = process.argv.indexOf("--root");
+const root = rootArg !== -1 ? path.resolve(repoRoot, process.argv[rootArg + 1]) : repoRoot;
 const ctx = vm.createContext({
   console, setTimeout, clearTimeout, setInterval, clearInterval,
   queueMicrotask, performance,
@@ -62,7 +67,7 @@ const LESSONS = g("LESSONS"), QUIZ = g("QUIZ"), DRILLS = g("DRILLS"),
   LESSON_PRACTICE = g("LESSON_PRACTICE");
 
 /* ---------- structural checks ---------- */
-const KNOWN_TYPES = ["learn", "lesson", "drills", "sim", "cards", "bugs", "write", "sheet", "test"];
+const KNOWN_TYPES = ["learn", "lesson", "drills", "sim", "cards", "bugs", "write", "sheet", "test", "custom"];
 const ids = new Set();
 for (const m of MODULES) {
   if (!m.id || !m.label || !KNOWN_TYPES.includes(m.type)) err(`MODULES: bad entry ${JSON.stringify(m)}`);
@@ -70,6 +75,10 @@ for (const m of MODULES) {
   ids.add(m.id);
   if (m.type === "sheet" && typeof m.html !== "string") err(`MODULES: sheet ${m.id} missing html`);
   if (m.type === "drills" && !Array.isArray(DRILLS[m.id])) err(`MODULES: drills module ${m.id} has no DRILLS.${m.id} array`);
+  if ((m.type === "sim" || m.type === "custom") && typeof m.renderFn !== "string")
+    err(`MODULES: ${m.type} module ${m.id} needs renderFn (global function name)`);
+  if (m.conceptLesson != null && (!Number.isInteger(m.conceptLesson) || m.conceptLesson < 0 || m.conceptLesson >= LESSONS.length))
+    err(`MODULES: ${m.id} has bad conceptLesson ${m.conceptLesson}`);
 }
 
 for (const [i, l] of LESSONS.entries()) {

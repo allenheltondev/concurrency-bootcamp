@@ -41,25 +41,29 @@ jobs:
         run: sam validate --lint --region us-east-1
 
       - name: Check JavaScript syntax
-        # App scripts live in js/ (core, content, packs, app) plus the
-        # standalone files (worker, Node reference, service worker) and the
-        # backend Lambda handlers. Parse them all so a typo can't ship a
-        # broken page, worker, cache, or API route.
+        # App scripts live in js/ (engine, core, content, packs) plus each
+        # course directory, the standalone files (worker, Node reference,
+        # service workers) and the backend Lambda handlers. Parse them all so
+        # a typo can't ship a broken page, worker, cache, or API route.
         run: |
           node --check worker.js
           node --check workers-atomics.js
           node --check sw.js
-          for f in js/*.js js/packs/*.js backend/src/*.mjs backend/src/*/*.mjs; do
+          node --check distributed-systems/sw.js
+          for f in js/*.js js/packs/*.js distributed-systems/js/*.js distributed-systems/js/packs/*.js backend/src/*.mjs backend/src/*/*.mjs; do
             [ -e "$f" ] || continue
             node --check "$f"
           done
           echo "all app scripts parse OK"
 
-      - name: Validate content
+      - name: Validate content (js-concurrency)
         # Executes every write-it exercise's reference solution against its
         # own sandbox tests and runs every drill demo — a broken exercise or
         # a content pack with failing assertions cannot merge.
         run: node tools/validate-content.mjs
+
+      - name: Validate content (distributed-systems)
+        run: node tools/validate-content.mjs --root distributed-systems
 
       - name: Validate backend catalogs
         # Dry run of the deploy-time seeder: parses backend/data/*.json,
@@ -90,15 +94,29 @@ jobs:
         # its reference solution (or orphans either one) cannot merge.
         run: node tools/test-solutions.mjs
 
-      - name: Check service worker precaches every app script
-        # A js/ file missing from the SHELL list breaks the app offline.
+      - name: Run distributed-systems practice pack tests
+        run: node tools/test-solutions.mjs --root distributed-systems
+
+      - name: Check service workers precache every app script
+        # A js/ file missing from a SHELL list breaks that course offline.
         run: |
           node -e '
             const fs = require("fs");
             const sw = fs.readFileSync("sw.js", "utf8");
-            const files = ["js/core.js", "js/content.js", "js/app.js",
+            const files = ["js/core.js", "js/content.js", "js/sim.js", "js/app.js",
               ...(fs.existsSync("js/packs") ? fs.readdirSync("js/packs").filter(f => f.endsWith(".js")).map(f => "js/packs/" + f) : [])];
             const missing = files.filter(f => !sw.includes("./" + f));
             if (missing.length) { console.error("sw.js SHELL is missing: " + missing.join(", ")); process.exit(1); }
             console.log("sw.js precaches all " + files.length + " app scripts");
+          '
+          node -e '
+            const fs = require("fs");
+            const sw = fs.readFileSync("distributed-systems/sw.js", "utf8");
+            const dir = "distributed-systems/js";
+            const files = ["js/core.js", "js/content.js", "js/sim.js",
+              ...(fs.existsSync(dir + "/packs") ? fs.readdirSync(dir + "/packs").filter(f => f.endsWith(".js")).map(f => "js/packs/" + f) : [])];
+            const missing = files.filter(f => !sw.includes("./" + f));
+            if (!sw.includes("../js/app.js")) missing.push("../js/app.js (shared engine)");
+            if (missing.length) { console.error("distributed-systems/sw.js SHELL is missing: " + missing.join(", ")); process.exit(1); }
+            console.log("distributed-systems/sw.js precaches all " + (files.length + 1) + " app scripts");
           '

@@ -1,7 +1,20 @@
 # Concurrency Bootcamp
 
 A mobile-first, dependency-free web app for learning and practicing JavaScript
-concurrency. It opens with an illustrated **Lessons** primer (36 stepped
+concurrency — and, since the course engine was extracted into a reusable
+pattern, the home of more than one course:
+
+- **`/`** — the original **JavaScript Concurrency Bootcamp** (this README).
+- **`/distributed-systems/`** — the **Distributed Systems Bootcamp**: the same
+  styles, animations, drills, sandboxed write-it grading, test mode, and
+  practice pack, applied to clocks, quorums, consensus, delivery guarantees,
+  and resilience patterns. See `distributed-systems/README.md`.
+- **`docs/COURSE_PATTERN.md`** — the extracted pattern: the shared engine
+  contract, content schemas, animation conventions, and the checklist for
+  reproducing the whole format as a new course.
+
+Both courses share one engine (`js/app.js`); everything below describes the
+original course. It opens with an illustrated **Lessons** primer (36 stepped
 chapters with animated HTML/CSS diagrams — tap ▶ replay to watch each sequence
 step through — one animated lesson for **every** concept the drills test),
 starting with a four-lesson **foundations** prerequisite that answers the
@@ -89,9 +102,11 @@ backend, no third-party scripts, no tracking.
 | --------------- | ------------------------------------------------------------------------- |
 | `index.html`        | Markup + all CSS; loads the scripts below. No build step.              |
 | `js/core.js`        | Helpers, reference implementations, and the demo runners.              |
-| `js/content.js`     | All authored content: lessons, drills, cards, bugs, write-it.          |
+| `js/content.js`     | All authored content: course config, lessons, drills, cards, bugs, write-it. |
+| `js/sim.js`         | This course's workers/atomics module (registered via `MODULES[].renderFn`). |
 | `js/packs/*.js`     | Content packs — self-contained additions loaded before the app boots.  |
-| `js/app.js`         | State, persistence, rendering, the write-it sandbox, test mode.        |
+| `js/app.js`         | The **shared, course-agnostic engine**: state, persistence, rendering, the write-it sandbox, test mode. Also loaded by `distributed-systems/`. |
+| `distributed-systems/` | A second course built from the same pattern — see `docs/COURSE_PATTERN.md`. |
 | `practice/`         | Blank-file pattern reps with runnable Node tests (see above).          |
 | `tools/validate-content.mjs` | Executes every exercise's reference against its own tests; runs in CI. |
 | `tools/test-solutions.mjs` | Runs every `practice/*.test.mjs` suite against its reference solution; runs in CI. |

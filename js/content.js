@@ -8,18 +8,55 @@
    cross-links in DRILL_LESSON / LESSON_PRACTICE. The app computes totals,
    permutes choices, and renders only at boot, so anything pushed here is a
    first-class citizen: progress bar, test mode, lesson links all include it. */
+/* course config: the engine (js/app.js) reads storage keys and defaults here */
+const COURSE = {
+  id: "js-concurrency",
+  storagePrefix: "cbootcamp",   // keep the historical keys so existing progress survives
+};
+
+/* Each entry carries the copy its module page renders (eyebrow/title/lead/sub),
+   plus optional cross-link + quiz metadata:
+     conceptLesson  index into LESSONS for the "Concept:" backlink
+     cardNote       the // comment atop each quiz card (type:"lesson" only)
+     poolTitle/poolQuestion   how quiz items appear in test mode
+     renderFn       global function name for course-owned module types (sim/custom) */
 const MODULES = [
   { id:"learn", label:"lessons", type:"learn" },
-  { id:"model", label:"the model", type:"lesson" },
-  { id:"primitives", label:"primitives", type:"drills" },
-  { id:"race", label:"workers & atomics", type:"sim" },
-  { id:"tradeoffs", label:"trade-offs", type:"cards" },
-  { id:"bank", label:"problem bank", type:"drills" },
-  { id:"toolkit", label:"interview kit", type:"drills" },
-  { id:"durable", label:"durable execution", type:"drills" },
-  { id:"bughunt", label:"spot the bug", type:"bugs" },
-  { id:"write", label:"write it", type:"write" },
-  { id:"test", label:"test yourself", type:"test" },
+  { id:"model", label:"the model", type:"lesson",
+    eyebrow:"module 00", title:"The model", conceptLesson:1,
+    cardNote:"predict the console output",
+    poolTitle:"Predict the output", poolQuestion:"What does this print, in order?",
+    lead:`One thread. One stack. A synchronous block runs start to finish before anything else gets a turn — that's why there's no torn read until you add real threads. Async work waits in two queues: <b style="color:var(--text)">microtasks</b> (promise callbacks) drain completely after each task; <b style="color:var(--text)">macrotasks</b> (setTimeout, I/O) get one per loop.`,
+    sub:`Predict each output before you tap. One at a time — answer, read why, then step on.` },
+  { id:"primitives", label:"primitives", type:"drills",
+    eyebrow:"module 01", title:"Build the primitives",
+    lead:`Each one is a queue of deferreds plus a rule for whose <code style='font-family:var(--mono)'>resolve()</code> you call next. Choose the correct line at each decision point, then run the reference to watch the invariant hold.` },
+  { id:"race", label:"workers & atomics", type:"sim", renderFn:"renderSimModule",
+    eyebrow:"module 02", title:"Workers & Atomics", conceptLesson:9 },
+  { id:"tradeoffs", label:"trade-offs", type:"cards",
+    eyebrow:"module 03", title:"Trade-offs", conceptLesson:22,
+    lead:`No code here — just the judgment calls that separate using concurrency from understanding it. Tap to flip, then advance. Rehearse until they're reflexive.` },
+  { id:"bank", label:"problem bank", type:"drills",
+    eyebrow:"module 04", title:"Problem bank",
+    lead:`Classic concurrency problems, built on the same primitives. State the invariant in your head before you choose.` },
+  { id:"toolkit", label:"interview kit", type:"drills",
+    eyebrow:"module 05", title:"Interview kit",
+    lead:`The async utilities interviewers actually ask you to write — <code style='font-family:var(--mono)'>debounce</code>, <code style='font-family:var(--mono)'>throttle</code>, <code style='font-family:var(--mono)'>Promise.all</code>, retry. Same drill: pick the line that holds the invariant, then run it.` },
+  { id:"durable", label:"durable execution", type:"drills",
+    eyebrow:"module 06", title:"Durable execution",
+    lead:`The concurrency model behind workflow engines like <b style='color:var(--text)'>Temporal</b>: code that's re-run from history must stay deterministic, race durable timers, and serialize concurrent signals. Same hazards as async JS — with replay raising the stakes.` },
+  { id:"bughunt", label:"spot the bug", type:"bugs",
+    eyebrow:"module 07", title:"Spot the bug",
+    lead:`A full concurrency class or function — the mutex, the semaphore, the bounded queue, the token bucket — with one scenario describing how it misbehaves and one subtle fault hiding in the implementation. Read the whole thing, tap the buggy line(s), then check.`,
+    sub:`Reading real code and finding the fault is the actual job. One implementation at a time — read the scenario, scan the code, pick the line(s), then check.` },
+  { id:"write", label:"write it", type:"write",
+    eyebrow:"module 08", title:"Write it",
+    lead:`No options to lean on. You get a spec, a scaffold, and a shuffled pile of lines — some belong, some are traps. Tap lines into place to write the implementation, then <b style="color:var(--text)">run the tests</b>: your assembled code actually executes against real assertions, so any arrangement that behaves correctly passes.`,
+    sub:`This is the whiteboard round, phone-sized. Say the invariant out loud, build to it, and let the tests argue back. Deadlocks just time out — the sandbox can't freeze the page.` },
+  { id:"test", label:"test yourself", type:"test",
+    eyebrow:"test yourself", title:"Test mode",
+    lead:`No hints. First answer counts, and the options are shuffled — so you can't lean on "it's usually the first one." Random questions, then a <b style="color:var(--text)">build round</b> to finish: assemble one implementation from its line bank and run it — the first run is the one that counts.`,
+    sub:`Prep tip: once you can pass these cold, rebuild each pattern in a blank file while talking it through out loud — that's the skill the interview actually grades.` },
 ];
 
 /* ---- model module: predict-output quiz ---- */

@@ -1,13 +1,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Concurrency Bootcamp</title>
-<meta name="description" content="A mobile-first, offline-capable bootcamp for JavaScript concurrency — lessons, drills, and a scored test.">
+<title>Distributed Systems Bootcamp</title>
+<meta name="description" content="A mobile-first, offline-capable bootcamp for distributed systems — animated lessons, tap-driven drills, and a scored test.">
 <!-- PWA: installable + works offline -->
 <meta name="theme-color" content="#0f1119">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Concurrency">
+<meta name="apple-mobile-web-app-title" content="DistSys">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
@@ -430,7 +430,7 @@
 <header>
   <div class="wrap">
     <div class="hbar">
-      <button class="brand" id="homebtn" type="button" aria-label="Concurrency Bootcamp — back to lessons"><b>Concurrency Bootcamp</b><span class="tick">// single thread, many turns</span></button>
+      <button class="brand" id="homebtn" type="button" aria-label="Distributed Systems Bootcamp — back to lessons"><b>Distributed Systems Bootcamp</b><span class="tick">// many nodes, no shared clock</span></button>
       <div class="prog">drills&nbsp;<span class="n" id="pn">0</span>/<span id="pt">8</span></div>
     </div>
     <div class="bar"><i id="progbar"></i></div>
@@ -440,7 +440,7 @@
 
 <main class="wrap" id="main"></main>
 <footer>
-  <span class="credit">built for thumb-driving on a phone · every drill runs real JS in your browser</span>
+  <span class="credit">built for thumb-driving on a phone · every drill runs a real simulated cluster in your browser</span>
   <span class="credit">a <a href="https://readysetcloud.io" target="_blank" rel="noopener">Ready, Set, Cloud!</a> project</span>
   <button class="installbtn" id="installbtn" type="button" hidden>⤓ install app</button>
   <button class="resetbtn" id="resetbtn" type="button">reset progress</button>
@@ -448,13 +448,11 @@
 
 <script src="js/core.js"></script>
 <script src="js/content.js"></script>
-<script src="js/sim.js"></script>  <!-- course-owned workers/atomics module (MODULES renderFn) -->
-<!-- content packs: each pushes its lessons/drills/exercises before the app boots -->
-<!-- foundations MUST load first: it PREPENDS the prerequisite lessons and renumbers -->
-<script src="js/packs/foundations.js"></script>
-<script src="js/packs/ordered-merge.js"></script>
-<script src="js/packs/async-iterators.js"></script>
-<script src="js/packs/cancellation.js"></script>
-<script src="js/packs/node-loop.js"></script>
-<script src="js/packs/temporal-map.js"></script>
-<script src="js/app.js"></script>
+<script src="js/sim.js"></script>  <!-- course-owned unreliable-network module (MODULES renderFn) -->
+<!-- content packs: numeric prefixes fix the load order (these packs APPEND, so
+     arc order == load order; the validator loads packs alphabetically too) -->
+<script src="js/packs/10-lessons-replication.js"></script>
+<script src="js/packs/20-lessons-coordination.js"></script>
+<script src="js/packs/30-hunt-build.js"></script>
+<script src="js/packs/40-cloud-map.js"></script>
+<script src="../js/app.js"></script>  <!-- the shared course engine -->

@@ -1,11 +1,18 @@
 "use strict";
-/* Concurrency Bootcamp — application: state, persistence, rendering, the
-   write-it sandbox, and test mode. Loaded last, after content + packs. */
+/* Course engine — state, persistence, rendering, the write-it sandbox, and
+   test mode. Loaded last, after content + packs. COURSE-AGNOSTIC: everything
+   course-specific comes from the shared globals a course's content.js defines
+   (COURSE config, MODULES with per-module metadata, LESSONS, QUIZ, DRILLS,
+   CARDS, BUGHUNT, WRITE, DRILL_LESSON, LESSON_PRACTICE) plus optional custom
+   module renderers dispatched via MODULES[].renderFn. The full authoring
+   contract lives in docs/COURSE_PATTERN.md. */
 /* ===========================================================
    STATE + PERSISTENCE
    =========================================================== */
-const TOTAL = DRILLS.primitives.length + DRILLS.bank.length + DRILLS.toolkit.length + DRILLS.durable.length + BUGHUNT.length + WRITE.length;
-let state = { module:"learn", solved:{} };
+const CFG = (typeof COURSE !== "undefined" && COURSE) || {};
+const KEY_PREFIX = CFG.storagePrefix || "cbootcamp";
+const TOTAL = Object.values(DRILLS).reduce((n, l) => n + l.length, 0) + BUGHUNT.length + WRITE.length;
+let state = { module:MODULES[0].id, solved:{} };
 
 /* one-at-a-time stepping: where we are inside each stepped module */
 let learnIdx = 0;                                          // current lesson chapter
@@ -14,14 +21,14 @@ let bugIdx = 0;                                            // current spot-the-b
 let writeIdx = 0;                                          // current write-it exercise
 // scored test mode. mode: "normal" | "review" | "sim". deadline/expired only for sim.
 let test = { on:false, mode:"normal", qs:[], idx:0, score:0, answered:false, build:null, deadline:0, expired:false, cleared:0 };
-let drillIdx = { primitives:0, bank:0, toolkit:0, durable:0 };  // current drill per module
+let drillIdx = Object.fromEntries(Object.keys(DRILLS).map(k=>[k,0]));  // current drill per module
 let quizDone = {};                                         // qi -> answered correctly (in-memory)
 let simTimer = null;                                       // the ONE interview-sim countdown interval (cleared before re-arm)
 let examBuildRunning = false;                              // a scored build-round sandbox is mid-run — don't rip it out on expiry
 
-const STORAGE_KEY="cbootcamp:solved";
-const POSITION_KEY="cbootcamp:position";   // where the user left off (lessons + skills)
-const MISS_KEY="cbootcamp:misses";         // persisted snapshots of missed questions + failed builds, for review mode
+const STORAGE_KEY=KEY_PREFIX+":solved";
+const POSITION_KEY=KEY_PREFIX+":position";   // where the user left off (lessons + skills)
+const MISS_KEY=KEY_PREFIX+":misses";         // persisted snapshots of missed questions + failed builds, for review mode
 
 /* ---- miss store: dedupe by stable key, cap 50, evict oldest, defensive like every storage helper ---- */
 function loadMisses(){
@@ -82,11 +89,11 @@ function resetProgress(){
   try{ localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(POSITION_KEY); localStorage.removeItem(MISS_KEY); }catch(e){}
   state.solved={}; quizDone={};
   learnIdx=0; modelIdx=0; bugIdx=0; writeIdx=0;
-  drillIdx={ primitives:0, bank:0, toolkit:0, durable:0 };
+  drillIdx=Object.fromEntries(Object.keys(DRILLS).map(k=>[k,0]));
   clearSimTimer();
   test={ on:false, mode:"normal", qs:[], idx:0, score:0, answered:false, build:null, deadline:0, expired:false, cleared:0 };
   for(const k in writeMem) delete writeMem[k];
-  state.module="learn";
+  state.module=MODULES[0].id;
   renderProgress(); render(); window.scrollTo({top:0});
 }
 function renderProgress(){
@@ -122,14 +129,15 @@ function render(){
   main.innerHTML="";
   const m=MODULES.find(x=>x.id===state.module);
   if(m.type==="learn") renderLearn();
-  else if(m.type==="lesson") renderModel();
-  else if(m.type==="drills") renderDrills(state.module);
-  else if(m.type==="sim") renderSim();
+  else if(m.type==="lesson") renderModel(m);
+  else if(m.type==="drills") renderDrills(m);
   else if(m.type==="cards") renderCards();
-  else if(m.type==="bugs") renderBugHunt();
-  else if(m.type==="write") renderWrite();
+  else if(m.type==="bugs") renderBugHunt(m);
+  else if(m.type==="write") renderWrite(m);
   else if(m.type==="sheet") renderSheet(m);
-  else if(m.type==="test") renderTest();
+  else if(m.type==="test") renderTest(m);
+  // course-provided module (e.g. a simulator): { type:"sim"|"custom", renderFn:"fnName" }
+  else if(m.renderFn && typeof globalThis[m.renderFn]==="function") globalThis[m.renderFn](m);
 }
 
 /* ---- generic static-page module (reference sheets, cheat sheets) ----
@@ -240,9 +248,11 @@ function renderLearn(){
 }
 
 /* ---- model: one quiz question at a time ---- */
+const QUIZ_MODULE = MODULES.find(m=>m.type==="lesson");
 function buildQuizCard(q, qi){
   const done=!!quizDone[qi];
-  const card=el(`<div class="card"><div class="why">// predict the console output</div><pre class="code">${esc(q.code)}</pre></div>`);
+  const note=(QUIZ_MODULE&&QUIZ_MODULE.cardNote)||"predict the output";
+  const card=el(`<div class="card"><div class="why">// ${esc(note)}</div><pre class="code">${esc(q.code)}</pre></div>`);
   q.options.forEach((opt,oi)=>{
     if(done){
       card.appendChild(el(`<button class="qopt ${oi===q.answer?"correct":""}" disabled>${esc(opt)}</button>`));
@@ -272,31 +282,25 @@ function quizLabel(q){
   return first.length>52 ? first.slice(0,51)+"…" : first;
 }
 
-function renderModel(){
+function renderModel(m){
   main.appendChild(el(`<div>
-    <div class="eyebrow">module 00</div>
-    <h1>The model</h1>
-    <p class="lead">One thread. One stack. A synchronous block runs start to finish before anything else gets a turn — that's why there's no torn read until you add real threads. Async work waits in two queues: <b style="color:var(--text)">microtasks</b> (promise callbacks) drain completely after each task; <b style="color:var(--text)">macrotasks</b> (setTimeout, I/O) get one per loop.</p>
-    <p class="sub">Predict each output before you tap. One at a time — answer, read why, then step on.</p>
+    <div class="eyebrow">${m.eyebrow||""}</div>
+    <h1>${m.title||m.label}</h1>
+    ${m.lead?`<p class="lead">${m.lead}</p>`:""}
+    ${m.sub?`<p class="sub">${m.sub}</p>`:""}
   </div>`));
-  { const row=conceptLinkRow(1); if(row){ row.style.margin="0 0 16px"; main.appendChild(row); } }
+  if(m.conceptLesson!=null){ const row=conceptLinkRow(m.conceptLesson); if(row){ row.style.margin="0 0 16px"; main.appendChild(row); } }
 
   modelIdx=Math.max(0,Math.min(modelIdx,QUIZ.length-1));
   main.appendChild(buildQuizCard(QUIZ[modelIdx], modelIdx));
   main.appendChild(stepperRow(modelIdx, QUIZ.length, (i)=>{ modelIdx=i; render(); window.scrollTo({top:0}); }, QUIZ.map(quizLabel)));
 }
 
-/* ---- drills (fill the blank) ---- */
-function renderDrills(modId){
+/* ---- drills (fill the blank) — header copy comes from the MODULES entry ---- */
+function renderDrills(m){
+  const modId=m.id;
   const list=DRILLS[modId];
-  const HEADERS = {
-    primitives:{eb:"module 01", h:"Build the primitives", lead:"Each one is a queue of deferreds plus a rule for whose <code style='font-family:var(--mono)'>resolve()</code> you call next. Choose the correct line at each decision point, then run the reference to watch the invariant hold."},
-    bank:{eb:"module 04", h:"Problem bank", lead:"Classic concurrency problems, built on the same primitives. State the invariant in your head before you choose."},
-    toolkit:{eb:"module 05", h:"Interview kit", lead:"The async utilities interviewers actually ask you to write — <code style='font-family:var(--mono)'>debounce</code>, <code style='font-family:var(--mono)'>throttle</code>, <code style='font-family:var(--mono)'>Promise.all</code>, retry. Same drill: pick the line that holds the invariant, then run it."},
-    durable:{eb:"module 06", h:"Durable execution", lead:"The concurrency model behind workflow engines like <b style='color:var(--text)'>Temporal</b>: code that's re-run from history must stay deterministic, race durable timers, and serialize concurrent signals. Same hazards as async JS — with replay raising the stakes."},
-  };
-  const header = HEADERS[modId];
-  main.appendChild(el(`<div><div class="eyebrow">${header.eb}</div><h1>${header.h}</h1><p class="lead">${header.lead}</p></div>`));
+  main.appendChild(el(`<div><div class="eyebrow">${m.eyebrow||""}</div><h1>${m.title||m.label}</h1>${m.lead?`<p class="lead">${m.lead}</p>`:""}</div>`));
 
   const idx=Math.max(0,Math.min(drillIdx[modId]||0, list.length-1));
   drillIdx[modId]=idx;
@@ -367,11 +371,11 @@ function buildDrillCard(d){
 }
 
 /* ---- spot the bug (pick the faulty line) ---- */
-function renderBugHunt(){
+function renderBugHunt(m){
   main.appendChild(el(`<div>
-    <div class="eyebrow">module 07</div><h1>Spot the bug</h1>
-    <p class="lead">A full concurrency class or function — the mutex, the semaphore, the bounded queue, the token bucket — with one scenario describing how it misbehaves and one subtle fault hiding in the implementation. Read the whole thing, tap the buggy line(s), then check.</p>
-    <p class="sub">Reading real code and finding the fault is the actual job. One implementation at a time — read the scenario, scan the code, pick the line(s), then check.</p>
+    <div class="eyebrow">${m.eyebrow||""}</div><h1>${m.title||m.label}</h1>
+    ${m.lead?`<p class="lead">${m.lead}</p>`:""}
+    ${m.sub?`<p class="sub">${m.sub}</p>`:""}
   </div>`));
   bugIdx=Math.max(0,Math.min(bugIdx,BUGHUNT.length-1));
   main.appendChild(buildBugCard(BUGHUNT[bugIdx]));
@@ -457,171 +461,14 @@ function buildBugCard(b){
   return card;
 }
 
-/* ---- workers & atomics simulator ---- */
-let sim={threads:3,iters:3,atomic:false};
-const ITER_SCALE=1_000_000;                 // each "increment" notch = 1,000,000 real ops
-// Real SharedArrayBuffer + shared-memory Atomics only exist on a cross-origin-isolated page.
-const REAL_RACE=(typeof SharedArrayBuffer!=="undefined") && (self.crossOriginIsolated===true);
-const fmt=(n)=>n.toLocaleString("en-US");
-
-// The genuine race: N Worker threads incrementing one shared Int32 over a SharedArrayBuffer.
-// Every worker parks on Atomics.wait until the gate opens, so they collide head-on.
-function runRealRace({threads,iters,atomic}){
-  return new Promise((resolve,reject)=>{
-    let view;
-    try{
-      const sab=new SharedArrayBuffer(8);   // [0] = counter, [1] = start gate
-      view=new Int32Array(sab);
-      const workers=[]; let ready=0, done=0;
-      const cleanup=()=>workers.forEach(w=>w.terminate());
-      for(let i=0;i<threads;i++){
-        const w=new Worker("worker.js");
-        w.onerror=(err)=>{ cleanup(); reject(err.message||"worker failed to load"); };
-        w.onmessage=(e)=>{
-          if(e.data.ready){
-            if(++ready===threads){ Atomics.store(view,1,1); Atomics.notify(view,1); }  // open the gate for all at once
-          }else if(e.data.done){
-            if(++done===threads){
-              cleanup();
-              resolve({mem:Atomics.load(view,0),expected:threads*iters,threads,iters,atomic});
-            }
-          }
-        };
-        w.postMessage({buffer:sab,iters,atomic});
-        workers.push(w);
-      }
-    }catch(err){ reject(err.message||String(err)); }
-  });
-}
-
-function renderSim(){
-  const real=REAL_RACE;
-  main.appendChild(el(`<div>
-    <div class="eyebrow">module 02</div>
-    <h1>Workers &amp; Atomics</h1>
-    <p class="lead">This is the one place JS has a real data race: multiple worker threads touching the same <b style="color:var(--text)">SharedArrayBuffer</b>. A plain <code style="font-family:var(--mono)">counter++</code> is three steps — read, add, write — and concurrent threads interleave those steps and clobber each other.</p>
-    <p class="sub">${real
-      ? `This page is <b style="color:var(--ordered)">cross-origin isolated</b>, so the run below spins up <b style="color:var(--text)">real Worker threads</b> over a genuine SharedArrayBuffer. With <b style="color:var(--text)">Atomic</b> off the count comes out wrong — and differently wrong each run. Flip it on and it&rsquo;s exact every time.`
-      : `Real SharedArrayBuffer needs cross-origin isolation, which isn&rsquo;t available here, so the run below <b style="color:var(--text)">simulates</b> the interleaving step by step. The lost-update behavior is identical. Flip <b style="color:var(--text)">Atomic</b> off and run it a few times.`}</p>
-  </div>`));
-  { const row=conceptLinkRow(9); if(row){ row.style.margin="0 0 16px"; main.appendChild(row); } }
-
-  const card=el(`<div class="card"><h2>${real?"Live data race":"Interleaving simulator"}</h2><div class="why">// each thread increments a shared counter</div></div>`);
-
-  // isolation status badge
-  const badge=el(`<div class="result ${real?"exact":""}" style="display:flex;align-items:center;gap:8px;margin:0 0 4px">
-    ${real
-      ? `<b style="color:var(--ordered)">● real threads</b> <span class="sub" style="font-size:12px">crossOriginIsolated = true · SharedArrayBuffer live</span>`
-      : `<b style="color:var(--race)">● simulated</b> <span class="sub" style="font-size:12px">crossOriginIsolated = false · stepwise model</span>`}
-  </div>`);
-  if(!real) badge.style.borderColor="var(--line)";
-  card.appendChild(badge);
-
-  const ctrls=el(`<div class="ctrls"></div>`);
-  const tEl=el(`<label class="ctrl">threads <input type="range" min="2" max="4" value="${sim.threads}"> <b style="color:var(--text)" data-tv>${sim.threads}</b></label>`);
-  const iEl=el(`<label class="ctrl">${real?"×&nbsp;million inc":"×&nbsp;increments"} <input type="range" min="2" max="4" value="${sim.iters}"> <b style="color:var(--text)" data-iv>${sim.iters}</b></label>`);
-  const aEl=el(`<div class="toggle ${sim.atomic?"on":""}"><div class="switch"></div> Atomic</div>`);
-  tEl.querySelector("input").oninput=e=>{sim.threads=+e.target.value;tEl.querySelector("[data-tv]").textContent=sim.threads;};
-  iEl.querySelector("input").oninput=e=>{sim.iters=+e.target.value;iEl.querySelector("[data-iv]").textContent=sim.iters;};
-  aEl.onclick=()=>{sim.atomic=!sim.atomic;aEl.classList.toggle("on",sim.atomic);};
-  ctrls.append(tEl,iEl,aEl);
-  card.appendChild(ctrls);
-
-  const runBtn=el(`<button class="btn go">▶ ${real?"run real threads":"run interleaving"}</button>`);
-  const tape=el(`<div class="tape"></div>`);
-  const result=el(`<div class="result" style="display:none"></div>`);
-  const colors=["var(--accent)","var(--ordered)","var(--race)","#e0c25a"];
-
-  const showResult=(mem,expected,extra)=>{
-    result.style.display="block";
-    const lost=expected-mem;
-    result.className="result "+(lost===0?"exact":"lost");
-    const head = lost===0
-      ? `counter = ${fmt(mem)}  ·  expected ${fmt(expected)}  ·  exact`
-      : `counter = ${fmt(mem)}  ·  expected ${fmt(expected)}  ·  ${fmt(lost)} update${lost>1?"s":""} lost`;
-    result.textContent = extra ? head+"  ·  "+extra : head;
-  };
-
-  if(real){
-    runBtn.onclick=async()=>{
-      runBtn.disabled=true; const old=runBtn.textContent; runBtn.textContent="running…";
-      tape.innerHTML="";
-      const iters=sim.iters*ITER_SCALE;
-      try{
-        const out=await runRealRace({threads:sim.threads,iters,atomic:sim.atomic});
-        showResult(out.mem,out.expected,`${out.threads} workers × ${fmt(iters)} · ${out.atomic?"Atomics.add":"view[0]=view[0]+1"}`);
-      }catch(err){
-        result.style.display="block"; result.className="result lost";
-        result.textContent="worker error: "+err;
-      }
-      runBtn.disabled=false; runBtn.textContent=old;
-    };
-  }else{
-    runBtn.onclick=()=>{
-      const out=simulate(sim);
-      tape.innerHTML="";
-      out.tape.forEach(s=>{
-        const label = s.op==="add" ? `T${s.t} add→${s.mem}`
-          : s.op==="read" ? `T${s.t} read ${s.val}` : `T${s.t} write ${s.val}`;
-        const chip=el(`<span class="step">${label}</span>`);
-        chip.style.borderColor=colors[s.t]; chip.style.color=colors[s.t];
-        tape.appendChild(chip);
-      });
-      showResult(out.mem,out.expected);
-    };
-  }
-  card.appendChild(el(`<div class="row"></div>`)).appendChild(runBtn);
-  card.appendChild(tape);
-  card.appendChild(result);
-  main.appendChild(card);
-
-  main.appendChild(el(`<div class="card">
-    <div class="why">// the fix, in real worker code</div>
-    <pre class="code"><span class="cm">// racy — read, add, write can interleave</span>
-counter[0] = counter[0] + 1;
-
-<span class="cm">// safe — one indivisible operation</span>
-<span class="ok">Atomics.add(counter, 0, 1);</span>
-
-<span class="cm">// Atomics.wait / Atomics.notify build a real
-// blocking lock across threads — the worker-world mutex.</span></pre>
-    <p class="sub" style="margin-bottom:0">${real
-      ? `This is exactly what runs above: <code style="font-family:var(--mono)">worker.js</code> increments a shared <code style="font-family:var(--mono)">Int32Array</code>, parked on <code style="font-family:var(--mono)">Atomics.wait</code> until every worker is ready so they collide head-on.`
-      : `In the browser, real SharedArrayBuffer needs cross-origin isolation headers (<code style="font-family:var(--mono)">COOP</code> + <code style="font-family:var(--mono)">COEP</code>). On a host that sets them, this exact module runs genuine threads via <code style="font-family:var(--mono)">worker.js</code> instead of simulating.`}</p>
-  </div>`));
-}
-
-function simulate({threads,iters,atomic}){
-  const expected=threads*iters;
-  if(atomic){
-    const tape=[]; let mem=0;
-    const seq=[]; for(let t=0;t<threads;t++) for(let k=0;k<iters;k++) seq.push(t);
-    // shuffle
-    for(let i=seq.length-1;i>0;i--){const j=rnd(i+1);[seq[i],seq[j]]=[seq[j],seq[i]];}
-    seq.forEach(t=>{mem+=1;tape.push({t,op:"add",mem});});
-    return {mem,tape,expected};
-  }
-  // non-atomic: each increment = read then write, with a private register
-  let mem=0; const reg=new Array(threads).fill(0);
-  const phase=new Array(threads).fill("read"); const remaining=new Array(threads).fill(iters);
-  const tape=[]; let steps=threads*iters*2;
-  while(steps>0){
-    const active=[]; for(let i=0;i<threads;i++) if(remaining[i]>0) active.push(i);
-    const t=active[rnd(active.length)];
-    if(phase[t]==="read"){ reg[t]=mem; tape.push({t,op:"read",val:mem}); phase[t]="write"; }
-    else { mem=reg[t]+1; tape.push({t,op:"write",val:mem}); phase[t]="read"; remaining[t]--; }
-    steps--;
-  }
-  return {mem,tape,expected};
-}
-
 /* ---- flashcards ---- */
 let cardIdx=0, cardFlipped=false;
 function renderCards(){
-  main.innerHTML="";   // flip/prev/next call this directly — clear so we replace, not stack
-  main.appendChild(el(`<div><div class="eyebrow">module 03</div><h1>Trade-offs</h1>
-    <p class="lead">No code here — just the judgment calls that separate using concurrency from understanding it. Tap to flip, then advance. Rehearse until they're reflexive.</p></div>`));
-  { const row=conceptLinkRow(22); if(row){ row.style.margin="0 0 16px"; main.appendChild(row); } }
+  const m=MODULES.find(x=>x.id===state.module);   // flip/prev/next re-enter here directly
+  main.innerHTML="";   // clear so we replace, not stack
+  main.appendChild(el(`<div><div class="eyebrow">${m.eyebrow||""}</div><h1>${m.title||m.label}</h1>
+    ${m.lead?`<p class="lead">${m.lead}</p>`:""}</div>`));
+  if(m.conceptLesson!=null){ const row=conceptLinkRow(m.conceptLesson); if(row){ row.style.margin="0 0 16px"; main.appendChild(row); } }
   const [front,back]=CARDS[cardIdx];
   const fc=el(`<div class="flash ${cardFlipped?"back":""}">
     <div class="face">${cardFlipped?"the answer":"prompt "+(cardIdx+1)+" / "+CARDS.length}</div>
@@ -774,11 +621,11 @@ function buildWriteCard(w, opts={}){
   return card;
 }
 
-function renderWrite(){
+function renderWrite(m){
   main.appendChild(el(`<div>
-    <div class="eyebrow">module 08</div><h1>Write it</h1>
-    <p class="lead">No options to lean on. You get a spec, a scaffold, and a shuffled pile of lines — some belong, some are traps. Tap lines into place to write the implementation, then <b style="color:var(--text)">run the tests</b>: your assembled code actually executes against real assertions, so any arrangement that behaves correctly passes.</p>
-    <p class="sub">This is the whiteboard round, phone-sized. Say the invariant out loud, build to it, and let the tests argue back. Deadlocks just time out — the sandbox can't freeze the page.</p>
+    <div class="eyebrow">${m.eyebrow||""}</div><h1>${m.title||m.label}</h1>
+    ${m.lead?`<p class="lead">${m.lead}</p>`:""}
+    ${m.sub?`<p class="sub">${m.sub}</p>`:""}
   </div>`));
   writeIdx=Math.max(0,Math.min(writeIdx,WRITE.length-1));
   main.appendChild(buildWriteCard(WRITE[writeIdx]));
@@ -790,8 +637,10 @@ function testPool(){
   const out=[];
   Object.keys(DRILLS).forEach(mod=>DRILLS[mod].forEach(d=>out.push(
     {title:d.title, context:d.pre, question:d.blank.q, options:d.blank.options, answer:d.blank.answer, whys:d.blank.whys})));
+  const qTitle=(QUIZ_MODULE&&QUIZ_MODULE.poolTitle)||"Predict the output";
+  const qQuestion=(QUIZ_MODULE&&QUIZ_MODULE.poolQuestion)||"What is the outcome?";
   QUIZ.forEach(q=>out.push(
-    {title:"Predict the output", context:q.code, question:"What does this print, in order?", options:q.options, answer:q.answer, whys:q.whys}));
+    {title:qTitle, context:q.code, question:qQuestion, options:q.options, answer:q.answer, whys:q.whys}));
   return out;
 }
 function shuffle(a){ const x=a.slice(); for(let i=x.length-1;i>0;i--){ const j=rnd(i+1); [x[i],x[j]]=[x[j],x[i]]; } return x; }
@@ -866,13 +715,14 @@ function expireSim(){
   }
   test.expired=true; clearSimTimer(); render(); window.scrollTo({top:0});
 }
-function renderTest(){
+function renderTest(m){
   if(!test.on){
     const total=testPool().length, misses=missCount();
+    const lead=(m&&m.lead)||`No hints. First answer counts, and the options are shuffled — so you can't lean on "it's usually the first one." Random questions, then a <b style="color:var(--text)">build round</b> to finish: assemble one implementation from its line bank and run it — the first run is the one that counts.`;
     main.appendChild(el(`<div>
-      <div class="eyebrow">test yourself</div><h1>Test mode</h1>
-      <p class="lead">No hints. First answer counts, and the options are shuffled — so you can't lean on "it's usually the first one." Random questions, then a <b style="color:var(--text)">build round</b> to finish: assemble one implementation from its line bank and run it — the first run is the one that counts.</p>
-      <p class="sub">Prep tip: once you can pass these cold, rebuild each pattern in a blank file while talking it through out loud — that's the skill the interview actually grades.</p>
+      <div class="eyebrow">${(m&&m.eyebrow)||"test yourself"}</div><h1>${(m&&m.title)||"Test mode"}</h1>
+      <p class="lead">${lead}</p>
+      ${m&&m.sub?`<p class="sub">${m.sub}</p>`:""}
     </div>`));
     // three tiers, single column, one thumb
     const col=el(`<div class="row" style="flex-direction:column;align-items:stretch"></div>`);

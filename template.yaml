@@ -96,6 +96,29 @@ Resources:
               Value: require-corp
               Override: true
 
+  # ---- Directory index rewrite: DefaultRootObject only covers "/", so
+  # subdirectory courses (/distributed-systems/) need a viewer-request rewrite
+  # to their own index.html. Extensionless paths get the same treatment. ----
+  DirectoryIndexFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub "${AWS::StackName}-dir-index"
+      AutoPublish: true
+      FunctionConfig:
+        Comment: Rewrite directory URIs to their index.html (subdirectory courses)
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var request = event.request;
+          var uri = request.uri;
+          if (uri.endsWith('/')) {
+            request.uri = uri + 'index.html';
+          } else if (!uri.split('/').pop().includes('.')) {
+            request.uri = uri + '/index.html';
+          }
+          return request;
+        }
+
   # ---- Origin Access Control: keeps the bucket private, lets only this distro read it ----
   OriginAccessControl:
     Type: AWS::CloudFront::OriginAccessControl
@@ -161,6 +184,9 @@ Resources:
           # Managed CachingOptimized policy.
           CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
           ResponseHeadersPolicyId: !Ref IsolationHeadersPolicy
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt DirectoryIndexFunction.FunctionMetadata.FunctionARN
         ViewerCertificate:
           AcmCertificateArn: !Ref Certificate
           SslSupportMethod: sni-only
