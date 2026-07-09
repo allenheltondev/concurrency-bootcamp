@@ -269,8 +269,6 @@ Resources:
           KeyType: HASH
         - AttributeName: sk
           KeyType: RANGE
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
 
   # ---- App-specific client in the shared Ready, Set, Cloud user pool.
   # Shared users (same sub everywhere), dedicated audience: tokens minted for
