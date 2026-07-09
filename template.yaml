@@ -262,7 +262,9 @@ Resources:
   # ---- App-specific client in the shared Ready, Set, Cloud user pool.
   # Shared users (same sub everywhere), dedicated audience: tokens minted for
   # other RSC apps are rejected by this API's authorizer, and this app's
-  # callback URLs / token lifetimes can change without touching other apps. ----
+  # token lifetimes can change without touching other apps. No Hosted UI /
+  # OAuth config: the site ships its own sign-in/sign-up screens
+  # (js/account.js) that call the Cognito user pool API directly. ----
   UserPoolClient:
     Type: AWS::Cognito::UserPoolClient
     Condition: BackendEnabled
@@ -272,21 +274,12 @@ Resources:
       GenerateSecret: false
       PreventUserExistenceErrors: ENABLED
       ExplicitAuthFlows:
+        # USER_PASSWORD_AUTH is the custom auth UI's sign-in flow (TLS
+        # everywhere; SRP without a library isn't worth the complexity) —
+        # the integration smoke script uses it too.
+        - ALLOW_USER_PASSWORD_AUTH
         - ALLOW_USER_SRP_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
-        # Lets the integration smoke script (backend/tools/integration-smoke.mjs)
-        # sign in a dedicated test user without an SRP implementation.
-        - ALLOW_USER_PASSWORD_AUTH
-      SupportedIdentityProviders: [COGNITO]
-      AllowedOAuthFlowsUserPoolClient: true
-      AllowedOAuthFlows: [code]
-      AllowedOAuthScopes: [openid, email, profile]
-      CallbackURLs:
-        - !Sub "https://${DomainName}"
-        - http://localhost:8080 # local dev (matches the README's http-server port)
-      LogoutURLs:
-        - !Sub "https://${DomainName}"
-        - http://localhost:8080
       AccessTokenValidity: 1
       IdTokenValidity: 1
       RefreshTokenValidity: 30

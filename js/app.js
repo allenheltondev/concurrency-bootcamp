@@ -30,12 +30,17 @@ const STORAGE_KEY=KEY_PREFIX+":solved";
 const POSITION_KEY=KEY_PREFIX+":position";   // where the user left off (lessons + skills)
 const MISS_KEY=KEY_PREFIX+":misses";         // persisted snapshots of missed questions + failed builds, for review mode
 
+/* Optional cloud sync (js/account.js) listens for these; the engine itself
+   never knows whether an account layer is present. */
+function announceProgressChange(){ try{ window.dispatchEvent(new Event("course:progress-changed")); }catch(e){} }
+function announceProgressReset(){ try{ window.dispatchEvent(new Event("course:progress-reset")); }catch(e){} }
+
 /* ---- miss store: dedupe by stable key, cap 50, evict oldest, defensive like every storage helper ---- */
 function loadMisses(){
   try{ const raw=localStorage.getItem(MISS_KEY); if(raw){ const a=JSON.parse(raw); if(Array.isArray(a)) return a; } }catch(e){}
   return [];
 }
-function saveMisses(a){ try{ localStorage.setItem(MISS_KEY,JSON.stringify(a)); }catch(e){} }
+function saveMisses(a){ try{ localStorage.setItem(MISS_KEY,JSON.stringify(a)); }catch(e){} announceProgressChange(); }
 function recordMiss(entry){
   if(!entry||!entry.key) return;
   try{
@@ -76,12 +81,14 @@ function loadProgress(){
 function saveProgress(){
   renderProgress();
   try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(state.solved)); }catch(e){}
+  announceProgressChange();
 }
 // persist the user's place across lessons + skills so they resume on return
 function savePosition(){
   try{ localStorage.setItem(POSITION_KEY,JSON.stringify({
     module: state.module, learnIdx, modelIdx, bugIdx, writeIdx, drillIdx, quizDone
   })); }catch(e){}
+  announceProgressChange();
 }
 // wipe everything: solved drills, quiz answers, and where the user left off
 function resetProgress(){
@@ -95,6 +102,7 @@ function resetProgress(){
   for(const k in writeMem) delete writeMem[k];
   state.module=MODULES[0].id;
   renderProgress(); render(); window.scrollTo({top:0});
+  announceProgressReset();
 }
 function renderProgress(){
   const n=Object.keys(state.solved).length;
