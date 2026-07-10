@@ -122,7 +122,7 @@ offeredLoad = 100 req/s   // exactly μ. what happens?`,
     answer:0,
     whys:[
       "Right. avg(p99s) is a made-up statistic: no request experienced it, and it weights each HOST equally regardless of traffic. The only valid aggregation is merging the underlying histograms — sum the bucket counts, then recompute the quantile over the merged population.",
-      "If one host serves 30% of traffic at p99 400ms and nine idle hosts report 9ms, the average reads ~48ms while roughly 3% of ALL requests exceed 400ms — the fleet p99 is 4× the SLO and the dashboard is green.",
+      "If the host serving 30% of traffic has p99 400ms and nine near-idle hosts report 9ms, the average reads ~48 — but the worst 1% of ALL requests live entirely on the sick host, so the fleet p99 is that host's ~p96.7: plausibly hundreds of ms, while the dashboard stays green.",
       "max(host p99s) is an upper BOUND on the fleet p99 — it never under-reports, but one sick canary taking 0.1% of traffic pages you for a healthy fleet, and it can't answer p50 or p95 at all. A bound is not the value."] },
 
   { code:`// load test: 50 virtual users in a loop —
@@ -474,7 +474,7 @@ function findKnee(points, slo) {
         whys:["Right. Capacity is the last step that met the SLO (300), the knee is the first that didn't (400) — and you STOP reading there. Past the knee the server is failing, and its numbers describe the failure, not the service.",
               "Without the break, the 500-rps step — where overload turned into quick errors and 'p99' improved to 70ms — re-credits capacity at 500. The report now recommends running 66% past the wall, certified by the collapse itself.",
               "Capacity tracks the OFFERED rate unconditionally — the report says 500 rps because that's what you threw at it, not what it served within SLO. Offered ≠ served is the entire lesson of overload testing."] },
-      post:`` },
+      post:`}` },
 
     { id:"retrystorm", title:"Retry-Storm Math", why:"retries multiply load exactly when capacity is gone", demo:demoRetryStorm,
       pre:`// every attempt fails independently with probability f;
@@ -536,7 +536,7 @@ function correctOmission(samples, intervalMs) {
         whys:["Right. The send that should have left one interval later would have waited about v − interval; the next, v − 2·interval; and so on, ramping down. That's HdrHistogram's expected-interval correction — it restores the ~9 samples the stall silently deleted.",
               "Recording only what was sent IS the omission: the histogram says 'one slow request' when roughly ten users' worth of sends were suppressed. The p99.9 reads ~100× better than reality, and the SLO conversation happens on fantasy numbers.",
               "Backfilling every missing send at the FULL stall value over-corrects: a request that would have left 900ms into the stall had ~100ms of it left to feel, not 1,000. Over-correction discredits the exercise the first time someone cross-checks a client trace."] },
-      post:`` },
+      post:`}` },
 
     { id:"qdiscipline", title:"Queue Discipline Under Fire", why:"FIFO is fair to requests and brutal to users", demo:demoDiscipline,
       pre:`// overload: the queue is long and every request carries a
