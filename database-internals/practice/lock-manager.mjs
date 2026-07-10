@@ -12,12 +12,16 @@
 
    release(tx, row): direct hand-off — if waiters are queued, the HEAD waiter
    becomes the holder (and its waitsFor edge is cleared) BEFORE its promise
-   resolves; only if the queue is empty does the row become free.
+   resolves; every waiter STILL queued must have its waitsFor edge re-pointed
+   at the new holder (a stale edge at the old holder makes the detector see
+   cycles that aren't there and miss ones that are); only if the queue is
+   empty does the row become free.
 
    INVARIANT: grants are FIFO; the lock is never observably free while a
    waiter exists — an acquire issued right after a release-with-waiters must
    queue behind them, not barge; a cyclic wait throws DeadlockError instead
-   of hanging forever.
+   of hanging forever; after every hand-off the wait-for graph tells the
+   truth about who waits on whom.
    EDGE: t1 holds A, t2 holds B, t1 requests B (queues), t2 requests A ->
    DeadlockError; after t2 aborts (releases B), t1 gets B. */
 "use strict";

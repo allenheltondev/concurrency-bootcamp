@@ -43,6 +43,8 @@ export class LockManager {
     if (next) {
       l.holder = next.tx;                            // hand off BEFORE resolving —
       this.waitsFor.delete(next.tx);                 // the lock is never observably free
+      for (const w of l.queue)                       // survivors now wait on the NEW holder —
+        this.waitsFor.set(w.tx, next.tx);            // stale edges fake cycles and hide real ones
       next.resolve();
     } else {
       this.locks.delete(row);                        // no waiters — genuinely free

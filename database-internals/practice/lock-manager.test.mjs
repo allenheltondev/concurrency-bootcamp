@@ -62,6 +62,43 @@ suite("lock manager — FIFO hand-off, no barging, deadlock detected not served"
     "after the victim releases its lock, the survivor's parked acquire must be granted — " +
     "deadlock detection saves the OTHER transaction");
 
+  // Hand-off must RE-POINT the surviving waiters' edges at the new holder —
+  // stale edges at the old holder fake cycles that aren't there and hide real ones.
+  const lm2 = new LockManager();
+  await lm2.acquire("t3", "S");                       // t3 holds S first
+  await lm2.acquire("t1", "R");
+  const h2 = lm2.acquire("t2", "R");                  // t2 waits on t1
+  const h3 = lm2.acquire("t3", "R");                  // t3 waits on t1 (while holding S)
+  lm2.release("t1", "R");                             // hand-off: t2 holds R; t3 must now wait on t2
+  await h2;
+
+  // false-positive check: t1 -> S(held by t3); the truthful chain t3 -> t2 ends at
+  // a non-waiter — a STALE t3 -> t1 edge would close a phantom cycle and throw here
+  let sGranted = false;
+  const h1S = lm2.acquire("t1", "S").then(() => { sGranted = true; });
+  await sleep(0);
+  assert(!sGranted && (lm2.locks.get("S") || { queue: [] }).queue.length === 1,
+    "t1 waiting on S is a plain chain (t1->t3->t2, and t2 waits on nobody) — a DeadlockError here " +
+    "means release() left t3's wait-for edge pointing at the OLD holder");
+
+  // missed-real-cycle check: t2 (new holder of R) -> S(held by t3) while t3 -> R(held by t2)
+  let boom2 = null;
+  try {
+    await lm2.acquire("t2", "S");
+  } catch (e) {
+    boom2 = e;
+  }
+  assert(boom2 instanceof DeadlockError,
+    "t2->t3 (S) while t3->t2 (R, after the hand-off) IS a cycle — missing it here means the " +
+    "wait-for graph still shows t3 waiting on t1; both transactions would hang forever");
+
+  lm2.release("t2", "R");                             // victim aborts: t3 gets R…
+  await h3;
+  lm2.release("t3", "S");                             // …finishes, releases S: t1 gets it
+  await h1S;
+  assert(sGranted && lm2.holderOf("S") === "t1", "the parked chain must drain cleanly after the abort");
+
   log("FIFO grants [" + grants + "]; the A/B cycle threw DeadlockError; the survivor got B after the abort");
-  return "no barging, no starvation, and the wait-for cycle threw instead of hanging";
+  log("hand-off re-pointed the wait-for edges: no phantom cycle for t1, the real t2/t3 cycle caught");
+  return "no barging, no starvation, honest wait-for edges — cycles throw instead of hanging";
 });

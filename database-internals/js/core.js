@@ -299,8 +299,8 @@ async function demoLsmRead(){
   const db=new LSM(2);
   db.put("user:7","v1"); db.put("x","x1");                     // flush #1 (oldest sstable)
   db.put("user:7","v2"); db.put("y","y1");                     // flush #2
-  db.put("user:9","fresh");                                    // still in the memtable
-  db.del("x");                                                 // tombstone (memtable)
+  db.put("user:9","fresh");                                    // memtable…
+  db.del("x");                                                 // …tombstone joins it → flush #3 (flushAt=2)
   const pass=db.get("user:7")==="v2" && db.get("y")==="y1"
     && db.get("user:9")==="fresh" && db.get("x")===undefined
     && db.sstables.length===3 && db.sstables[2].get("user:7")==="v1";

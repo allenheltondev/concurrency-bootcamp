@@ -27,13 +27,27 @@ suite("WAL — replay equals the committed history, before and after checkpoint"
   assert(w.records.length === before,
     "recover() must not mutate the log — recovery is a read, and it can happen twice");
 
-  // Checkpoint: compact the log without changing what recovery answers.
+  // Checkpoint: compact the log without changing what recovery answers —
+  // and without discarding t2, which is still in flight.
+  const beforeCp = w.records.length;
   w.checkpoint();
-  assert(w.records.length === 1 && w.records[0].op === "checkpoint",
-    "checkpoint() must leave exactly one {op:\"checkpoint\", state} record — that is the compaction");
+  assert(w.records[0].op === "checkpoint",
+    "checkpoint() must put the {op:\"checkpoint\", state} snapshot at the head of the log");
+  assert(w.records.length < beforeCp,
+    "checkpoint() must compact — the committed history folds into the snapshot");
+  assert(w.records.some((r) => r.tx === "t2"),
+    "t2 was still OPEN at the checkpoint — its records must survive the compaction, or its " +
+    "later commit silently loses every pre-checkpoint write");
   const afterCp = w.recover();
   assert(afterCp.get("a") === 1 && afterCp.get("c") === 3 && !afterCp.has("b"),
     "recover() must answer identically before and after checkpoint — compaction changes cost, never truth");
+
+  // The in-flight tx commits AFTER the checkpoint: its pre-checkpoint writes must land.
+  w.commit("t2");
+  const late = w.recover();
+  assert(late.get("b") === 2,
+    "t2 wrote before the checkpoint and committed after it — the checkpoint may fold in only " +
+    "the COMMITTED past, never a transaction that might still commit");
 
   // Life goes on after the checkpoint: t3 commits, t4 crashes mid-flight.
   w.begin("t3");

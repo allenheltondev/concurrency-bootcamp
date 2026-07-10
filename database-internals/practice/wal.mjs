@@ -12,13 +12,16 @@
    recovery is a read, and it can happen twice.
 
    checkpoint() compacts: compute the committed state, then replace
-   this.records with a single { op: "checkpoint", state } record — so a later
-   recover() replays the snapshot first, then any transactions that committed
-   after the checkpoint on top of it.
+   this.records with { op: "checkpoint", state } FOLLOWED BY the records of
+   every transaction still in flight (no commit record yet) — folding an open
+   transaction into oblivion would lose its writes if it commits later. A
+   later recover() replays the snapshot first, then any transactions that
+   committed after the checkpoint on top of it.
 
    EDGE: interleaved transactions; writes appended after a checkpoint by a tx
-   that commits later; recover() while an uncommitted tail is still present —
-   that IS the crash. */
+   that commits later; a tx that wrote BEFORE the checkpoint and commits
+   AFTER it; recover() while an uncommitted tail is still present — that IS
+   the crash. */
 "use strict";
 
 export class WAL {

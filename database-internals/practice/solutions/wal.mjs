@@ -35,7 +35,13 @@ export class WAL {
   }
 
   checkpoint() {
-    const state = this.recover();                // the committed state, nothing else
-    this.records = [{ op: "checkpoint", state }];
+    const state = this.recover();                // the committed past folds into the snapshot…
+    const committed = new Set();
+    for (const r of this.records) {
+      if (r.op === "commit") committed.add(r.tx);
+    }
+    const inFlight = this.records.filter(        // …but open transactions must keep their
+      (r) => r.tx !== undefined && !committed.has(r.tx));  // records — they may still commit
+    this.records = [{ op: "checkpoint", state }, ...inFlight];
   }
 }
