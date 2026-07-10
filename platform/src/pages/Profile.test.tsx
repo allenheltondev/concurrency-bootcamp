@@ -88,10 +88,9 @@ describe("profile page", () => {
       </MemoryRouter>
     );
 
-    // header from the id token claims
-    expect(await screen.findByRole("heading", { name: "Allen Helton" })).toBeInTheDocument();
-    expect(screen.getByText("allen@example.com")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+    // page title (identity + sign-out now live in the shared AppNav)
+    expect(await screen.findByRole("heading", { name: "Your progress" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open profile menu" })).toBeInTheDocument();
 
     // stat tiles
     expect(await screen.findByText("1250")).toBeInTheDocument();
