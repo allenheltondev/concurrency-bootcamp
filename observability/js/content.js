@@ -928,3 +928,329 @@ assert(flip.name === "GET /checkout" && flip.children[0].name === "charge",
     takeaway:"A trace is a tree serialized as a bag of spans — parent ids ARE the structure, and arrival order is noise you must be deaf to. Every trace UI you've used runs this exact assembly before it can draw a single waterfall.",
     hint:"Index all spans by id (cloning with an empty children array). One pass: parentless span → root; otherwise push onto the parent if it exists. Sort every children array by start. Return the root." },
 ];
+
+/* ===========================================================
+   LESSONS — arcs: foundations (0-3), metrics (4-9). Tracing,
+   logging, SLOs, and debugging are appended by the lesson
+   packs; see the LESSON PLAN at the top of this file.
+   =========================================================== */
+const LESSONS = [
+  { eb:"lesson 01 · foundations", title:"The two axioms", html:`
+    <p class="big">It's 3:07am and checkout is failing. You cannot attach a debugger, you cannot add a print statement, you cannot reproduce it on your laptop. <b class="hl">Axiom one: production can only be debugged through telemetry you emitted in advance.</b> Whatever question you'll need answered tonight, the answer had to be recorded before you knew the question.</p>
+    <div class="diagram anim" style="--step:.7s">
+      <div class="dlabel">a request you'll never see again &middot; only its telemetry survives</div>
+      <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
+        <rect x="10" y="30" width="80" height="34" rx="8" fill="#11131c" stroke="#2c3350"/>
+        <text x="50" y="51" fill="#e7e9f3" font-size="9" text-anchor="middle">edge</text>
+        <rect x="130" y="30" width="80" height="34" rx="8" fill="#11131c" stroke="#2c3350"/>
+        <text x="170" y="51" fill="#e7e9f3" font-size="9" text-anchor="middle">api</text>
+        <rect x="250" y="30" width="80" height="34" rx="8" fill="#11131c" stroke="#2c3350"/>
+        <text x="290" y="51" fill="#e7e9f3" font-size="9" text-anchor="middle">db</text>
+        <line x1="90" y1="47" x2="130" y2="47" stroke="#2c3350" stroke-width="1.2"/>
+        <line x1="210" y1="47" x2="250" y2="47" stroke="#2c3350" stroke-width="1.2"/>
+        <rect x="60" y="108" width="220" height="30" rx="8" fill="#11131c" stroke="#8e86f0" stroke-width="1.3"/>
+        <text x="170" y="127" fill="#8e86f0" font-size="8.5" text-anchor="middle">telemetry store — the only witness left</text>
+        <circle r="6" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+          <animateMotion dur="5.5s" repeatCount="indefinite" calcMode="linear"
+            keyTimes="0;0.3;0.6;1" keyPoints="0;0.5;1;1" path="M 50 47 L 170 47 L 290 47"/>
+          <animate attributeName="opacity" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.6;0.68;1" values="1;1;0;0"/>
+        </circle>
+        <circle r="3" fill="#8e86f0"><animateMotion dur="5.5s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.1;0.3;1" keyPoints="0;0;1;1" path="M 50 64 L 100 108"/><animate attributeName="opacity" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.1;0.28;0.3;1" values="0;1;1;0;0"/></circle>
+        <circle r="3" fill="#8e86f0"><animateMotion dur="5.5s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.36;0.56;1" keyPoints="0;0;1;1" path="M 170 64 L 170 108"/><animate attributeName="opacity" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.36;0.54;0.56;1" values="0;1;1;0;0"/></circle>
+        <circle r="3" fill="#8e86f0"><animateMotion dur="5.5s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.62;0.82;1" keyPoints="0;0;1;1" path="M 290 64 L 240 108"/><animate attributeName="opacity" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.62;0.8;0.82;1" values="0;1;1;0;0"/></circle>
+        <text x="170" y="16" fill="#ff9a6b" font-size="8.5" text-anchor="middle">✗ no debugger &middot; ✗ no breakpoint &middot; ✗ no reproducing it locally</text>
+      </svg>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">axiom 1</div><div class="lstep seq" style="--i:0">you can only ask questions of telemetry you <b>emitted in advance</b></div>
+        <div class="lanehead seq" style="--i:1">axiom 2</div><div class="lstep bad seq" style="--i:1">every signal is a <b>lossy compression</b> — aggregates lie unless you know what was thrown away</div>
+        <div class="lanehead seq" style="--i:2">therefore</div><div class="lstep good seq pop" style="--i:2">observability = choosing the compressions <b>before</b> the incident chooses the questions</div>
+      </div>
+      <div class="dnote seq" style="--i:3">A metric threw away the individuals. A trace threw away 99% of requests. A log line threw away the request's structure. <b style="color:var(--ordered)">Knowing what each one discarded</b> is the skill this course drills.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>Axiom two is the sharper one. The average latency is 228ms — and 1% of your users are timing out. The error rate is 0.4% — and it's 100% of one big customer. The gauge read 61% — and the process OOM-killed forty seconds later. None of these signals is broken; each is a <b class="hl">compression</b> doing exactly what compressions do. The failure is reading them as if they were the raw truth.</p>
+    <div class="impl">
+      <div class="dlabel">reference &middot; the mindset, as code</div>
+      <pre class="code"><span class="cm">// debugging dev:  inspect state you can reach</span>
+debugger; console.log(order);
+<span class="cm">// debugging prod: query state you chose to record</span>
+metrics.count("checkout.errors", { route, status });
+trace.span("charge", () =&gt; stripe.post(order));
+log.wide({ route, user_tier, cache: "miss", status });
+<span class="ok">// the instrumentation IS the debugger — written in advance</span></pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> everything ahead — histograms, sampling, burn rates, canonical lines — derives from these two axioms. Instrument before you need it; know what each signal discarded. Interviewers probe exactly this: not "what is a metric" but <i>what can this metric not tell you?</i></p>` },
+
+  { eb:"lesson 02 · foundations", title:"The three signals", html:`
+    <p class="big">Metrics, logs, traces — the industry's holy trinity, and most teams use all three to answer <i>none</i> of their questions well. Each signal is a different compression, tuned for a different question. <b class="hl">Metrics detect. Traces localize. Logs explain.</b></p>
+    <div class="diagram anim" style="--step:.75s">
+      <div class="dlabel">one failing request &middot; three compressions of it</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">metric</div><div class="lstep seq" style="--i:0">errors{route="/checkout"} += 1 &middot; <b>is it broken? how much? for how long?</b> — cheap, unsampled, alertable</div>
+        <div class="lanehead seq" style="--i:1">trace</div><div class="lstep seq" style="--i:1">edge &rarr; api &rarr; <span style="color:var(--race)">db 380ms ✗</span> &middot; <b>where in THIS request?</b> — structural, sampled, per-request</div>
+        <div class="lanehead seq" style="--i:2">log</div><div class="lstep seq" style="--i:2">"pool exhausted, 42 waiters, timeout 300ms" &middot; <b>why did that hop fail?</b> — detailed, local, voluminous</div>
+      </div>
+      <div class="flowarrow seq" style="--i:3">&darr; triage moves DOWN the ladder &darr;</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:4">3:07am</div><div class="lstep good seq" style="--i:4">metric pages you &rarr; trace names the hop &rarr; the hop's logs name the cause</div>
+        <div class="lanehead seq" style="--i:5">anti-flow</div><div class="lstep bad seq pop" style="--i:5">"grep the logs to find out if we're down" — answering a fleet question with the per-hop signal &#10007;</div>
+      </div>
+      <div class="dnote seq" style="--i:6">Each signal answers the NEXT one's question badly: you can't alert on sampled traces, can't localize from a counter, can't see fleet health in one hop's logs. <b style="color:var(--ordered)">Match the grade of the question to the grade of the signal.</b></div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>The costs differ as much as the questions. A metric is a few bytes per <i>series</i> regardless of traffic — that's why it can watch everything, always. A trace costs per <i>request</i>, which is why it's sampled. Logs cost per <i>line times verbosity</i>, which is why unmanaged logging is the biggest bill in most observability stacks. The discipline: emit all three <b class="hl">from the same request, joined by the same ids</b>, so each can hand off to the next.</p>
+    <div class="impl">
+      <div class="dlabel">reference &middot; one request, three emissions, one identity</div>
+      <pre class="code">const traceId = ctx.traceId;               <span class="cm">// the join key</span>
+metrics.histogram("http.duration", ms, { route });
+<span class="cm">//   -&gt; aggregate, with an EXEMPLAR pointing at traceId</span>
+span.setStatus("error");                    <span class="cm">// -&gt; the structure</span>
+log.wide({ trace_id: traceId, route, err }); <span class="cm">// -&gt; the detail</span>
+<span class="ok">// detect on the metric, jump to the trace, read the event</span></pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> "we have Datadog" is not observability. The 3am test is concrete: can you get from <i>page</i> to <i>failing hop</i> to <i>cause</i> without ssh, without grep-and-pray, without waking the person who wrote the service? That path is exactly one handoff per signal — if any handoff is missing, you'll feel it at the worst possible hour.</p>` },
+
+  { eb:"lesson 03 · foundations", title:"Cardinality: the dimension that decides everything", html:`
+    <p class="big">One number decides whether your metrics are cheap and instant or a five-figure bill with 40-second queries: <b class="hl">how many time series exist</b>. A series is one metric name plus one distinct combination of label values — and combinations <b class="hl">multiply</b>.</p>
+    <div class="diagram anim" style="--step:.75s">
+      <div class="dlabel">http_requests_total &middot; every label multiplies the series count</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">method</div><div class="lstep seq" style="--i:0">7 values &rarr; <b>7 series</b></div>
+        <div class="lanehead seq" style="--i:1">&times; status</div><div class="lstep seq" style="--i:1">5 values &rarr; <b>35 series</b></div>
+        <div class="lanehead seq" style="--i:2">&times; route</div><div class="lstep seq" style="--i:2">40 templates &rarr; <b>1,400 series</b> — fine, this is what metrics are for</div>
+        <div class="lanehead seq" style="--i:3">&times; user_id</div><div class="lstep bad seq pop" style="--i:3">2,000,000 users &rarr; <b>2.8 billion series</b> — the TSDB is now on fire &#10007;</div>
+      </div>
+      <div class="dnote seq" style="--i:4">Each series is a permanent index entry, an in-memory presence, and its own sample stream. The TSDB's cost model is <b style="color:var(--race)">the product of label cardinalities</b> — and one unbounded label multiplies everything else.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>The test for a label is: <b class="hl">could you enumerate its values in a design review?</b> method, status class, route template, region, tier — yes; those are dimensions you'll group by on dashboards. user_id, request_id, session, email, raw URL, error message — no; those are <b class="hl">identities</b>, and identity belongs in traces and wide events, where a value is a field on a row instead of a series forever. Exemplars bridge the two worlds when you need to jump from an aggregate to an instance.</p>
+    <div class="impl">
+      <div class="dlabel">reference &middot; the series accountant</div>
+      <pre class="code"><span class="cm">// series = product of distinct label values</span>
+seriesProduct({ method: 7, status: 5, route: 40 })
+<span class="ok">// -&gt; 1,400 · a dashboard's worth</span>
+seriesProduct({ method: 7, status: 5, route: 40, user_id: 2e6 })
+<span class="cm">// -&gt; 2,800,000,000 · a postmortem's worth</span>
+<span class="cm">// identity goes on the EVENT: log.wide({ user_id, ... })</span></pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> cardinality is where cost, performance, and queryability meet — the most senior-signal topic in the whole metrics conversation. "Why not put user_id on the metric?" is a top-three observability interview question, and the answer is a number: the product.</p>` },
+
+  { eb:"lesson 04 · foundations", title:"Known unknowns vs unknown unknowns", html:`
+    <p class="big">A dashboard is a <b class="hl">pre-computed answer to a question you predicted</b>. Incidents specialize in the other kind of question. The split — known unknowns vs unknown unknowns — decides which telemetry you need more of, and it's the cleanest definition of "monitoring vs observability" that isn't marketing.</p>
+    <div class="diagram anim" style="--step:.75s">
+      <div class="dlabel">two kinds of question &middot; two kinds of telemetry</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">predicted</div><div class="lstep seq" style="--i:0">"is error rate high?" &middot; "is p99 over SLO?" &rarr; dashboards + alerts answer <b>instantly</b></div>
+        <div class="lanehead seq" style="--i:1">not predicted</div><div class="lstep bad seq" style="--i:1">"is it only Android users in Brazil on the new app version hitting carts &gt; 50 items?" &rarr; no panel exists &#10007;</div>
+      </div>
+      <div class="flowarrow seq" style="--i:2">&darr; what answers the second kind &darr;</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:3">wide events</div><div class="lstep good seq" style="--i:3">one rich record per request — dozens of fields, high cardinality kept — <b>sliceable after the fact</b></div>
+        <div class="lanehead seq" style="--i:4">the move</div><div class="lstep good seq pop" style="--i:4">GROUP BY every field, sort by error rate &rarr; the outlier dimension names itself</div>
+      </div>
+      <div class="dnote seq" style="--i:5">Metrics pre-aggregate at write time (cheap, rigid). Events aggregate at read time (costly, <b style="color:var(--ordered)">flexible</b>). Every observability vendor is a different point on that one trade.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>The debugging move that wide events unlock is mechanical, and it's the single highest-leverage trick in this course: when something is wrong but nothing predicted it, <b class="hl">group the failing events by every dimension you have</b> — version, region, device, customer, shard, feature flag — and look for the dimension where failures concentrate. You're not hypothesizing; you're letting the data confess. Teams with only dashboards do this by guessing one hypothesis at a time, at 3am, in a war room.</p>
+    <div class="impl">
+      <div class="dlabel">reference &middot; the confession query</div>
+      <pre class="code"><span class="cm">-- over the wide events of the last 30 min:</span>
+SELECT app_version, region, device,
+       count(*) AS n,
+       avg(status &gt;= 500) AS err_rate
+FROM   request_events
+GROUP  BY 1, 2, 3 ORDER BY err_rate DESC;
+<span class="ok">-- "v2.4.1 · Brazil · Android" floats to the top. done.</span></pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> the postmortem line "we didn't have a dashboard for that" is a category error — you can never have a dashboard for <i>that</i>. You can have events rich enough to build the answer live. Budget accordingly: dashboards for the questions you must never stop watching, wide events for the questions you haven't met yet.</p>` },
+
+  { eb:"lesson 05 · metrics", title:"Counters: monotonic on purpose", html:`
+    <p class="big">A counter only goes up. That sounds like a limitation; it's the entire design. Because the value is <b class="hl">cumulative</b>, nothing that happens between scrapes is ever lost — and because it can only grow, <b class="hl">any observed decrease has exactly one meaning: the process restarted</b>, and the counter was reborn at zero.</p>
+    <div class="diagram anim" style="--step:.75s">
+      <div class="dlabel">scrapes every 15s across a deploy &middot; what rate() sees</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">scrapes</div><div class="lstep seq" style="--i:0">1000 &rarr; 1300 &rarr; <span style="color:var(--race)">70</span> &rarr; 370 &nbsp;<span style="color:var(--faint)">(restart between scrape 2 and 3)</span></div>
+        <div class="lanehead seq" style="--i:1">naive delta</div><div class="lstep bad seq" style="--i:1">370 − 1000 = <b>−630</b> &rarr; the dashboard reports negative traffic &#10007;</div>
+        <div class="lanehead seq" style="--i:2">reset rule</div><div class="lstep good seq" style="--i:2">+300, then <b>+70</b> (a drop = reborn at zero: the new value IS the increase), then +300</div>
+        <div class="lanehead seq" style="--i:3">rate()</div><div class="lstep good seq pop" style="--i:3">670 requests / 45s = <b>14.9/s</b> — smooth straight through the deploy &#10003;</div>
+      </div>
+      <div class="dnote seq" style="--i:4">This is why events are counters and not gauges, and why every panel says rate(x[5m]) instead of plotting x raw: the counter carries the truth <b style="color:var(--ordered)">between and across</b> scrapes; rate() decodes it.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>Two honesty notes about rate(). It's a <b class="hl">per-second average over the window</b> — a 5m window smooths any burst shorter than 5 minutes, so a 10-second spike becomes a gentle bump; shrink the window to sharpen, at the cost of noise. And Prometheus's rate() <b class="hl">extrapolates</b> slightly to the window's edges (scrapes rarely align with them), so increase() can return non-integers on integer counters. Neither is a bug; both are the compression being visible.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; the reset rule</div>
+      <pre class="code">function increase(samples) {
+  let inc = 0;
+  for (let i = 1; i &lt; samples.length; i++) {
+    const d = samples[i].v - samples[i - 1].v;
+    <span class="ok">inc += d &gt;= 0 ? d : samples[i].v;</span>  <span class="cm">// drop = restart-from-0</span>
+  }
+  return inc;
+}
+<span class="cm">// rate = increase / window-seconds — never negative</span></pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> the counter/rate contract is the load-bearing wall under every RPS and error-rate panel you have. When a dashboard shows negative traffic, or deploy days look mysteriously quiet, you're looking at hand-rolled counter math missing the reset rule — the first spot-the-bug in this course, because it's the first one in real life.</p>` },
+
+  { eb:"lesson 06 · metrics", title:"Gauges: the truth, sampled", html:`
+    <p class="big">A gauge is a <b class="hl">snapshot</b>: memory in use, queue depth, connections open — a value that goes up and down and is only ever true <i>at the instant it was scraped</i>. Between scrapes, the gauge knows nothing. That gap is not a corner case; it's where incidents live.</p>
+    <div class="diagram anim" style="--step:.75s">
+      <div class="dlabel">60s scrape interval &middot; a 30s allocation burst &middot; an OOM kill</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">14:31:00</div><div class="lstep seq" style="--i:0">scrape: memory 61% — recorded &#10003;</div>
+        <div class="lanehead seq" style="--i:1">14:31:15</div><div class="lstep bad seq" style="--i:1">burst begins: 61% &rarr; 97% in twenty seconds — <b>no scrape happens; never recorded</b></div>
+        <div class="lanehead seq" style="--i:2">14:31:40</div><div class="lstep bad seq" style="--i:2">OOM kill — the pod is gone &#10007;</div>
+        <div class="lanehead seq" style="--i:3">14:32:00</div><div class="lstep seq" style="--i:3">scrape: target missing &middot; panel shows 61% &rarr; <i>gap</i> &rarr; "memory looked fine"</div>
+      </div>
+      <div class="dnote seq" style="--i:4">Counters aggregate BETWEEN scrapes — nothing escapes them. Gauges are only the instants. Anything spiky that matters needs a counter, a histogram, or the kernel's own record (<b style="color:var(--ordered)">OOMKilled, restart counts</b>) — evidence that can't be missed.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>The classification rule: <b class="hl">events get counters, states get gauges.</b> Requests, errors, bytes, retries — events; count them. Memory, queue depth, open connections, temperature — states; sample them. The classic sin is an event metric implemented as a gauge ("errors in the last minute, computed by the app") — it can't be rate()d, resets lie, restarts zero it, and bursts between scrapes evaporate. When a state's <i>extremes</i> matter more than its shape, export a high-water-mark gauge (max since last scrape) or a histogram of the state's observations.</p>
+    <div class="impl">
+      <div class="dlabel">reference &middot; choosing the instrument</div>
+      <pre class="code"><span class="cm">// events -&gt; counter (nothing between scrapes is lost)</span>
+metrics.counter("http_requests_total").inc();
+<span class="cm">// states -&gt; gauge (true only at scrape instants)</span>
+metrics.gauge("pool_connections_active").set(pool.active);
+<span class="ok">// spiky state you must not miss -&gt; record the extreme</span>
+metrics.gauge("pool_waiters_max").set(pool.maxWaitersSinceScrape());</pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> "the graph looked fine right before the crash" is one of the most repeated sentences in postmortems, and it's almost always this lesson: a gauge testified about instants, and the incident happened between two of them. Knowing which signals <i>can't</i> miss things — counters, histograms, kernel events — is what lets you trust a quiet dashboard.</p>` },
+
+  { eb:"lesson 07 · metrics", title:"Histograms: buckets, not values", html:`
+    <p class="big">You cannot afford to store every latency. A histogram is the compromise the whole industry landed on: <b class="hl">predefine boundary edges, keep only a count per bucket</b> — plus a running sum and total. The values are gone forever; the <i>shape</i> survives, at a few dozen counters of cost, no matter the traffic.</p>
+    <div class="diagram anim" style="--step:.75s">
+      <div class="dlabel">a request takes 342ms &middot; what the histogram actually stores</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">observe</div><div class="lstep seq" style="--i:0">342ms arrives &rarr; find the first bucket with 342 &le; bound</div>
+        <div class="lanehead seq" style="--i:1">buckets</div><div class="lstep seq" style="--i:1">le=100: 4,022 &middot; le=250: 6,910 &middot; <b style="color:var(--ordered)">le=500: 8,241+1</b> &middot; le=1000: 8,410 &middot; le=+Inf: 8,433</div>
+        <div class="lanehead seq" style="--i:2">also</div><div class="lstep seq" style="--i:2">sum += 342 &middot; count += 1 &nbsp;<span style="color:var(--faint)">(so mean = sum/count is exact)</span></div>
+        <div class="lanehead seq" style="--i:3">forgotten</div><div class="lstep bad seq pop" style="--i:3">"342" itself — inside (250, 500] every value is now <b>indistinguishable</b></div>
+      </div>
+      <div class="dnote seq" style="--i:4">Prometheus exposes buckets cumulatively (le = "less or equal") — each bucket contains everything below it. Cumulative counts are still just counters: <b style="color:var(--ordered)">rate() them, sum them across hosts</b>, and the whole metrics algebra keeps working.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>The design act is choosing the boundaries, and it happens <b class="hl">before the data exists</b>. Too few buckets and everything interesting hides inside one; too many and you've reinvented cardinality explosion (each bucket is a series — remember lesson 03). The two rules that survive contact with production: <b class="hl">put an edge at every number you've promised</b> (your SLO threshold — a promise inside a bucket can only be estimated), and cluster resolution where your traffic actually lives, sparse everywhere else.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; record</div>
+      <pre class="code">record(v) {
+  <span class="ok">let i = this.bounds.findIndex(b =&gt; v &lt;= b);</span>  <span class="cm">// le, not lt</span>
+  if (i === -1) i = this.bounds.length;         <span class="cm">// +Inf bucket</span>
+  this.counts[i]++; this.total++; this.sum += v;
+}
+<span class="cm">// bounds chosen for a 300ms SLO:</span>
+<span class="cm">//   [50, 100, 200, 300, 600, 1200, 3000] — the promise is an edge</span></pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> every latency percentile you've ever read off a dashboard came out of this structure — which means every one of them inherited the boundary choices someone made in a code review months earlier. The next lesson is about exactly how that inheritance works, and when it lies.</p>` },
+
+  { eb:"lesson 08 · metrics", title:"The p99 is an interpolation", html:`
+    <p class="big">histogram_quantile(0.99, ...) does not know your p99. It knows which <b class="hl">bucket</b> the 99th-percentile rank falls into, and then it <b class="hl">draws a straight line through the bucket</b> and reads a point off it — assuming observations spread evenly between the edges. Your dashboard's p99 is that estimate.</p>
+    <div class="diagram anim" style="--step:.75s">
+      <div class="dlabel">100 observations &middot; where's the p99? &middot; bounds [100, 250, 500, 1000]</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">counts</div><div class="lstep seq" style="--i:0">le=100: 40 &middot; le=250: 30 &middot; le=500: 20 &middot; le=1000: 10</div>
+        <div class="lanehead seq" style="--i:1">rank</div><div class="lstep seq" style="--i:1">0.99 &times; 100 = rank 99 &rarr; cumulative crosses 99 in bucket <b>(500, 1000]</b></div>
+        <div class="lanehead seq" style="--i:2">interpolate</div><div class="lstep seq" style="--i:2">9 of that bucket's 10 observations sit below the rank &rarr; 90% deep &rarr; 500 + 0.9 &times; 500 = <b>950ms</b></div>
+        <div class="lanehead seq" style="--i:3">reality</div><div class="lstep bad seq pop" style="--i:3">every actual sample in that bucket was <b>800ms</b> — the panel reports a latency nobody experienced</div>
+      </div>
+      <div class="dnote seq" style="--i:4">Worst-case error = the width of the bucket the quantile lands in. Edge cases you must know: a rank in the <b style="color:var(--race)">+Inf bucket returns the largest finite bound</b> (your p99 "pins" at the top edge — a tell that your bounds are too low), and quantiles below the first bound interpolate from zero.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>This is not a reason to distrust histograms — it's the price of merging. Percentile sketches with tighter error exist, but bucket histograms bought the property everything else in this course depends on: <b class="hl">counts add across hosts</b>. The operational skill is reading the estimate like an estimate: a p99 that plateaus exactly at a bucket edge, or "jumps" between edges with no traffic change, is the interpolation showing through — the distribution moved <i>within</i> a bucket, or crossed one.</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; quantile</div>
+      <pre class="code">quantile(q) {
+  const rank = q * this.total;
+  let cum = 0;
+  for (let i = 0; i &lt; this.counts.length; i++) {
+    const prev = cum; cum += this.counts[i];
+    if (cum &gt;= rank &amp;&amp; this.counts[i] &gt; 0) {
+      if (i &gt;= this.bounds.length)              <span class="cm">// +Inf rule</span>
+        return this.bounds[this.bounds.length - 1];
+      const lo = i === 0 ? 0 : this.bounds[i - 1];
+      const hi = this.bounds[i];
+      <span class="ok">return lo + (hi - lo) * ((rank - prev) / this.counts[i]);</span>
+    }
+  }
+}</pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> when someone asks "why does our p99 say 950 when the traces all show 800?", the senior answer names the mechanism — rank, bucket, straight line — and the fix — a boundary where the traffic is. Axiom two, in its purest form: the number on the dashboard is <i>made</i>, and you now know the recipe.</p>` },
+
+  { eb:"lesson 09 · metrics", title:"The aggregation trap", html:`
+    <p class="big">Forty hosts each report a p99. The fleet panel shows avg(p99) = 310ms, green against a 500ms SLO — while one canary serves 2,900ms to every request it touches. Nothing is misconfigured. The panel is simply computing <b class="hl">a statistic of statistics</b>, and that operation is not math, it's decoration.</p>
+    <div class="diagram anim" style="--step:.8s">
+      <div class="dlabel">what composes, what doesn't</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">counters</div><div class="lstep good seq" style="--i:0">sum(rate(errors[5m])) across hosts &rarr; <b>exact</b> — counts add, always &#10003;</div>
+        <div class="lanehead seq" style="--i:1">histograms</div><div class="lstep good seq" style="--i:1">sum bucket counts, THEN histogram_quantile &rarr; <b>the real fleet p99</b> &#10003;</div>
+        <div class="lanehead seq" style="--i:2">percentiles</div><div class="lstep bad seq" style="--i:2">avg(p99) / max(p99) / p99-of-p99s &rarr; a number <b>no request experienced</b> &#10007;</div>
+        <div class="lanehead seq" style="--i:3">averages</div><div class="lstep bad seq pop" style="--i:3">avg of per-host averages &rarr; weights <b>hosts</b>, not requests — the idle host votes equal to the loaded one &#10007;</div>
+      </div>
+      <div class="dnote seq" style="--i:4">The rule that generates all the rows: <b style="color:var(--ordered)">aggregate raw quantities, compute results LAST</b>. A percentile, a ratio, an average — anything already divided or ranked — has thrown away the weights it would need to combine again.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>Run the canary numbers once and the lesson sticks: 39 hosts at p99 240ms plus one at 2,900ms averages to 306ms — "compliant" — while ~2.5% of all requests (the canary's entire traffic) are 6× over the SLO. Merge the histograms instead and the fleet p99 lands where the pain is. Same trap, subtler costume: averaging <i>error ratios</i> across shards (divide first, weight lost) instead of sum(errors)/sum(requests). If it's already a ratio, a rank, or a mean — it doesn't add.</p>
+    <div class="impl">
+      <div class="dlabel">reference &middot; the honest fleet quantile</div>
+      <pre class="code"><span class="cm">// per-host: export BUCKETS (counters), never percentiles</span>
+histogram_quantile(0.99,
+  <span class="ok">sum by (le) (rate(http_duration_bucket[5m]))</span>)
+<span class="cm">// sum by (le): merge every host's buckets — exact —</span>
+<span class="cm">// then compute the quantile ONCE, over the fleet</span></pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> this is the axiom-two flagship, and a genuine seniority marker — "you can't average percentiles" plus the <i>why</i> (results don't carry weights) plus the fix (merge distributions, compute last). It's also why histograms exist at all: they're the only latency representation that survives aggregation with the truth intact.</p>` },
+
+  { eb:"lesson 10 · metrics", title:"RED, USE, and the golden signals", html:`
+    <p class="big">At 3am you don't want creativity; you want a checklist that covers the search space. Three overlapping ones survived contact with the industry: <b class="hl">RED</b> for things that serve requests, <b class="hl">USE</b> for things requests consume, and Google's <b class="hl">four golden signals</b> bridging both.</p>
+    <div class="diagram anim" style="--step:.75s">
+      <div class="dlabel">the checklists &middot; and what each one covers</div>
+      <div class="lanes">
+        <div class="lanehead seq" style="--i:0">RED</div><div class="lstep seq" style="--i:0"><b>R</b>ate &middot; <b>E</b>rrors &middot; <b>D</b>uration — per service, per route &rarr; <i>is this SERVICE healthy?</i></div>
+        <div class="lanehead seq" style="--i:1">USE</div><div class="lstep seq" style="--i:1"><b>U</b>tilization &middot; <b>S</b>aturation &middot; <b>E</b>rrors — per resource (CPU, pool, disk, queue) &rarr; <i>is this RESOURCE the bottleneck?</i></div>
+        <div class="lanehead seq" style="--i:2">golden</div><div class="lstep seq" style="--i:2">latency &middot; traffic &middot; errors &middot; <b>saturation</b> — RED plus the early-warning fourth</div>
+        <div class="lanehead seq" style="--i:3">the split</div><div class="lstep good seq pop" style="--i:3">RED sees the <b>symptom</b> (users hurting) &middot; USE finds the <b>suspect</b> (what ran out)</div>
+      </div>
+      <div class="dnote seq" style="--i:4">Saturation deserves its reputation: it's the leading indicator. Utilization at 80% is a fact; <b style="color:var(--ordered)">a queue forming</b> — waiters on the pool, depth climbing, load shedding — is the future arriving early.</div>
+    </div>
+    <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
+    <p>The triage choreography: <b class="hl">RED first, on the service the users touch</b> — it confirms and scopes the symptom. Then USE, <b class="hl">walking the dependency chain</b> — for each resource the slow path consumes, check utilization, saturation, errors, and the bottleneck introduces itself. The discipline is instrumenting both <i>in advance</i> (axiom one): every service gets RED per route the day it ships; every finite resource — pools, queues, threads, disks — gets USE the day it's provisioned. Dashboards then write themselves, identically, for every service you own.</p>
+    <div class="impl">
+      <div class="dlabel">reference &middot; RED per route, USE per pool — the minimum kit</div>
+      <pre class="code"><span class="cm">// RED — emitted by middleware, free forever after:</span>
+rate(http_requests_total{route}[5m])          <span class="cm">// R</span>
+rate(http_requests_total{route,code=~"5.."}[5m])  <span class="cm">// E</span>
+histogram_quantile(0.99, ...duration_bucket)  <span class="cm">// D</span>
+<span class="cm">// USE — for the connection pool:</span>
+pool_in_use / pool_size                       <span class="cm">// utilization</span>
+<span class="ok">pool_waiters                                  // saturation!</span>
+pool_checkout_timeouts_total                  <span class="cm">// errors</span></pre>
+    </div>
+    <p><b class="hl">Why it matters:</b> checklists beat brilliance under adrenaline. "Walk RED on the service, then USE down its dependencies" is a complete, teachable triage algorithm — and in interviews, structuring your answer around RED/USE instantly signals you've actually held a pager.</p>` },
+];
+
+/* ---- lesson <-> skill cross-links ----
+   Lessons teach a concept; the matching skill checks comprehension from a
+   different angle. Indices reference the FINAL lesson order (see the LESSON
+   PLAN at the top of this file) — packs 10/20 fill in lessons 10-28. */
+// skill (drill) id -> the lesson whose concept it tests (0-based index)
+const DRILL_LESSON = {
+  counterrate:4, histquantile:7, histmerge:8, traceassemble:10, headtail:13,
+  burnrate:20, canonlog:17, cardinality:2,
+  picksignal:1, culprithop:12, bucketdesign:6, alertdesign:21, cardtriage:2,
+  missingtelemetry:27, deploycorr:23,
+};
+// lesson index -> where to go practice it { mod, drill? }
+const LESSON_PRACTICE = {
+  0:{mod:"signals"}, 1:{mod:"bank",drill:"picksignal"}, 2:{mod:"primitives",drill:"cardinality"},
+  3:{mod:"tradeoffs"}, 4:{mod:"primitives",drill:"counterrate"}, 5:{mod:"signals"},
+  6:{mod:"bank",drill:"bucketdesign"}, 7:{mod:"primitives",drill:"histquantile"},
+  8:{mod:"primitives",drill:"histmerge"}, 9:{mod:"tradeoffs"},
+  10:{mod:"primitives",drill:"traceassemble"}, 11:{mod:"signals"},
+  12:{mod:"bank",drill:"culprithop"}, 13:{mod:"primitives",drill:"headtail"},
+  14:{mod:"tradeoffs"}, 15:{mod:"tradeoffs"}, 16:{mod:"signals"},
+  17:{mod:"primitives",drill:"canonlog"}, 18:{mod:"tradeoffs"}, 19:{mod:"tradeoffs"},
+  20:{mod:"primitives",drill:"burnrate"}, 21:{mod:"bank",drill:"alertdesign"},
+  22:{mod:"tradeoffs"}, 23:{mod:"bank",drill:"deploycorr"}, 24:{mod:"incident"},
+  25:{mod:"incident"}, 26:{mod:"incident"}, 27:{mod:"bank",drill:"missingtelemetry"},
+  28:{mod:"tradeoffs"},
+};
