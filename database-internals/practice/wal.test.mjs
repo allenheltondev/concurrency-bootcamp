@@ -4,7 +4,8 @@ import { WAL } from "./wal.mjs";
 suite("WAL — replay equals the committed history, before and after checkpoint", ({ log, assert }) => {
   const w = new WAL();
 
-  // Two interleaved transactions; only t1 commits — then the power goes out.
+  // Two interleaved transactions; only t1 has committed so far. recover() here
+  // answers "what would a crash at this instant leave behind?" — t2 stays open.
   w.begin("t1");
   w.begin("t2");
   w.set("t1", "a", 1);
@@ -62,8 +63,9 @@ suite("WAL — replay equals the committed history, before and after checkpoint"
     [...crash2].map(([k, v]) => k + ":" + v).join(", ") + " }");
   assert(crash2.get("a") === 9,
     "a tx committing after the checkpoint must replay ON TOP of the snapshot — newest committed write wins");
-  assert(crash2.get("c") === 3 && crash2.get("d") === 4,
-    "the checkpointed state and the post-checkpoint commits must BOTH survive");
+  assert(crash2.get("c") === 3 && crash2.get("d") === 4 && crash2.get("b") === 2,
+    "the checkpointed state, the tx that straddled the checkpoint, and the post-checkpoint " +
+    "commits must ALL survive");
   assert(!crash2.has("e"),
     "t4 began and wrote after the checkpoint but never committed — atomicity does not expire at a checkpoint");
 
