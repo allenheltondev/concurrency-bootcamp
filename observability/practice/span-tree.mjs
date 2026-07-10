@@ -8,7 +8,9 @@
    fatal (exporters drop spans; the rest of the tree must still render).
    criticalPath(root): from the root, repeatedly follow the child that
    FINISHES LAST (largest end) to a leaf; return the names, root first —
-   the last-finisher chain is the only place user latency lives.
+   the last-finisher chain, i.e. the first-order critical path (the last
+   finisher at every level is always on it; sequential predecessors that
+   gate its start matter too).
    EDGE: a childless root is its own critical path; the longest-duration
    child is NOT necessarily the last finisher. */
 "use strict";

@@ -65,7 +65,7 @@ implement until green, diff against the solution, redo from blank tomorrow.
 | `js/sim.js` | The incident-simulator module (seeded PRNG, virtual time, symptom/cause alert toggle). |
 | `js/packs/10-…, 20-…` | Lesson packs: tracing/logging and SLOs/debugging/verification arcs. |
 | `js/packs/30-hunt-build.js` | The rest of spot-the-bug and write-it. |
-| `js/packs/40-stack-map.js` | The stack map sheet and four flashcards. |
+| `js/packs/40-stack-map.js` | The stack map sheet, four more quiz questions, and six flashcards. |
 | `../js/app.js` | The shared course engine (see `../docs/COURSE_PATTERN.md`). |
 | `practice/` | Blank-file pattern reps with runnable Node tests. |
 | `sw.js`, `manifest.webmanifest`, `icon.svg` | Offline-first PWA shell, scoped to this directory. |

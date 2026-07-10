@@ -1,7 +1,8 @@
 /* Log sampler — cut 99% of the bill, keep 100% of the evidence.
 
    INVARIANT: two rules, in strict order. (1) ERROR-level records are ALWAYS
-   kept — pushed to this.kept and returned — no dice ever rolled for them.
+   kept — pushed to this.kept and returned — no dice ever rolled for them,
+   and no sample_rate stamped (absent means 1: the record stands for itself).
    (2) Everything else is kept only when fnv1a(record.trace_id) lands under
    rate * 10000 (deterministic by trace id, so logs and traces keep the same
    specimens), and each kept record is stamped with sample_rate = 1 / rate so

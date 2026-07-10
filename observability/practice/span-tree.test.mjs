@@ -38,5 +38,5 @@ suite("span tree — same tree from any order, and the last-finisher path", ({ l
     "the LAST FINISHER gates the parent, not the longest child — got " + p2.join(","));
   assert(criticalPath(buildTrace([{ id: "x", parent: null, name: "leaf", start: 0, end: 5 }])).join(",") === "leaf",
     "a childless root is its own path");
-  return "parent ids are the structure, arrival order is noise — and latency lives on one chain";
+  return "parent ids are the structure, arrival order is noise — and the last-finisher chain is the first-order critical path";
 });

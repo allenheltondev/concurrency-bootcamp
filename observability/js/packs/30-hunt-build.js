@@ -10,7 +10,7 @@
      ========================================================= */
   BUGHUNT.push(
   { id:"bug_tailbuffer", title:"Tail-sampling buffer", why:"the oldest open trace IS the slow trace you promised to keep", lesson:13,
-    scenario:"Tail sampling was sold to the team as 'we keep 100% of slow traces.' In production, the slowest requests are exactly the ones missing from the store — and the miss rate climbs with traffic. Errors are kept fine. Which line(s) throw away the merchandise?",
+    scenario:"Tail sampling was sold to the team as 'we keep 100% of slow traces.' In production, the slowest requests are exactly the ones missing from the store — and the miss rate climbs with traffic. Fast errors are kept fine. Which line(s) throw away the merchandise?",
     lines:[
       "class TailBuffer {",
       "  constructor(max, slowMs) {",
@@ -88,7 +88,7 @@
       "}",
     ],
     bug:[7],
-    explain:"Line 8 rolls the sampling dice BEFORE the level check ever runs. Any error whose trace id lands on a dropped tick — 99% of them at a 1% rate — returns null without reaching the 'errors always kept' branch, which is now dead code for dropped ticks. The outage keeps ~1% of its evidence, exactly the observed 41 of 4,000. The classifier must run first: `if (record.level === \"error\") return record;` unconditionally, and only THEN sample the happy path. Order of guards is the entire invariant in a sampler." },
+    explain:"Line 8 rolls the sampling dice BEFORE the level check ever runs. Any error whose trace id lands on a dropped tick — 99% of them at a 1% rate — returns null without reaching the 'errors always kept' branch, which is now dead code for dropped ticks. The outage keeps ~1% of its evidence, exactly the observed 41 of 4,000. The classifier must run first: `if (record.level === \"error\") return record;` unconditionally (unstamped — a missing sample_rate means 1, the record stands for itself), and only THEN sample the happy path. Order of guards is the entire invariant in a sampler." },
 
   { id:"bug_spanwrap", title:"Span middleware", why:"exceptions take the exit you didn't instrument", lesson:11,
     scenario:"Tracing worked for weeks. Then: after the first exception in a worker process, every LATER request's spans nest under the request that failed hours ago — one zombie trace growing forever, its duration climbing monotonically. A restart clears it until the next exception. Which line?",
@@ -139,7 +139,7 @@
      ========================================================= */
   WRITE.push(
   { id:"w-critpath", title:"Critical-path finder — write it", why:"latency lives on exactly one chain through the tree", lesson:12,
-    spec:"Write criticalPath(root): walk from the root, at each node following the child that FINISHES LAST (largest end), until a leaf. Return the span names along the way, root first. That chain is the only place where optimization changes user latency.",
+    spec:"Write criticalPath(root): walk from the root, at each node following the child that FINISHES LAST (largest end), until a leaf. Return the span names along the way, root first. That last-finisher chain is the first-order critical path: the last finisher at every level is always on it (sequential predecessors that gate its start matter too — read the stairs).",
     pre:`// node = { name, start, end, children: [...] }
 function criticalPath(root) {`,
     post:`}`,
@@ -185,9 +185,19 @@ log("long-early (dur 200) vs short-late (ends 210): " + p2.join(" -> "));
 assert(p2.join(",") === "root,short-late",
   "the LAST FINISHER gates the parent, not the longest child - got " + p2.join(","));
 assert(criticalPath({ name: "leaf", start: 0, end: 5, children: [] }).join(",") === "leaf",
-  "a childless root is its own critical path");`,
+  "a childless root is its own critical path");
+const gate = {
+  name: "root", start: 0, end: 310, children: [
+    { name: "long-span", start: 0, end: 300, children: [] },
+    { name: "mid-burst", start: 100, end: 200, children: [] },
+  ],
+};
+const p3 = criticalPath(gate);
+log("last-started (mid-burst) vs last-finisher (long-span): " + p3.join(" -> "));
+assert(p3.join(",") === "root,long-span",
+  "the LAST-STARTED child is not the last finisher - got " + p3.join(","));`,
     pass:"the last-finisher chain found — including the trap where the longest child is NOT on the path",
-    takeaway:"Total latency is decided by one chain: at every node, the child that finishes last. Work anywhere else in the tree is invisible to the user — which is why 'we made service X 40% faster and nothing changed' is always a critical-path story.",
+    takeaway:"The last finisher at every level is always on the chain that gates total latency — the first-order critical path, and the place to look FIRST. Sequential predecessors that gate its start matter too; but when 'we made service X 40% faster and nothing changed', X was usually nowhere near this chain.",
     hint:"Start the path with root.name. While the current node has children, reduce them to the one with the largest end, push its name, descend. Return the names array." },
 
   { id:"w-headsampler", title:"Head sampler — write it", why:"every service must reach the same verdict, alone", lesson:13,
@@ -224,7 +234,11 @@ const ids = [];
 for (let i = 0; i < 400; i++) ids.push("trace-" + i);
 const kept = ids.filter(id => s.keep(id)).length;
 log("rate 0.25 over 400 trace ids -> kept " + kept);
-assert(kept > 60 && kept < 140, "kept fraction must be near 25%, got " + kept + "/400");
+assert(kept === 96, "the kept set is a pure function of the ids: exactly 96 of these 400, got " + kept);
+assert(s.keep("trace-0") === true && s.keep("trace-42") === true &&
+  s.keep("trace-1") === false && s.keep("trace-9") === false &&
+  s.keep("trace-17") === false && s.keep("trace-99") === false,
+  "golden verdicts: keep() must depend on the trace id ALONE - no randomness, no clock");
 for (const id of ids.slice(0, 50))
   assert(s.keep(id) === s.keep(id), "the same trace id must always get the same verdict");
 const s2 = new HeadSampler(0.25);
@@ -398,7 +412,7 @@ assert(events[1].route === "/boom" && events[1].request_id === "r2",
     hint:"Build canon with route/request_id/started. try: run handler, record status, return. catch: status 500, error message, re-throw. finally: stamp duration_ms and emit — the finally ALWAYS runs." },
 
   { id:"w-logsampler", title:"Error-preserving log sampler — write it", why:"cut 99% of the bill, keep 100% of the evidence", lesson:18,
-    spec:"Write emit(record): ERROR-level records are ALWAYS kept (pushed to this.kept and returned) — no dice ever rolled. Other records are kept only when fnv1a(record.trace_id) lands under rate × 10000, and each kept one is stamped with sample_rate = 1/rate so query-time totals can reweigh. Dropped records return null.",
+    spec:"Write emit(record): ERROR-level records are ALWAYS kept (pushed to this.kept and returned) — no dice ever rolled, and no sample_rate stamped: absent means 1, each record stands for itself. Other records are kept only when fnv1a(record.trace_id) lands under rate × 10000, and each kept one is stamped with sample_rate = 1/rate so query-time totals can reweigh. Dropped records return null.",
     pre:`function fnv1a(s) {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {

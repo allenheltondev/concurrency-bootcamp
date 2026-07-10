@@ -7,7 +7,10 @@ suite("head sampler — every service reaches the same verdict, alone", ({ log, 
   for (let i = 0; i < 400; i++) ids.push("trace-" + i);
   const kept = ids.filter(id => s.keep(id)).length;
   log("rate 0.25 over 400 trace ids -> kept " + kept);
-  assert(kept > 60 && kept < 140, "kept fraction must be near 25%, got " + kept + "/400");
+  assert(kept === 96, "the kept set is a pure function of the ids: exactly 96 of these 400, got " + kept);
+  assert(s.keep("trace-0") === true && s.keep("trace-42") === true &&
+    s.keep("trace-1") === false && s.keep("trace-99") === false,
+    "golden verdicts: keep() must depend on the trace id alone — no randomness, no clock");
 
   for (const id of ids.slice(0, 50))
     assert(s.keep(id) === s.keep(id), "the same trace id must ALWAYS get the same verdict");

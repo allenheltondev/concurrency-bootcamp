@@ -22,11 +22,12 @@
     <p>Two design rules keep SLOs honest. <b class="hl">Measure at the user's edge</b> — an SLI computed inside the service can't see the load balancer 502s or the DNS failures users experience; the closer to the user, the truer the ratio. And <b class="hl">make the good-event predicate computable from telemetry you already emit</b>: the latency threshold in the SLI is why lesson 07 told you to put a histogram boundary exactly at 400ms — compliance becomes a bucket sum instead of an interpolated guess.</p>
     <div class="impl">
       <div class="dlabel">reference &middot; the SLI as a query</div>
-      <pre class="code"><span class="cm">// good events / total events, straight from RED telemetry:</span>
-sum(rate(http_requests_total{route="/checkout",code!~"5.."}[30d]))
-  and latency: sum(rate(http_duration_bucket{<span class="ok">le="400"</span>}[30d]))
-/ sum(rate(http_requests_total{route="/checkout"}[30d]))
-<span class="cm">// budget remaining = 1 - SLO  minus  1 - SLI(so far)</span></pre>
+      <pre class="code"><span class="cm">// good events / total events — one status-partitioned histogram</span>
+<span class="cm">// carries BOTH predicates (fast AND successful) in one series family:</span>
+sum(rate(http_duration_bucket{route="/checkout",
+                              code!~"5..",<span class="ok">le="400"</span>}[30d]))
+/ sum(rate(http_duration_count{route="/checkout"}[30d]))
+<span class="cm">// budget remaining = (1 - SLO) - (1 - SLI so far)</span></pre>
     </div>
     <p><b class="hl">Why it matters:</b> every alerting lesson after this one is arithmetic on the budget — burn rate is just "budget spent per unit time." And in design reviews, "what's the SLI?" is the adult version of "is it up?": it forces the room to say which failures count, measured from where, over what window.</p>` },
 

@@ -125,7 +125,7 @@ function simAlertRows(run, mode) {
     ? { fired: false, text: "quiet — " + label + " " + note }
     : { fired: true, text: "PAGE @m" + t + " — " + label };
   if (mode === "symptom") return [
-    row(a.errBurn, "error-budget burn (5m ∧ 15m windows > 8× budget)", "(users' error budget never burned fast enough to page)"),
+    row(a.errBurn, "error-budget burn > 8× on 5m ∧ 15m — windows scaled for the 60-min sim; prod: 14.4× on 1h ∧ 5m", "(users' error budget never burned fast enough to page)"),
     row(a.latSlo, "latency SLO breach (p99 > " + SIM_LAT_SLO + "ms, 3m sustained)", "(the p99 promise held)"),
   ];
   return [

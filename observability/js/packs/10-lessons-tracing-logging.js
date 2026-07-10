@@ -92,14 +92,14 @@ tracer.startSpan("charge.consume", <span class="ok">{ parent }</span>);</pre>
         </circle>
       </svg>
       <div class="lanes">
-        <div class="lanehead seq" style="--i:0">critical path</div><div class="lstep seq" style="--i:0">the chain whose end decides the total: checkout &rarr; charge &rarr; stripe. <b>Only work here changes user latency</b></div>
+        <div class="lanehead seq" style="--i:0">critical path</div><div class="lstep seq" style="--i:0">the last-finisher chain: checkout &rarr; charge &rarr; stripe — <b>the first-order critical path</b>. The last finisher at every level is always on it; sequential predecessors that gate its start are on it too</div>
         <div class="lanehead seq" style="--i:1">stairs</div><div class="lstep seq" style="--i:1">auth then cart, strictly sequential — if they're independent, that's <b>missing concurrency</b>: 120ms where 80 would do</div>
-        <div class="lanehead seq" style="--i:2">gaps</div><div class="lstep bad seq pop" style="--i:2">charge starts 16ms after cart ends; stripe returns 10ms before charge ends — <b>uninstrumented time</b>: serialization, queues, GC, code without spans</div>
+        <div class="lanehead seq" style="--i:2">gaps</div><div class="lstep bad seq pop" style="--i:2">charge runs 10ms before stripe.post starts and 10ms after it returns — <b>uninstrumented time</b>: serialization, queues, GC, code without spans</div>
       </div>
-      <div class="dnote seq" style="--i:3">Total time &ne; sum of spans: parallel spans overlap and gaps belong to nobody. Optimizing a span OFF the critical path is refactoring for fun — <b style="color:var(--ordered)">the path is the only place latency lives</b>.</div>
+      <div class="dnote seq" style="--i:3">Total time &ne; sum of spans: parallel spans overlap and gaps belong to nobody. The chain is <b style="color:var(--ordered)">first-order</b>: start optimizing there — and remember the stairs: a sequential predecessor that gates the chain's start (auth gates cart gates charge) shapes the total too.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p>The mechanical version: walk from the root, and at each node follow <b class="hl">the child that finishes last</b> — that chain is the critical path. Along it, look at each span's <b class="hl">self-time</b> (its duration minus its children's coverage): the biggest self-time is the hop that personally spent the time, as opposed to merely containing a slow descendant. Everything else — pretty as it renders — is context.</p>
+    <p>The mechanical version: walk from the root, and at each node follow <b class="hl">the child that finishes last</b> — that chain is the last-finisher chain, the first-order critical path. Along it, look at each span's <b class="hl">self-time</b> (its duration minus its children's coverage): the biggest self-time is the hop that personally spent the time, as opposed to merely containing a slow descendant. Everything else is context — though the stairs are context you can cash in: a sequential predecessor that gates a chain span's start moves the total when you parallelize it away.</p>
     <div class="impl">
       <div class="dlabel">reference implementation &middot; the two questions, as code</div>
       <pre class="code">function criticalPath(root) {
@@ -114,7 +114,7 @@ tracer.startSpan("charge.consume", <span class="ok">{ parent }</span>);</pre>
 <span class="cm">// selfTime(node) = duration − union(children intervals)</span>
 <span class="cm">// biggest self-time ON the path = the actual culprit</span></pre>
     </div>
-    <p><b class="hl">Why it matters:</b> "we made the cart service 40% faster and checkout latency didn't move" is a critical-path lesson someone paid a sprint for. Read the waterfall first: stairs tell you what to parallelize, gaps tell you what to instrument, and the path tells you the only place optimization counts.</p>` },
+    <p><b class="hl">Why it matters:</b> "we made the cart service 40% faster and checkout latency didn't move" is a critical-path lesson someone paid a sprint for. Read the waterfall first: stairs tell you what to parallelize, gaps tell you what to instrument, and the last-finisher chain tells you where optimization counts first.</p>` },
 
   { eb:"lesson 14 · tracing", title:"Sampling: head vs tail", html:`
     <p class="big">Tracing every request at full detail would cost more than the service it observes. So you sample — and <b class="hl">where you decide is everything</b>: at the head (trace start), you're cheap and blind; at the tail (trace end), you see everything and pay for the privilege.</p>

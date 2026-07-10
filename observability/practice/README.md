@@ -83,8 +83,8 @@ then wire the pager to the promise.
 ### Traces — where inside THIS request
 
 - **span-tree** — assemble a trace from an out-of-order bag of spans (root =
-  the parentless span; orphans skipped, never fatal) and walk the critical
-  path by last-finisher — the only chain where latency lives.
+  the parentless span; orphans skipped, never fatal) and walk the
+  last-finisher chain — the first-order critical path.
 - **head-sampler** — the deterministic keep/drop decision: a pure function of
   the trace id, so every service reaches the same verdict alone and traces
   never fragment.
