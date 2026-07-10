@@ -456,16 +456,17 @@ async function demoBucketDesign(){
 }
 async function demoAlertDesign(){
   const slo=0.99;
-  const blip=new Array(360).fill(0); blip[100]=1; blip[101]=1;        // 2 min of 100% errors
-  const leak=new Array(360).fill(0.08);                               // 8% errors for 6 hours
+  const blip=new Array(720).fill(0); blip[460]=1; blip[461]=1;   // 6h+ healthy, then 2 min of 100% errors
+  const leak=new Array(720).fill(0);                             // 6h healthy, then 8% errors sustained
+  for(let i=360;i<720;i++) leak[i]=0.08;
   const staticBlip=staticAlertFires(blip,0.10,2);
   const staticLeak=staticAlertFires(leak,0.10,2);
   const burnBlip=burnAlertFires(blip,slo);
   const burnLeak=burnAlertFires(leak,slo);
-  const pass=staticBlip!==-1 && staticLeak===-1 && burnBlip===-1 && burnLeak!==-1;
+  const pass=staticBlip===461 && staticLeak===-1 && burnBlip===-1 && burnLeak===630;
   return {lines:[
-    {t:`blip (100% for 2 min, self-healed): static "err>10% for 2m" PAGES at t=${staticBlip} · burn-rate stays quiet (1h burn 3.3 < 14.4)`},
-    {t:`leak (8% for 6 hours): static NEVER fires (8 < 10) · burn-rate pages at t=${burnLeak} (6h & 30m burn 8 > 6)`},
+    {t:`blip (100% for 2 min at t=460, self-healed): static "err>10% for 2m" PAGES at t=${staticBlip} · burn-rate stays quiet (1h burn 3.3 < 14.4)`},
+    {t:`leak (8% from t=360): static NEVER fires (8 < 10) · burn-rate pages at t=${burnLeak} — ${((burnLeak-360)/60).toFixed(1)}h after onset, once the 6h AND 30m burns both clear 6`},
     {t:`same two alerts, opposite verdicts — the static threshold woke you for nothing and slept through the outage`},
   ], pass, verdict:pass?"thresholds ask 'how high?'; burn rates ask 'how fast is the promise dying?' — only one of those is the question":`sb=${staticBlip} sl=${staticLeak} bb=${burnBlip} bl=${burnLeak}`};
 }

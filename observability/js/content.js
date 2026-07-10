@@ -90,7 +90,7 @@ const QUIZ = [
              "approve it: only users who actually appear create series, so the cost is proportional to traffic"],
     answer:0,
     whys:[
-      "Right. A time series exists per distinct label-set, and series are the unit of cost: each one is an indexed, in-memory entity with its own samples. 2M users × method × path × status is tens of millions of series — that's a TSDB outage, not a feature. High-cardinality identity goes in events/traces, where each value is a field on a row, not a new row forever.",
+      "Right. A time series exists per distinct label-set, and series are the unit of cost: each one is an indexed, in-memory entity with its own samples. 2M users multiplied by the existing method × path × status combinations is on the order of billions of series (2.8 billion at this course's label counts) — that's a TSDB outage, not a feature. High-cardinality identity goes in events/traces, where each value is a field on a row, not a new row forever.",
       "Metrics aren't rows — they're series. A label isn't a column on existing data; every new VALUE creates a new series with its own index entry and sample stream. The cost model is multiplicative (product of label cardinalities), and that's the single most expensive misunderstanding in observability.",
       "Even 'only' 50k active users multiplied by the existing labels is millions of series — and churn makes it worse: every new user is a permanent index entry. The bill arrives monthly; the query slowdown arrives immediately."] },
 
@@ -194,7 +194,7 @@ const QUIZ = [
     whys:[
       "Right. An exemplar is the anti-aggregation escape hatch: when a request lands in a bucket, its trace id is (sometimes) attached to that bucket. So the spike on the panel carries live pointers to actual victims — one click from 'p99 went up' to 'here is the waterfall of a request that made it go up.' This is the two axioms shaking hands: the aggregate detects, the exemplar de-compresses.",
       "The timestamp matches thousands of interleaved requests, and log lines don't sort by slowness unless you logged durations and correlate by request id — a 20-minute forensic project for what the exemplar answers in one click. Grep is where you go when the bridge doesn't exist.",
-      "Only works if slow traces survived sampling — under head sampling most didn't, and you'll 'discover' there were no slow requests. The exemplar is captured at the instrument, from the same population as the metric itself; a trace-store search shows you the survivors."] },
+      "Only works if slow traces survived sampling — under head sampling most didn't, and you'll 'discover' there were no slow requests. And even among survivors, a duration search is unanchored guesswork (slower than what, in which window?), while an exemplar is a bucket-targeted pointer from the exact panel and spike you're staring at. Pair exemplars with tail or error-biased sampling and the dots on your worst buckets are nearly always live."] },
 
   { code:`// two alert candidates for the same service:
 //  A: page on user pain — SLO burn on errors + latency
@@ -644,7 +644,7 @@ const BUGHUNT = [
     explain:"Line 6 trusts the raw delta. A counter is cumulative per process — when a deploy restarts the service, the counter is reborn at zero, and 70 − 1300 contributes −1230 to the sum. The rate goes negative once per restart, the low-traffic alert fires on arithmetic instead of traffic, and the panel is wrong exactly when people watch it hardest (during deploys). The delta needs the reset rule: a decrease can only mean restart, so count the post-reset value itself — `const d = samples[i].v - samples[i-1].v; inc += d >= 0 ? d : samples[i].v;` — which is precisely what rate()/increase() do." },
 
   { id:"bug_quantile", title:"Histogram quantile estimator", why:"the rank's depth into THIS bucket, not into everything", lesson:7,
-    scenario:"The homegrown p99 panel reads suspiciously LOW — flat mid-bucket values while users report worse — and the error grows during traffic spikes, exactly when accuracy matters. The bucket search is fine. Which line skews the estimate?",
+    scenario:"The homegrown p99 panel reads suspiciously LOW while users report worse — and the higher the quantile, the harder it hugs its bucket's floor: the p99 is the most wrong number on the panel. The bucket search is fine. Which line skews the estimate?",
     lines:[
       "quantile(q) {",
       "  const rank = q * this.total;",
@@ -664,7 +664,7 @@ const BUGHUNT = [
       "}",
     ],
     bug:[11],
-    explain:"Line 12 divides by `cum` — the running total of ALL observations up to and including this bucket — instead of `this.counts[i]`, the count inside the bucket the rank landed in. The fraction is systematically too small, so every quantile hugs its bucket's lower edge; and because `cum` grows with total traffic, the distortion worsens as volume rises — the panel is most wrong during the spike. Interpolation is local: `(rank − prev) / this.counts[i]` measures how deep into THIS bucket's population the rank sits, which is the fiction histogram_quantile actually promises." },
+    explain:"Line 12 divides by `cum` — the running total of ALL observations up to and including this bucket — instead of `this.counts[i]`, the count inside the bucket the rank landed in. The fraction is systematically too small, so every quantile hugs its bucket's lower edge — and the higher the quantile, the larger `prev`'s share of `cum`, so the p99 hugs the floor hardest of all: your most-watched number is your most wrong one. Interpolation is local: `(rank − prev) / this.counts[i]` measures how deep into THIS bucket's population the rank sits, which is the fiction histogram_quantile actually promises." },
 
   { id:"bug_traceasm", title:"Trace assembler", why:"the root is a structural fact, not an arrival accident", lesson:10,
     scenario:"In dev every trace renders perfectly. In production, roughly half the waterfalls show a database span as the 'request', with the real HTTP request nested underneath it as a child — and the durations read nonsense. Which line crowns the wrong span?",
@@ -923,7 +923,14 @@ const withOrphan = buildTrace(spans.concat([{ id: "sX", parent: "GONE", name: "o
 assert(withOrphan.name === "GET /checkout", "an orphan span (dropped parent) must not break assembly");
 const flip = buildTrace([spans[3], spans[0], spans[2]]);
 assert(flip.name === "GET /checkout" && flip.children[0].name === "charge",
-  "any arrival order must produce the same tree");`,
+  "any arrival order must produce the same tree");
+const overlap = buildTrace([
+  { id: "r", parent: null, name: "root", start: 0, end: 600 },
+  { id: "B", parent: "r", name: "quick-second", start: 20, end: 30 },
+  { id: "A", parent: "r", name: "slow-first", start: 10, end: 500 },
+]);
+assert(overlap.children.map(c => c.name).join(",") === "slow-first,quick-second",
+  "overlapping siblings must sort by START time, got " + overlap.children.map(c => c.name).join(","));`,
     pass:"same tree from any arrival order, orphans survived, children read left-to-right by start",
     takeaway:"A trace is a tree serialized as a bag of spans — parent ids ARE the structure, and arrival order is noise you must be deaf to. Every trace UI you've used runs this exact assembly before it can draw a single waterfall.",
     hint:"Index all spans by id (cloning with an empty children array). One pass: parentless span → root; otherwise push onto the parent if it exists. Sort every children array by start. Return the root." },
@@ -1077,7 +1084,7 @@ GROUP  BY 1, 2, 3 ORDER BY err_rate DESC;
       <div class="dnote seq" style="--i:4">This is why events are counters and not gauges, and why every panel says rate(x[5m]) instead of plotting x raw: the counter carries the truth <b style="color:var(--ordered)">between and across</b> scrapes; rate() decodes it.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p>Two honesty notes about rate(). It's a <b class="hl">per-second average over the window</b> — a 5m window smooths any burst shorter than 5 minutes, so a 10-second spike becomes a gentle bump; shrink the window to sharpen, at the cost of noise. And Prometheus's rate() <b class="hl">extrapolates</b> slightly to the window's edges (scrapes rarely align with them), so increase() can return non-integers on integer counters. Neither is a bug; both are the compression being visible.</p>
+    <p>Three honesty notes about rate(). It's a <b class="hl">per-second average over the window</b> — a 5m window smooths any burst shorter than 5 minutes, so a 10-second spike becomes a gentle bump; shrink the window to sharpen, at the cost of noise. Prometheus's rate() <b class="hl">extrapolates</b> slightly to the window's edges (scrapes rarely align with them), so increase() can return non-integers on integer counters. And rate() needs <b class="hl">at least two samples inside the range</b> — a 5m range over a 4m scrape interval intermittently finds one, and the panel blinks empty; keep the range at least 2× (comfortably 4×) the scrape interval. None of the three is a bug; all are the compression being visible.</p>
     <div class="impl">
       <div class="dlabel">reference implementation &middot; the reset rule</div>
       <pre class="code">function increase(samples) {
@@ -1217,9 +1224,10 @@ histogram_quantile(0.99,
     <div class="impl">
       <div class="dlabel">reference &middot; RED per route, USE per pool — the minimum kit</div>
       <pre class="code"><span class="cm">// RED — emitted by middleware, free forever after:</span>
-rate(http_requests_total{route}[5m])          <span class="cm">// R</span>
-rate(http_requests_total{route,code=~"5.."}[5m])  <span class="cm">// E</span>
-histogram_quantile(0.99, ...duration_bucket)  <span class="cm">// D</span>
+rate(http_requests_total{route="/checkout"}[5m])            <span class="cm">// R</span>
+rate(http_requests_total{route="/checkout",code=~"5.."}[5m]) <span class="cm">// E</span>
+histogram_quantile(0.99, sum by (le)                        <span class="cm">// D</span>
+  (rate(http_duration_bucket{route="/checkout"}[5m])))
 <span class="cm">// USE — for the connection pool:</span>
 pool_in_use / pool_size                       <span class="cm">// utilization</span>
 <span class="ok">pool_waiters                                  // saturation!</span>
@@ -1236,7 +1244,7 @@ pool_checkout_timeouts_total                  <span class="cm">// errors</span><
 const DRILL_LESSON = {
   counterrate:4, histquantile:7, histmerge:8, traceassemble:10, headtail:13,
   burnrate:20, canonlog:17, cardinality:2,
-  picksignal:1, culprithop:12, bucketdesign:6, alertdesign:21, cardtriage:2,
+  picksignal:1, culprithop:12, bucketdesign:6, alertdesign:20, cardtriage:2,
   missingtelemetry:27, deploycorr:23,
 };
 // lesson index -> where to go practice it { mod, drill? }
@@ -1247,10 +1255,10 @@ const LESSON_PRACTICE = {
   8:{mod:"primitives",drill:"histmerge"}, 9:{mod:"tradeoffs"},
   10:{mod:"primitives",drill:"traceassemble"}, 11:{mod:"signals"},
   12:{mod:"bank",drill:"culprithop"}, 13:{mod:"primitives",drill:"headtail"},
-  14:{mod:"tradeoffs"}, 15:{mod:"tradeoffs"}, 16:{mod:"signals"},
-  17:{mod:"primitives",drill:"canonlog"}, 18:{mod:"tradeoffs"}, 19:{mod:"tradeoffs"},
-  20:{mod:"primitives",drill:"burnrate"}, 21:{mod:"bank",drill:"alertdesign"},
+  14:{mod:"signals"}, 15:{mod:"primitives",drill:"canonlog"}, 16:{mod:"signals"},
+  17:{mod:"primitives",drill:"canonlog"}, 18:{mod:"bughunt"}, 19:{mod:"tradeoffs"},
+  20:{mod:"primitives",drill:"burnrate"}, 21:{mod:"signals"},
   22:{mod:"tradeoffs"}, 23:{mod:"bank",drill:"deploycorr"}, 24:{mod:"incident"},
   25:{mod:"incident"}, 26:{mod:"incident"}, 27:{mod:"bank",drill:"missingtelemetry"},
-  28:{mod:"tradeoffs"},
+  28:{mod:"incident"},
 };
