@@ -179,7 +179,9 @@ async function withCasRetry(table,id,fn,max=5){
 function makeLedger(init){ return { rows:new Map(Object.entries(init).map(([k,v])=>[k,{value:v,version:1}])), committed:[] }; }
 function ledgerBegin(db, level){
   const snap=new Map(); for(const [k,r] of db.rows) snap.set(k,{value:r.value,version:r.version});
-  return { level, snap, reads:new Set(), writes:new Map(), status:"active" };
+  // startCommits: how much committed history predates this tx — SSI only
+  // considers transactions that OVERLAP in time, never the settled past
+  return { level, snap, reads:new Set(), writes:new Map(), status:"active", startCommits:db.committed.length };
 }
 function ledgerRead(db, tx, key){
   if(tx.writes.has(key)) return tx.writes.get(key);            // your own write
@@ -197,7 +199,7 @@ function ledgerCommit(db, tx){
       }
   }
   if(tx.level==="serializable"){
-    for(const other of db.committed){                          // simplified SSI: mutual rw-antidependency
+    for(const other of db.committed.slice(tx.startCommits)){   // simplified SSI: mutual rw-antidependency, concurrent txs only
       const iReadTheirWrite=[...tx.reads].some(k=>other.writes.has(k));
       const theyReadMyWrite=[...other.reads].some(k=>tx.writes.has(k));
       if(iReadTheirWrite&&theyReadMyWrite){

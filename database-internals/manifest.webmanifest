@@ -1,0 +1,19 @@
+{
+  "name": "Database Internals Bootcamp",
+  "short_name": "DBInternals",
+  "description": "A mobile-first, offline-capable bootcamp for database internals — write-ahead logs, B-trees and LSM trees, MVCC and isolation levels, query plans, and production operations; animated lessons, tap-driven drills, and a scored test.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1119",
+  "theme_color": "#0f1119",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
