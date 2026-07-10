@@ -1,11 +1,19 @@
-import { Navigate, Route, Routes } from "react-router-dom";
-import { AuthProvider, RequireAuth } from "./context/AuthContext";
+import { AuthProvider, RequireAuth } from "@readysetcloud/ui/auth";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import ForgotPassword from "./pages/ForgotPassword";
 import Hub from "./pages/Hub";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import Signup from "./pages/Signup";
+
+/* The package's RequireAuth is router-agnostic: it renders a fallback node
+   when signed out. Ours carries a return-to so a successful sign-in lands
+   the visitor back where they aimed. */
+function RedirectToLogin() {
+  const location = useLocation();
+  return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
+}
 
 export default function App() {
   return (
@@ -21,7 +29,7 @@ export default function App() {
           <Route
             path="/app"
             element={
-              <RequireAuth>
+              <RequireAuth fallback={<RedirectToLogin />}>
                 <Hub />
               </RequireAuth>
             }
@@ -29,7 +37,7 @@ export default function App() {
           <Route
             path="/app/profile"
             element={
-              <RequireAuth>
+              <RequireAuth fallback={<RedirectToLogin />}>
                 <Profile />
               </RequireAuth>
             }

@@ -3,7 +3,7 @@
    clear-session-on-definite-failure behavior, so a 401 here simply surfaces
    as an ApiError for the caller's error state. */
 
-import { getFreshIdToken } from "./auth";
+import { getFreshIdToken } from "@readysetcloud/ui/auth";
 import { getConfig } from "./config";
 
 export class ApiError extends Error {

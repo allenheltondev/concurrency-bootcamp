@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["-y", "http-server", ".", "-p", "8765", "-c-1"],
       "port": 8765
+    },
+    {
+      "name": "platform",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "platform"],
+      "port": 5173
     }
   ]
 }

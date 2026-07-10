@@ -3,7 +3,7 @@
    front door is the marketing page at the root. */
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "@readysetcloud/ui/auth";
 import { get, type MyCourse, type MyCoursesResponse } from "../lib/api";
 import { TAGLINES, useCatalog } from "../lib/catalog";
 import { courseHref } from "../lib/courses";

@@ -3,9 +3,10 @@
    directly (no account needed; the gated dashboard lives at /app). All
    copy is plain-spoken on purpose: the goodwill IS the pitch. */
 import { Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "@readysetcloud/ui/auth";
 import { courseHref } from "../lib/courses";
 import { TAGLINES, useCatalog } from "../lib/catalog";
+import { useConfigured } from "../lib/useConfigured";
 
 const FEATURES: Array<{ icon: string; title: string; body: string }> = [
   {
@@ -47,7 +48,8 @@ const FEATURES: Array<{ icon: string; title: string; body: string }> = [
 ];
 
 export default function Landing() {
-  const { signedIn, configured } = useAuth();
+  const { signedIn } = useAuth();
+  const configured = useConfigured();
   const courses = useCatalog();
 
   return (

@@ -1,5 +1,7 @@
 /* Component tests: login validation + friendly errors, and the RequireAuth
-   gate redirecting signed-out visitors to /login. */
+   gate redirecting signed-out visitors to /login. Auth now comes from
+   @readysetcloud/ui/auth — same rsc:auth contract, so only the mock target
+   and the package's validation copy changed here. */
 
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -9,13 +11,13 @@ vi.mock("../lib/config", () => ({
   getConfig: vi.fn(async () => ({ clientId: "client-1", region: "us-east-1", apiBase: "/api" }))
 }));
 
-vi.mock("../lib/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../lib/auth")>();
+vi.mock("@readysetcloud/ui/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@readysetcloud/ui/auth")>();
   return { ...actual, signIn: vi.fn() };
 });
 
 import App from "../App";
-import { AuthError, signIn } from "../lib/auth";
+import { AuthError, signIn } from "@readysetcloud/ui/auth";
 
 const renderAt = (path: string) =>
   render(
@@ -33,10 +35,11 @@ describe("login form", () => {
   it("blocks invalid input client-side without calling the pool", async () => {
     renderAt("/login");
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "not-an-email" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "short" } });
     fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
 
-    expect(await screen.findByText("Enter a valid email address.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Enter a full email address, e.g. you@example.com")
+    ).toBeInTheDocument();
     expect(screen.getByText("Enter your password.")).toBeInTheDocument();
     expect(signIn).not.toHaveBeenCalled();
   });
