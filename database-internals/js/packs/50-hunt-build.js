@@ -10,8 +10,8 @@
 
 /* ---- spot-the-bug: five full implementations, one subtle fault each ---- */
 BUGHUNT.push(
-  { id:"bug_retry", title:"Serializable retry wrapper", why:"retry the whole transaction, reads included", lesson:19,
-    scenario:"A funds-transfer endpoint runs at SERIALIZABLE with retries, and the books almost balance. Overdrafts appear only on transfers whose logs contain a serialization-retry entry — every transfer that succeeded on its first attempt is provably correct, and load tests without contention pass forever. Which line?",
+  { id:"bug_retry", title:"Serializable retry wrapper", why:"retry the whole transaction, reads included", lesson:17,
+    scenario:"A funds-transfer endpoint runs at SERIALIZABLE with retries, and the books almost balance. Overdrafts cluster overwhelmingly on transfers whose logs contain a serialization-retry entry — first-attempt transfers are almost never affected — and load tests without contention pass forever. Which line?",
     lines:[
       "async function transferWithRetry(db, from, to, amount) {",
       "  const src = await db.get(",
@@ -41,7 +41,7 @@ BUGHUNT.push(
       "}",
     ],
     bug:[1,2],
-    explain:"Lines 2–3 read the source balance ONCE, before the retry loop — outside every transaction the loop will ever run. The first attempt is fine; but when SERIALIZABLE aborts it with 40001, the retry re-runs only the WRITES against the original read: another transaction drained the account between attempts, src.balance is stale, the insufficient-funds check passes on dead data, and the debit UPDATE stores a balance computed from a world that no longer exists — the overdraft that only ever appears on retried transfers. Retrying a serialization failure means re-running the WHOLE transaction, reads included: move the SELECT inside the loop, after BEGIN, so every attempt decides from fresh data. The catch block is the decoy and it is exactly right — ROLLBACK first, then rethrow anything that isn't 40001." },
+    explain:"Lines 2–3 read the source balance ONCE, before the retry loop — outside every transaction the loop will ever run. A first attempt usually gets away with it (the stale window is one network hop); but when SERIALIZABLE aborts with 40001, the retry re-runs only the WRITES against the original read: another transaction drained the account between attempts, src.balance is stale, the insufficient-funds check passes on dead data, and the debit UPDATE stores a balance computed from a world that no longer exists — which is why overdrafts cluster on retried transfers. Retrying a serialization failure means re-running the WHOLE transaction, reads included: move the SELECT inside the loop, after BEGIN, so every attempt decides from fresh data (which also closes the small first-attempt gap). The catch block is the decoy and it is exactly right — ROLLBACK first, then rethrow anything that isn't 40001." },
 
   { id:"bug_migration", title:"Deploy migration script", why:"an index build can block every write", lesson:24,
     scenario:"The migration was rehearsed on staging and took 40 seconds. In production, the moment step 3 starts, every INSERT and UPDATE on users hangs — for the ~20 minutes the build needs on the 200M-row table — p99 explodes, queues back up through the API, and on-call aborts the deploy. Reads were fine the whole time. Which line?",
@@ -66,8 +66,8 @@ BUGHUNT.push(
       "",
       "  // step 3: enforce uniqueness on the normalized value",
       "  await db.query(",
-      "    \"CREATE UNIQUE INDEX users_email_lower_idx \" +",
-      "    \"ON users (lower(email))\");",
+      "    \"CREATE UNIQUE INDEX users_email_normalized_idx \" +",
+      "    \"ON users (email_normalized)\");",
       "}",
     ],
     bug:[20],

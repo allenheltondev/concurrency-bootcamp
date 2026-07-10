@@ -1122,7 +1122,7 @@ const DRILL_LESSON = {
 const LESSON_PRACTICE = {
   0:{mod:"model"}, 1:{mod:"model"}, 2:{mod:"tradeoffs"}, 3:{mod:"primitives",drill:"walwrite"},
   4:{mod:"bank",drill:"crashreplay"}, 5:{mod:"primitives",drill:"btreesplit"}, 6:{mod:"primitives",drill:"lsmread"},
-  7:{mod:"tradeoffs"}, 8:{mod:"write"}, 9:{mod:"tradeoffs"}, 10:{mod:"write"}, 11:{mod:"model"},
+  7:{mod:"tradeoffs"}, 8:{mod:"write"}, 9:{mod:"tradeoffs"}, 10:{mod:"write"}, 11:{mod:"tradeoffs"},
   12:{mod:"model"}, 13:{mod:"model"}, 14:{mod:"tradeoffs"}, 15:{mod:"primitives",drill:"mvccvis"},
   // 11 (covering indexes) points at tradeoffs: the INCLUDE/covering card probes it
   16:{mod:"bank",drill:"lostupdate"}, 17:{mod:"isosim"}, 18:{mod:"primitives",drill:"rowlock"},
