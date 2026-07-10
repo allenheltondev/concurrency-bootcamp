@@ -338,7 +338,7 @@ async function demoOpenLoop(){
   const openBad = open.filter(v => v >= 100).length;
   const closedBad = closed.filter(v => v >= 100).length;
   const pass = openBad === 7 && closedBad === 1
-    && open[3] === 470 && Math.max(...closed) === 500;
+    && open[3] === 500 && open[9] === 470 && Math.max(...closed) === 500;
   return { lines: [
     { t: `10 requests scheduled every 10ms; request #4 stalls the server for 500ms` },
     { t: `open loop (world's clock): ${openBad} samples ≥ 100ms — the backlog is IN the data` },
@@ -502,9 +502,9 @@ async function demoCacheCap(){
   const healthy = originRps(20000, 0.99);
   const degraded = originRps(20000, 0.97);
   const fits = originFits(20000, 0.99, 500), breaks = originFits(20000, 0.97, 500);
-  const pass = healthy === 200 && Math.abs(degraded - 600) < 1e-9 && fits && !breaks;
+  const pass = Math.abs(healthy - 200) < 1e-9 && Math.abs(degraded - 600) < 1e-9 && fits && !breaks;
   return { lines: [
-    { t: `20,000 rps at the edge, 99% hit ratio -> origin sees ${healthy} rps (fits a 500-rps origin with headroom)` },
+    { t: `20,000 rps at the edge, 99% hit ratio -> origin sees ${Math.round(healthy)} rps (fits a 500-rps origin with headroom)` },
     { t: `hit ratio slips 2 points to 97% -> origin sees ${Math.round(degraded)} rps — 3x, over capacity` },
     { t: `the origin must be sized for the worst CREDIBLE hit ratio, not the average one` },
   ], pass, verdict: pass

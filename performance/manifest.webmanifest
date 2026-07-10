@@ -1,0 +1,19 @@
+{
+  "name": "Performance & Queueing Bootcamp",
+  "short_name": "WhySlow",
+  "description": "A mobile-first, offline-capable bootcamp for performance and queueing — why latency explodes near saturation, honest percentiles, load shedding, adaptive limits, and capacity math; animated lessons, tap-driven drills, and a scored test.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1119",
+  "theme_color": "#0f1119",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
