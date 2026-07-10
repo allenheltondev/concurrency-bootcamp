@@ -111,16 +111,27 @@ Resources:
         function handler(event) {
           var request = event.request;
           var uri = request.uri;
-          // Course apps are static directories: classic directory-index
-          // rewrites so /js-concurrency/ and extensionless course paths
-          // serve their own index.html.
-          if (uri.startsWith('/js-concurrency') || uri.startsWith('/distributed-systems')) {
-            if (uri.endsWith('/')) {
-              request.uri = uri + 'index.html';
-            } else if (!uri.split('/').pop().includes('.')) {
-              request.uri = uri + '/index.html';
+          // Course apps are static directories, each served from its own
+          // top-level prefix (see docs/COURSE_PATTERN.md). Every course must
+          // be listed here: a course missing from this array falls through to
+          // the SPA branch below and gets rewritten to the hub shell instead
+          // of its own index.html. Keep in sync with the courses uploaded in
+          // .github/workflows/deploy.yml.
+          var courses = [
+            '/js-concurrency', '/distributed-systems', '/agent-memory',
+            '/database-internals', '/performance', '/observability'
+          ];
+          for (var i = 0; i < courses.length; i++) {
+            if (uri === courses[i] || uri.startsWith(courses[i] + '/')) {
+              // Classic directory-index rewrites so /<course>/ and
+              // extensionless course paths serve their own index.html.
+              if (uri.endsWith('/')) {
+                request.uri = uri + 'index.html';
+              } else if (!uri.split('/').pop().includes('.')) {
+                request.uri = uri + '/index.html';
+              }
+              return request;
             }
-            return request;
           }
           // Everything else is the platform SPA (the hub at the root —
           // docs/PLATFORM_PLAN.md): any non-file path serves the app shell
