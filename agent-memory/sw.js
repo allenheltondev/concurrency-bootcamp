@@ -2,13 +2,14 @@
    Bump CACHE on every content change so clients pick up the new build.
    Registered at scope ./ ; ../js/app.js (the shared engine) is same-origin
    and precaches fine. */
-const CACHE = "amembootcamp-v1";
+const CACHE = "amembootcamp-v2";
 const SHELL = [
   "./", "./index.html", "./manifest.webmanifest", "./icon.svg",
   "./js/core.js", "./js/content.js", "./js/sim.js",
   "./js/packs/10-lessons-longterm.js",
   "./js/packs/20-lessons-evolution.js",
   "./js/packs/30-production-map.js",
+  "./js/packs/40-case-study.js",
   "../js/app.js",
   "../js/account.js",
 ];

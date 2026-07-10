@@ -8,7 +8,7 @@ animations. Everything runs in the browser: every drill's ▶ button executes a
 embeddings, superseding fact stores, an evolving profile) against its
 invariant, and every write-it build actually runs in a sandboxed worker.
 
-It opens with an illustrated **Lessons** primer (16 stepped chapters with
+It opens with an illustrated **Lessons** primer (17 stepped chapters with
 animated HTML/CSS/SVG diagrams — tap ▶ replay to watch each sequence step
 through), starting with a **foundations** arc built on the two axioms that
 generate the whole field — the model is stateless (every request starts from
@@ -40,7 +40,12 @@ graded by actually running it against assertions in a sandboxed worker), a
 **production map** reference sheet (every concept mapped to the construct
 that embodies it in a real agent stack, with design-review bridge lines), and
 **test mode** (quick test / full test / interview sim, each ending in a build
-round; missed questions persist to a review list).
+round; missed questions persist to a review list). A closing **case-study
+lesson** walks a real production system — a content platform's "voice"
+feature, where saved blog posts become episodic vector memories and every few
+samples a reflection re-derives an aggregated, versioned voice profile — and
+brings a matching drill (the reflect-once counter), quiz questions, and
+flashcards on its failure-mode design.
 
 Finally, `practice/` takes it off the phone and into your editor: six
 blank-file pattern skeletons (session buffer, memory index, retrieval score,
@@ -58,6 +63,7 @@ until green, diff against the solution, redo from blank tomorrow.
 | `js/sim.js` | The evolving-profile simulator module. |
 | `js/packs/10-…, 20-…` | Lesson packs: retrieval/long-term and evolution arcs. |
 | `js/packs/30-production-map.js` | The production map sheet and four flashcards. |
+| `js/packs/40-case-study.js` | The voice-memory case study: lesson, reflect-once drill, quiz, cards. |
 | `../js/app.js` | The shared course engine (see `../docs/COURSE_PATTERN.md`). |
 | `practice/` | Blank-file pattern reps with runnable Node tests. |
 | `sw.js`, `manifest.webmanifest`, `icon.svg` | Offline-first PWA shell, scoped to this directory. |
