@@ -53,7 +53,8 @@ jobs:
           node --check sw.js
           node --check js-concurrency/sw.js
           node --check distributed-systems/sw.js
-          for f in js/*.js js-concurrency/js/*.js js-concurrency/js/packs/*.js distributed-systems/js/*.js distributed-systems/js/packs/*.js backend/src/*.mjs backend/src/*/*.mjs; do
+          node --check agent-memory/sw.js
+          for f in js/*.js js-concurrency/js/*.js js-concurrency/js/packs/*.js distributed-systems/js/*.js distributed-systems/js/packs/*.js agent-memory/js/*.js agent-memory/js/packs/*.js backend/src/*.mjs backend/src/*/*.mjs; do
             [ -e "$f" ] || continue
             node --check "$f"
           done
@@ -67,6 +68,9 @@ jobs:
 
       - name: Validate content (distributed-systems)
         run: node tools/validate-content.mjs --root distributed-systems
+
+      - name: Validate content (agent-memory)
+        run: node tools/validate-content.mjs --root agent-memory
 
       - name: Validate the account layer
         # Loads js/account.js in a bare VM (proving it stays dormant without
@@ -122,6 +126,9 @@ jobs:
       - name: Run distributed-systems practice pack tests
         run: node tools/test-solutions.mjs --root distributed-systems
 
+      - name: Run agent-memory practice pack tests
+        run: node tools/test-solutions.mjs --root agent-memory
+
       - name: Check service workers precache every app script
         # A js/ file missing from a SHELL list breaks that course offline.
         # The root sw.js is now a kill-switch (no SHELL) so it's excluded here.
@@ -149,4 +156,16 @@ jobs:
             if (!sw.includes("../js/account.js")) missing.push("../js/account.js (account layer)");
             if (missing.length) { console.error("distributed-systems/sw.js SHELL is missing: " + missing.join(", ")); process.exit(1); }
             console.log("distributed-systems/sw.js precaches all " + (files.length + 2) + " app scripts");
+          '
+          node -e '
+            const fs = require("fs");
+            const sw = fs.readFileSync("agent-memory/sw.js", "utf8");
+            const dir = "agent-memory/js";
+            const files = ["js/core.js", "js/content.js", "js/sim.js",
+              ...(fs.existsSync(dir + "/packs") ? fs.readdirSync(dir + "/packs").filter(f => f.endsWith(".js")).map(f => "js/packs/" + f) : [])];
+            const missing = files.filter(f => !sw.includes("./" + f));
+            if (!sw.includes("../js/app.js")) missing.push("../js/app.js (shared engine)");
+            if (!sw.includes("../js/account.js")) missing.push("../js/account.js (account layer)");
+            if (missing.length) { console.error("agent-memory/sw.js SHELL is missing: " + missing.join(", ")); process.exit(1); }
+            console.log("agent-memory/sw.js precaches all " + (files.length + 2) + " app scripts");
           '

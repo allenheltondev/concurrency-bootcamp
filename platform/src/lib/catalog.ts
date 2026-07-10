@@ -23,13 +23,23 @@ export const FALLBACK_COURSES: CatalogCourse[] = [
     status: "active",
     totalItems: 0,
     contentVersion: 0
+  },
+  {
+    id: "agent-memory",
+    title: "Agent Memory Bootcamp",
+    description:
+      "Learn and practice AI agent memory from the stateless model up: animated lessons on session buffers, retrieval scoring, and long-term memory that evolves; tap-driven drills that run a simulated memory system; an evolving-profile simulator; spot-the-bug and write-it modules; and a scored test mode.",
+    status: "active",
+    totalItems: 0,
+    contentVersion: 0
   }
 ];
 
 /* Course branding, not catalog data — lives with the UI either way. */
 export const TAGLINES: Record<string, string> = {
   "js-concurrency": "single thread, many turns",
-  "distributed-systems": "many nodes, no shared clock"
+  "distributed-systems": "many nodes, no shared clock",
+  "agent-memory": "context is not memory"
 };
 
 export function useCatalog(): CatalogCourse[] {

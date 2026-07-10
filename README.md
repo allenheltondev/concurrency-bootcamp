@@ -12,6 +12,11 @@ pattern, the home of more than one course:
   styles, animations, drills, sandboxed write-it grading, test mode, and
   practice pack, applied to clocks, quorums, consensus, delivery guarantees,
   and resilience patterns. See `distributed-systems/README.md`.
+- **`/agent-memory/`** — the **Agent Memory Bootcamp**: the same format
+  applied to AI agent memory — session buffers and rolling summaries,
+  retrieval scoring, episodic/semantic/procedural long-term stores, and the
+  consolidation loop that evolves an aggregate profile as episodic memories
+  arrive. See `agent-memory/README.md`.
 - **`docs/COURSE_PATTERN.md`** — the extracted pattern: the shared engine
   contract, content schemas, animation conventions, and the checklist for
   reproducing the whole format as a new course.

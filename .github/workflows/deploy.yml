@@ -232,6 +232,24 @@ jobs:
           aws s3 cp distributed-systems/icon.svg "s3://${BUCKET}/distributed-systems/icon.svg" \
             --content-type "image/svg+xml" \
             --cache-control "public, max-age=300"
+          # Agent Memory course — a sibling directory with the same internal
+          # layout (see docs/COURSE_PATTERN.md). Its pages reuse the shared
+          # engine at /js/app.js uploaded above.
+          aws s3 cp agent-memory/index.html "s3://${BUCKET}/agent-memory/index.html" \
+            --content-type "text/html; charset=utf-8" \
+            --cache-control "public, max-age=300"
+          aws s3 sync agent-memory/js/ "s3://${BUCKET}/agent-memory/js/" --delete \
+            --content-type "text/javascript; charset=utf-8" \
+            --cache-control "public, max-age=300"
+          aws s3 cp agent-memory/sw.js "s3://${BUCKET}/agent-memory/sw.js" \
+            --content-type "text/javascript; charset=utf-8" \
+            --cache-control "public, max-age=0, must-revalidate"
+          aws s3 cp agent-memory/manifest.webmanifest "s3://${BUCKET}/agent-memory/manifest.webmanifest" \
+            --content-type "application/manifest+json; charset=utf-8" \
+            --cache-control "public, max-age=300"
+          aws s3 cp agent-memory/icon.svg "s3://${BUCKET}/agent-memory/icon.svg" \
+            --content-type "image/svg+xml" \
+            --cache-control "public, max-age=300"
 
       - name: Publish auth config
         # The switch that wakes the UI's account layer (js/account.js): it
@@ -276,7 +294,8 @@ jobs:
           # ✗ line in the report below, not abort the step (bash -e) opaquely.
           for p in / /sw.js /js/app.js /js/account.js \
                    /js-concurrency/ /js-concurrency/sw.js /js-concurrency/worker.js /js-concurrency/js/content.js \
-                   /distributed-systems/ /distributed-systems/sw.js /distributed-systems/js/content.js; do
+                   /distributed-systems/ /distributed-systems/sw.js /distributed-systems/js/content.js \
+                   /agent-memory/ /agent-memory/sw.js /agent-memory/js/content.js; do
             code=$(curl -sS -o /dev/null -w "%{http_code}" "${URL}${p}" || true)
             if [ "$code" = "200" ]; then
               echo "✓ ${p} -> ${code}"
@@ -313,7 +332,7 @@ jobs:
           fi
 
           # each course serves its own index.html
-          for pair in "js-concurrency" "distributed-systems"; do
+          for pair in "js-concurrency" "distributed-systems" "agent-memory"; do
             served_c=$(curl -sS "${URL}/${pair}/" 2>/dev/null | sha256sum | cut -d' ' -f1)
             local_c=$(sha256sum "${pair}/index.html" | cut -d' ' -f1)
             if [ "$served_c" = "$local_c" ]; then

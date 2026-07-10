@@ -3,7 +3,8 @@
    courses working the day their directory ships. */
 const COURSE_LINKS: Record<string, string> = {
   "js-concurrency": "/js-concurrency/",
-  "distributed-systems": "/distributed-systems/"
+  "distributed-systems": "/distributed-systems/",
+  "agent-memory": "/agent-memory/"
 };
 
 export const courseHref = (courseId: string): string =>
