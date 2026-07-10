@@ -406,7 +406,7 @@ function findCycle(waitFor) {
     { id:"versioncas", title:"Optimistic Version CAS", why:"detect the conflict at write time; retry instead of waiting", demo:demoVersionCas,
       pre:`// rows carry a version column. casUpdate issues:
 //   UPDATE ... SET value=$3, version=version+1
---   WHERE id=$1 AND version=$2      -- returns rows matched
+//   WHERE id=$1 AND version=$2      -- returns rows matched
 async function withCasRetry(table, id, fn, max = 5) {`,
       blank:{ q:"Two handlers race on the same row and one CAS must lose. Which loop turns the loss into a retry instead of a lie?",
         options:[
@@ -521,7 +521,8 @@ function recover(records) {
 `-- declare it: an EXCLUDE USING gist constraint on
 -- (room WITH =, slot WITH &&) — the second INSERT
 -- fails no matter how the transactions interleave
--- (or: run both at SERIALIZABLE + retry)`,
+-- (scalar = in gist needs btree_gist;
+--  or: run both at SERIALIZABLE + retry)`,
 `-- SELECT ... FOR UPDATE on the overlap query, so
 -- the check locks what it read before deciding`,
 `-- re-run the count() a second time just before
@@ -717,7 +718,7 @@ const BUGHUNT = [
       "// when no connection is idle.",
     ],
     bug:[3],
-    explain:"Line 4 only runs when fn resolves. Every time fn throws — every failed query during the incident — the function unwinds past the release and that connection is checked out forever. At a 5% failure rate a 20-connection pool leaks to empty in a few hundred requests; afterwards every acquire parks in the waiter queue for a connection that no longer exists, which is why recovery required a restart while the database sat idle. Release must be unconditional: wrap fn in try { return await fn(conn); } finally { pool.release(conn); }. The subtlety worth saying in review: `return await` inside the try is load-bearing — plain `return fn(conn)` would release before a rejected promise settles… and still leak on synchronous throws." },
+    explain:"Line 4 only runs when fn resolves. Every time fn throws — every failed query during the incident — the function unwinds past the release and that connection is checked out forever. At a 5% failure rate a 20-connection pool leaks to empty in a few hundred requests; afterwards every acquire parks in the waiter queue for a connection that no longer exists, which is why recovery required a restart while the database sat idle. Release must be unconditional: wrap fn in try { return await fn(conn); } finally { pool.release(conn); }. The subtlety worth saying in review: `return await` inside the try is load-bearing — plain `return fn(conn)` runs the finally — and the release — before the query's promise settles, so an in-flight connection goes back to the pool and gets handed to another request. (Synchronous throws are covered either way; the `await` is what makes the release wait for the settle.)" },
 
   { id:"bug_cas", title:"Optimistic seat reservation", why:"a CAS that ignores its rowcount is just a write that sometimes doesn't happen", lesson:20,
     scenario:"A ticketing system with a version column on seats still occasionally sells one seat to two buyers — always two requests within the same few milliseconds. The UPDATE statement itself is textbook-correct optimistic locking. Which line loses the race anyway?",
@@ -1050,7 +1051,7 @@ SELECT relpages, reltuples::bigint FROM pg_class
           <animateMotion dur="5.5s" repeatCount="indefinite" calcMode="linear"
             path="M 40 83 L 290 83 L 90 83 L 240 83 L 60 83 L 300 83 L 140 83 L 200 83 L 30 83 L 270 83"/>
         </circle>
-        <text x="10" y="116" fill="#8b90ab" font-size="8">HDD: ~5-10 ms per seek vs ~200 MB/s streaming &mdash; a 100,000&times; gap per byte</text>
+        <text x="10" y="116" fill="#8b90ab" font-size="8">HDD: ~5-10 ms per seek vs ~200 MB/s streaming &mdash; roughly a million-fold gap per byte</text>
         <text x="10" y="130" fill="#8b90ab" font-size="8">NVMe SSD: no head to move, but 4 KB random reads still lose to streaming &mdash;</text>
         <text x="10" y="143" fill="#8b90ab" font-size="8">and random 8 KB WRITES pay read-modify-erase on flash blocks</text>
       </svg>
@@ -1123,6 +1124,7 @@ const LESSON_PRACTICE = {
   4:{mod:"bank",drill:"crashreplay"}, 5:{mod:"primitives",drill:"btreesplit"}, 6:{mod:"primitives",drill:"lsmread"},
   7:{mod:"tradeoffs"}, 8:{mod:"write"}, 9:{mod:"tradeoffs"}, 10:{mod:"write"}, 11:{mod:"model"},
   12:{mod:"model"}, 13:{mod:"model"}, 14:{mod:"tradeoffs"}, 15:{mod:"primitives",drill:"mvccvis"},
+  // 11 (covering indexes) points at tradeoffs: the INCLUDE/covering card probes it
   16:{mod:"bank",drill:"lostupdate"}, 17:{mod:"isosim"}, 18:{mod:"primitives",drill:"rowlock"},
   19:{mod:"primitives",drill:"waitfor"}, 20:{mod:"primitives",drill:"versioncas"}, 21:{mod:"bank",drill:"poolexhaust"},
   22:{mod:"bank",drill:"nplusone"}, 23:{mod:"model"}, 24:{mod:"bank",drill:"expandcontract"}, 25:{mod:"bank",drill:"readyourwrites"},
