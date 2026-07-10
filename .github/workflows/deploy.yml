@@ -250,6 +250,27 @@ jobs:
           aws s3 cp agent-memory/icon.svg "s3://${BUCKET}/agent-memory/icon.svg" \
             --content-type "image/svg+xml" \
             --cache-control "public, max-age=300"
+          # Database Internals, Performance & Queueing, and Observability
+          # courses — sibling directories with the same internal layout (see
+          # docs/COURSE_PATTERN.md). Their pages reuse the shared engine at
+          # /js/app.js uploaded above.
+          for course in database-internals performance observability; do
+            aws s3 cp "${course}/index.html" "s3://${BUCKET}/${course}/index.html" \
+              --content-type "text/html; charset=utf-8" \
+              --cache-control "public, max-age=300"
+            aws s3 sync "${course}/js/" "s3://${BUCKET}/${course}/js/" --delete \
+              --content-type "text/javascript; charset=utf-8" \
+              --cache-control "public, max-age=300"
+            aws s3 cp "${course}/sw.js" "s3://${BUCKET}/${course}/sw.js" \
+              --content-type "text/javascript; charset=utf-8" \
+              --cache-control "public, max-age=0, must-revalidate"
+            aws s3 cp "${course}/manifest.webmanifest" "s3://${BUCKET}/${course}/manifest.webmanifest" \
+              --content-type "application/manifest+json; charset=utf-8" \
+              --cache-control "public, max-age=300"
+            aws s3 cp "${course}/icon.svg" "s3://${BUCKET}/${course}/icon.svg" \
+              --content-type "image/svg+xml" \
+              --cache-control "public, max-age=300"
+          done
 
       - name: Publish auth config
         # The switch that wakes the UI's account layer (js/account.js): it
@@ -295,7 +316,10 @@ jobs:
           for p in / /sw.js /js/app.js /js/account.js \
                    /js-concurrency/ /js-concurrency/sw.js /js-concurrency/worker.js /js-concurrency/js/content.js \
                    /distributed-systems/ /distributed-systems/sw.js /distributed-systems/js/content.js \
-                   /agent-memory/ /agent-memory/sw.js /agent-memory/js/content.js; do
+                   /agent-memory/ /agent-memory/sw.js /agent-memory/js/content.js \
+                   /database-internals/ /database-internals/sw.js /database-internals/js/content.js \
+                   /performance/ /performance/sw.js /performance/js/content.js \
+                   /observability/ /observability/sw.js /observability/js/content.js; do
             code=$(curl -sS -o /dev/null -w "%{http_code}" "${URL}${p}" || true)
             if [ "$code" = "200" ]; then
               echo "✓ ${p} -> ${code}"
@@ -332,7 +356,8 @@ jobs:
           fi
 
           # each course serves its own index.html
-          for pair in "js-concurrency" "distributed-systems" "agent-memory"; do
+          for pair in "js-concurrency" "distributed-systems" "agent-memory" \
+                      "database-internals" "performance" "observability"; do
             served_c=$(curl -sS "${URL}/${pair}/" 2>/dev/null | sha256sum | cut -d' ' -f1)
             local_c=$(sha256sum "${pair}/index.html" | cut -d' ' -f1)
             if [ "$served_c" = "$local_c" ]; then

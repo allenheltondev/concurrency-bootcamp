@@ -54,7 +54,10 @@ jobs:
           node --check js-concurrency/sw.js
           node --check distributed-systems/sw.js
           node --check agent-memory/sw.js
-          for f in js/*.js js-concurrency/js/*.js js-concurrency/js/packs/*.js distributed-systems/js/*.js distributed-systems/js/packs/*.js agent-memory/js/*.js agent-memory/js/packs/*.js backend/src/*.mjs backend/src/*/*.mjs; do
+          node --check database-internals/sw.js
+          node --check performance/sw.js
+          node --check observability/sw.js
+          for f in js/*.js js-concurrency/js/*.js js-concurrency/js/packs/*.js distributed-systems/js/*.js distributed-systems/js/packs/*.js agent-memory/js/*.js agent-memory/js/packs/*.js database-internals/js/*.js database-internals/js/packs/*.js performance/js/*.js performance/js/packs/*.js observability/js/*.js observability/js/packs/*.js backend/src/*.mjs backend/src/*/*.mjs; do
             [ -e "$f" ] || continue
             node --check "$f"
           done
@@ -71,6 +74,15 @@ jobs:
 
       - name: Validate content (agent-memory)
         run: node tools/validate-content.mjs --root agent-memory
+
+      - name: Validate content (database-internals)
+        run: node tools/validate-content.mjs --root database-internals
+
+      - name: Validate content (performance)
+        run: node tools/validate-content.mjs --root performance
+
+      - name: Validate content (observability)
+        run: node tools/validate-content.mjs --root observability
 
       - name: Validate the account layer
         # Loads js/account.js in a bare VM (proving it stays dormant without
@@ -129,43 +141,34 @@ jobs:
       - name: Run agent-memory practice pack tests
         run: node tools/test-solutions.mjs --root agent-memory
 
+      - name: Run database-internals practice pack tests
+        run: node tools/test-solutions.mjs --root database-internals
+
+      - name: Run performance practice pack tests
+        run: node tools/test-solutions.mjs --root performance
+
+      - name: Run observability practice pack tests
+        run: node tools/test-solutions.mjs --root observability
+
       - name: Check service workers precache every app script
         # A js/ file missing from a SHELL list breaks that course offline.
         # The root sw.js is now a kill-switch (no SHELL) so it's excluded here.
         run: |
           node -e '
             const fs = require("fs");
-            const sw = fs.readFileSync("js-concurrency/sw.js", "utf8");
-            const dir = "js-concurrency/js";
-            const files = ["js/core.js", "js/content.js", "js/sim.js",
-              ...(fs.existsSync(dir + "/packs") ? fs.readdirSync(dir + "/packs").filter(f => f.endsWith(".js")).map(f => "js/packs/" + f) : [])];
-            const missing = files.filter(f => !sw.includes("./" + f));
-            if (!sw.includes("../js/app.js")) missing.push("../js/app.js (shared engine)");
-            if (!sw.includes("../js/account.js")) missing.push("../js/account.js (account layer)");
-            if (missing.length) { console.error("js-concurrency/sw.js SHELL is missing: " + missing.join(", ")); process.exit(1); }
-            console.log("js-concurrency/sw.js precaches all " + (files.length + 2) + " app scripts");
-          '
-          node -e '
-            const fs = require("fs");
-            const sw = fs.readFileSync("distributed-systems/sw.js", "utf8");
-            const dir = "distributed-systems/js";
-            const files = ["js/core.js", "js/content.js", "js/sim.js",
-              ...(fs.existsSync(dir + "/packs") ? fs.readdirSync(dir + "/packs").filter(f => f.endsWith(".js")).map(f => "js/packs/" + f) : [])];
-            const missing = files.filter(f => !sw.includes("./" + f));
-            if (!sw.includes("../js/app.js")) missing.push("../js/app.js (shared engine)");
-            if (!sw.includes("../js/account.js")) missing.push("../js/account.js (account layer)");
-            if (missing.length) { console.error("distributed-systems/sw.js SHELL is missing: " + missing.join(", ")); process.exit(1); }
-            console.log("distributed-systems/sw.js precaches all " + (files.length + 2) + " app scripts");
-          '
-          node -e '
-            const fs = require("fs");
-            const sw = fs.readFileSync("agent-memory/sw.js", "utf8");
-            const dir = "agent-memory/js";
-            const files = ["js/core.js", "js/content.js", "js/sim.js",
-              ...(fs.existsSync(dir + "/packs") ? fs.readdirSync(dir + "/packs").filter(f => f.endsWith(".js")).map(f => "js/packs/" + f) : [])];
-            const missing = files.filter(f => !sw.includes("./" + f));
-            if (!sw.includes("../js/app.js")) missing.push("../js/app.js (shared engine)");
-            if (!sw.includes("../js/account.js")) missing.push("../js/account.js (account layer)");
-            if (missing.length) { console.error("agent-memory/sw.js SHELL is missing: " + missing.join(", ")); process.exit(1); }
-            console.log("agent-memory/sw.js precaches all " + (files.length + 2) + " app scripts");
+            const courses = ["js-concurrency", "distributed-systems", "agent-memory",
+                             "database-internals", "performance", "observability"];
+            let failed = false;
+            for (const course of courses) {
+              const sw = fs.readFileSync(course + "/sw.js", "utf8");
+              const dir = course + "/js";
+              const files = ["js/core.js", "js/content.js", "js/sim.js",
+                ...(fs.existsSync(dir + "/packs") ? fs.readdirSync(dir + "/packs").filter(f => f.endsWith(".js")).map(f => "js/packs/" + f) : [])];
+              const missing = files.filter(f => !sw.includes("./" + f));
+              if (!sw.includes("../js/app.js")) missing.push("../js/app.js (shared engine)");
+              if (!sw.includes("../js/account.js")) missing.push("../js/account.js (account layer)");
+              if (missing.length) { console.error(course + "/sw.js SHELL is missing: " + missing.join(", ")); failed = true; }
+              else console.log(course + "/sw.js precaches all " + (files.length + 2) + " app scripts");
+            }
+            if (failed) process.exit(1);
           '
