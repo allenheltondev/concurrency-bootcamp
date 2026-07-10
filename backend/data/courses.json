@@ -25,5 +25,32 @@
     "contentVersion": 1,
     "totalItems": "auto",
     "contentRoot": "agent-memory"
+  },
+  {
+    "id": "database-internals",
+    "title": "Database Internals Bootcamp",
+    "description": "Learn and practice database internals from the disk up: animated lessons on write-ahead logs, B-trees vs LSM trees, MVCC and the isolation ladder, query plans, and zero-downtime operations; tap-driven drills that run a simulated storage engine; an isolation-anomaly simulator; spot-the-bug and write-it modules; and a scored test mode.",
+    "status": "active",
+    "contentVersion": 1,
+    "totalItems": "auto",
+    "contentRoot": "database-internals"
+  },
+  {
+    "id": "performance",
+    "title": "Performance & Queueing Bootcamp",
+    "description": "Learn and practice performance engineering from Little's law up: animated lessons on latency distributions, tail amplification, overload, and capacity math; tap-driven drills that run real queueing models; a saturation simulator; spot-the-bug and write-it modules; and a scored test mode.",
+    "status": "active",
+    "contentVersion": 1,
+    "totalItems": "auto",
+    "contentRoot": "performance"
+  },
+  {
+    "id": "observability",
+    "title": "Observability Bootcamp",
+    "description": "Learn and practice observability from the three signals up: animated lessons on metrics, traces, logs, SLOs, and burn-rate alerting; tap-driven drills that run a real telemetry pipeline; an incident simulator; spot-the-bug and write-it modules; and a scored test mode.",
+    "status": "active",
+    "contentVersion": 1,
+    "totalItems": "auto",
+    "contentRoot": "observability"
   }
 ]

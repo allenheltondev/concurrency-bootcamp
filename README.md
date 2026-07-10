@@ -17,11 +17,27 @@ pattern, the home of more than one course:
   retrieval scoring, episodic/semantic/procedural long-term stores, and the
   consolidation loop that evolves an aggregate profile as episodic memories
   arrive. See `agent-memory/README.md`.
+- **`/database-internals/`** — the **Database Internals Bootcamp**: the same
+  format applied to what happens under `BEGIN…COMMIT` — pages and the buffer
+  pool, the WAL and crash recovery, B-trees vs LSM trees, indexing, MVCC and
+  the isolation-anomaly zoo, locking and deadlocks, and day-two operations
+  (pooling, query plans, zero-downtime migrations). See
+  `database-internals/README.md`.
+- **`/performance/`** — the **Performance & Queueing Bootcamp**: the same
+  format applied to "how will this behave at 10× traffic" — Little's law and
+  the saturation hockey stick, percentiles and tail amplification, overload
+  and load shedding, honest measurement, and capacity math. See
+  `performance/README.md`.
+- **`/observability/`** — the **Observability Bootcamp**: the same format
+  applied to debugging production — metrics/logs/traces and what each can
+  answer, cardinality, sampling, SLOs and burn-rate alerting, and the triage
+  loop for reading an incident out of telemetry. See
+  `observability/README.md`.
 - **`docs/COURSE_PATTERN.md`** — the extracted pattern: the shared engine
   contract, content schemas, animation conventions, and the checklist for
   reproducing the whole format as a new course.
 
-Both courses share one engine (`js/app.js`), still served from the repo root;
+All courses share one engine (`js/app.js`), still served from the repo root;
 everything below describes the JS Concurrency course, which now lives in
 `js-concurrency/` as a sibling of `distributed-systems/` rather than at the
 site root. It opens with an illustrated **Lessons** primer (36 stepped
