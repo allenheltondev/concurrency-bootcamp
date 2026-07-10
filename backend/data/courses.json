@@ -16,5 +16,14 @@
     "contentVersion": 1,
     "totalItems": "auto",
     "contentRoot": "distributed-systems"
+  },
+  {
+    "id": "agent-memory",
+    "title": "Agent Memory Bootcamp",
+    "description": "Learn and practice AI agent memory from the stateless model up: animated lessons on session buffers, retrieval scoring, and long-term memory that evolves; tap-driven drills that run a simulated memory system; an evolving-profile simulator; spot-the-bug and write-it modules; and a scored test mode.",
+    "status": "active",
+    "contentVersion": 1,
+    "totalItems": "auto",
+    "contentRoot": "agent-memory"
   }
 ]
