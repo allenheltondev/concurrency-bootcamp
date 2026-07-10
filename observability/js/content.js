@@ -508,7 +508,7 @@ function culpritHop(root) {`,
 // compliant on one side, violating on the other`],
         answer:0,
         whys:["Right. Everything at-or-below 300 is an exact bucket sum — compliance becomes arithmetic, not estimation — while the edges around it keep resolution where regressions will creep (200→300) and where violations spread (600, 1200). Rule of thumb: put a boundary on every number you've promised anyone.",
-              "No edge at 300 means the compliance query interpolates inside (250, 500] — assuming requests spread evenly across a bucket where yours cluster at 280. The demo shows the damage:真 85% compliant, reported 20%. The bounds are pretty; the SLO number they produce is fiction that changes with traffic shape.",
+              "No edge at 300 means the compliance query interpolates inside (250, 500] — assuming requests spread evenly across a bucket where yours cluster at 280. The demo shows the damage: truth 85% compliant, reported 20%. The bounds are pretty; the SLO number they produce is fiction that changes with traffic shape.",
               "Perfectly accurate about the one promise and blind to everything else: no p50, no p99, no 'how close to the edge are we', no seeing the regression that moved requests from 80ms to 280ms — still compliant, silently primed to blow. You'd re-bucket during the incident, and histograms don't backfill."] },
       post:`` },
 
@@ -592,7 +592,7 @@ function suspectChange(stepAt, changes, windowMin) {`,
 `  const prior = changes.filter(c =>
     c.t <= stepAt && stepAt - c.t <= windowMin);
   if (!prior.length) return null;
-  return prior.reduce((a, b) => b.t > a.t ? a.t > b.t ? a : b : a);`,
+  return prior.reduce((a, b) => b.t > a.t ? b : a);`,
 `  return changes.reduce((a, b) =>
     Math.abs(b.t - stepAt) < Math.abs(a.t - stepAt)
       ? b : a);`,
@@ -715,7 +715,7 @@ const WRITE = [
     spec:"Write increase(samples) and ratePerSec(samples): samples are cumulative counter scrapes [{t (ms), v}], oldest first. increase() sums the growth, treating any decrease as a process restart — the post-reset value counts from zero. ratePerSec() divides by the window in seconds.",
     pre:`// a counter can only grow; a drop means the process
 // restarted and began again at zero.`,
-    post:``,
+    post:`// scrapes arrive oldest-first; the window is timestamps, not counts`,
     lines:[
       "function increase(samples) {",
       "  let inc = 0;",
@@ -867,7 +867,7 @@ const b = makeHistogram([100, 250, 500]);
 log("host A p99 " + a.quantile(0.99).toFixed(0) + "ms · canary B p99 " + b.quantile(0.99).toFixed(0) + "ms");
 const m = merge([a, b]);
 assert(m.total === 20, "merged total must be 20, got " + m.total);
-assert(m.counts.join(",") === "10,0,9,0", "merged counts must be element-wise sums, got " + m.counts.join(","));
+assert(m.counts.join(",") === "10,1,9,0", "merged counts must be element-wise sums, got " + m.counts.join(","));
 const fleet = m.quantile(0.99);
 log("fleet p99 (merge then quantile): " + fleet.toFixed(0) + "ms");
 const avg = (a.quantile(0.99) + b.quantile(0.99)) / 2;
