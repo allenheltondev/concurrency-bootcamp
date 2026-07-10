@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "@readysetcloud/ui/auth";
+import { Link } from "react-router-dom";
 import {
   get,
   type BadgeCatalogResponse,
@@ -60,9 +59,7 @@ async function loadProfile(): Promise<ProfileData> {
 }
 
 export default function Profile() {
-  const { user, signOut } = useAuth();
   const configured = useConfigured();
-  const navigate = useNavigate();
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
 
@@ -88,8 +85,6 @@ export default function Profile() {
     };
   }, [configured, attempt]);
 
-  const name = [user.given_name, user.family_name].filter(Boolean).join(" ") || user.email || "Your profile";
-
   if (configured === false) {
     return (
       <main className="mx-auto max-w-3xl px-6 py-16">
@@ -113,21 +108,11 @@ export default function Profile() {
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
-      <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">{name}</h1>
-          {user.email && <p className="mt-1 text-sm text-muted-foreground">{user.email}</p>}
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            void signOut();
-            navigate("/");
-          }}
-          className="btn border-border bg-surface text-foreground hover:bg-muted"
-        >
-          Sign out
-        </button>
+      <header className="mb-8">
+        <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Your progress</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          XP, streaks, and badges across every course.
+        </p>
       </header>
 
       {state.status === "loading" && <ProfileSkeleton />}

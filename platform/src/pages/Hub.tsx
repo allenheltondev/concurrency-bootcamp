@@ -2,7 +2,6 @@
    the member's progress woven in. Sits behind RequireAuth; the public
    front door is the marketing page at the root. */
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { useAuth } from "@readysetcloud/ui/auth";
 import { get, type MyCourse, type MyCoursesResponse } from "../lib/api";
 import { TAGLINES, useCatalog } from "../lib/catalog";
@@ -34,7 +33,7 @@ function ProgressStrip({ progress }: { progress: MyCourse }) {
 }
 
 export default function Hub() {
-  const { signedIn, user } = useAuth();
+  const { signedIn } = useAuth();
   const courses = useCatalog();
   const [progress, setProgress] = useState<Record<string, MyCourse>>({});
 
@@ -49,19 +48,8 @@ export default function Hub() {
     return () => { live = false; };
   }, [signedIn]);
 
-  const firstName = signedIn ? user.given_name : undefined;
-
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
-      <nav className="mb-12 flex items-center justify-between text-sm">
-        <Link to="/" className="font-medium uppercase tracking-widest text-primary-600 hover:text-primary-700">
-          Ready, Set, Cloud!
-        </Link>
-        <Link to="/app/profile" className="font-medium text-primary-600 hover:text-primary-700">
-          ◉ {firstName ?? "profile"}
-        </Link>
-      </nav>
-
       <header className="mb-10 text-center">
         <h1 className="text-3xl font-bold text-foreground sm:text-4xl">Your courses</h1>
         <p className="mx-auto mt-3 max-w-xl text-muted-foreground">

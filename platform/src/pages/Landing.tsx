@@ -3,7 +3,6 @@
    directly (no account needed; the gated dashboard lives at /app). All
    copy is plain-spoken on purpose: the goodwill IS the pitch. */
 import { Link } from "react-router-dom";
-import { useAuth } from "@readysetcloud/ui/auth";
 import { courseHref } from "../lib/courses";
 import { TAGLINES, useCatalog } from "../lib/catalog";
 import { useConfigured } from "../lib/useConfigured";
@@ -48,24 +47,13 @@ const FEATURES: Array<{ icon: string; title: string; body: string }> = [
 ];
 
 export default function Landing() {
-  const { signedIn } = useAuth();
   const configured = useConfigured();
   const courses = useCatalog();
 
   return (
     <div>
       {/* ---- hero ---- */}
-      <header className="mx-auto max-w-3xl px-6 pb-16 pt-12 text-center">
-        <nav className="mb-14 flex items-center justify-between text-sm">
-          <span className="font-medium uppercase tracking-widest text-primary-600">
-            Ready, Set, Cloud!
-          </span>
-          {configured !== false && (
-            <Link to="/app" className="font-medium text-primary-600 hover:text-primary-700">
-              {signedIn ? "◉ my dashboard" : "sign in"}
-            </Link>
-          )}
-        </nav>
+      <header className="mx-auto max-w-3xl px-6 pb-16 pt-16 text-center">
         <h1 className="text-4xl font-bold leading-tight text-foreground sm:text-5xl">
           Learn the hard stuff by actually doing it.
         </h1>

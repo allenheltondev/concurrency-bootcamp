@@ -6,6 +6,14 @@
     <meta name="theme-color" content="#3B82F6" />
     <meta name="description" content="Ready, Set, Cloud courses — hands-on, tap-driven bootcamps with synced progress." />
     <title>Ready, Set, Cloud Courses</title>
+    <!-- Apply the persisted AppNav theme before first paint (no flash of the
+         wrong palette). Mirrors the "rsc:theme" key SiteNav writes. -->
+    <script>
+      try {
+        var t = localStorage.getItem("rsc:theme");
+        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
