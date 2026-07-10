@@ -16,9 +16,9 @@
       <div class="dlabel">worked example &middot; 10&times; launch, SLO p99 &le; 100ms</div>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">measured</div><div class="lstep seq" style="--i:0">knee at 400 rps/instance &rarr; plan at &le;70% of knee: <b>280 rps</b> usable each</div>
-        <div class="lanehead seq" style="--i:1">demand</div><div class="lstep seq" style="--i:1">today 800 rps peak &times;10 = 8,000 rps &rarr; 8000/280 &asymp; <b>29 instances</b></div>
-        <div class="lanehead seq" style="--i:2">+ failure</div><div class="lstep seq" style="--i:2">survive an AZ loss (1 of 3): need the surviving 2/3 to carry it &rarr; &times;1.5 &rarr; <b>44</b></div>
-        <div class="lanehead seq" style="--i:3">+ deploys</div><div class="lstep seq" style="--i:3">rolling deploy takes 10% out &rarr; a few more &rarr; <b>~48</b>, rounded up per AZ</div>
+        <div class="lanehead seq" style="--i:1">demand</div><div class="lstep seq" style="--i:1">today 800 rps peak &times;10 = 8,000 rps &rarr; 8000/280 = <b>28.6 instances</b> (keep the fraction &mdash; round once, at the end)</div>
+        <div class="lanehead seq" style="--i:2">+ failure</div><div class="lstep seq" style="--i:2">survive an AZ loss (1 of 3): need the surviving 2/3 to carry it &rarr; &times;1.5 &rarr; <b>42.9</b></div>
+        <div class="lanehead seq" style="--i:3">+ deploys</div><div class="lstep seq" style="--i:3">rolling deploy takes 10% out &rarr; &divide;0.9 &rarr; 47.6 &rarr; <b>ceil once: 48</b>, split evenly per AZ</div>
         <div class="lanehead seq" style="--i:4">the answer</div><div class="lstep good seq pop" style="--i:4">"48 instances, and here is each factor" &mdash; auditable, updatable, defensible</div>
       </div>
       <div class="qbox micro seq" style="--i:5">
@@ -31,10 +31,10 @@
     <div class="impl">
       <div class="dlabel">reference &middot; the plan as arithmetic</div>
       <pre class="code">const usable   = knee * 0.7;                 <span class="cm">// tail headroom</span>
-const base     = Math.ceil(peak10x / usable);
+const base     = peak10x / usable;           <span class="cm">// keep the fraction</span>
 const azFactor = az / (az - 1);              <span class="cm">// survive one AZ</span>
 const deploys  = 1 / (1 - rolloutSlice);     <span class="cm">// capacity out during deploys</span>
-<span class="ok">const fleet = Math.ceil(base * azFactor * deploys);</span>
+<span class="ok">const fleet = Math.ceil(base * azFactor * deploys);</span>  <span class="cm">// round ONCE, at the end</span>
 <span class="cm">// every factor has a name — that's what makes it a plan, not a guess</span></pre>
     </div>
     <p><b class="hl">Why it matters:</b> this is the senior-engineer answer to the course's founding question. Not "we should load test" — a number, derived from a measured knee, with named multipliers for tail, failure, and deploys. Ten minutes of arithmetic, and it's the difference between a launch plan and a launch prayer.</p>` },
@@ -67,6 +67,18 @@ function drainSeconds(backlog, muNew, lambda) {
 }
 <span class="cm">// run these numbers for your worst credible step, today,</span>
 <span class="cm">// while it's arithmetic instead of an incident review.</span></pre>
+    </div>
+    <p>The "smooth deliberately" knob has a contract worth knowing cold: the <b class="hl">EWMA</b>. One state variable, one rule — <b class="hl">v &larr; &alpha;&middot;sample + (1&minus;&alpha;)&middot;v</b>, where <b class="hl">&alpha; is the weight of the NEW sample</b>: 0.1 trusts history (calm, laggy), 0.9 chases the present (current, flappy). Its effective memory is <b class="hl">&asymp; 1/&alpha; samples</b> — which is exactly the lag it adds to your scaler's reaction time, so &alpha; is a piece of T that you chose. Two bugs ship constantly: <b class="hl">seeding at zero</b> (the average spends its first ~1/&alpha; samples climbing out of a hole that never existed, hiding a bad deploy inside the warm-up ramp — seed with the first sample) and <b class="hl">transposing the weights</b> (the new sample silently gets 1&minus;&alpha; = 90% of the say, the "smoothed" line IS the noise, and the fleet churns on every wobble).</p>
+    <div class="impl">
+      <div class="dlabel">reference implementation &middot; the smoother, convention and all</div>
+      <pre class="code">update(sample) {
+  <span class="ok">if (this.v === null) this.v = sample;</span>  <span class="cm">// seed with the FIRST sample, never 0</span>
+  else this.v = <span class="ok">this.alpha * sample</span>        <span class="cm">// &alpha; = the NEW sample's share…</span>
+             + (1 - this.alpha) * this.v;   <span class="cm">// …history keeps the rest</span>
+  return this.v;
+}
+<span class="cm">// memory &asymp; 1/&alpha; samples: &alpha;=0.2 → a ~5-sample window — the noise</span>
+<span class="cm">// you filtered is the lag you bought. pick &alpha; knowing the trade.</span></pre>
     </div>
     <p><b class="hl">Why it matters:</b> "we have autoscaling" ends more capacity conversations than it should. The follow-up that shows seniority is one number: <i>what's our T, and what absorbs a step during it?</i> Every elastic system has this gap; the good ones have sized it.</p>` },
 

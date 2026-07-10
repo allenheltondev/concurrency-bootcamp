@@ -5,9 +5,11 @@
    it can NEVER under-report. counts[i] holds samples in
    (bounds[i-1], bounds[i]]; the final slot is the overflow bucket and
    reports Infinity.
-   EDGE: merge(other) requires identical bounds (throw otherwise) and sums
-   counts index-wise into a NEW histogram — merging populations is the only
-   valid way to aggregate percentiles across hosts. */
+   EDGE: an EMPTY histogram has no percentiles — percentile() returns
+   undefined when total is 0, never the first bound. merge(other) requires
+   identical bounds (throw otherwise) and sums counts index-wise into a
+   NEW histogram — merging populations is the only valid way to aggregate
+   percentiles across hosts. */
 "use strict";
 
 export class Histogram {

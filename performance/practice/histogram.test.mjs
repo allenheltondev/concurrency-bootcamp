@@ -3,6 +3,7 @@ import { Histogram } from "./histogram.mjs";
 
 suite("streaming histogram — conservative percentiles, valid merging", ({ log, assert }) => {
   const h = new Histogram([10, 20, 50, 100, 200]);
+  assert(h.percentile(99) === undefined, "an EMPTY histogram has no p99 — undefined, never the first bound");
   for (let i = 0; i < 96; i++) h.record(8);
   h.record(60); h.record(60); h.record(150); h.record(180);
   assert(h.total === 100, "100 samples recorded, got " + h.total);

@@ -16,6 +16,7 @@ export class Histogram {
   }
 
   percentile(p) {
+    if (this.total === 0) return undefined;           // no data, no answer
     const rank = Math.ceil((p / 100) * this.total);   // ranks count samples: start at 1
     let cum = 0;
     for (let i = 0; i < this.counts.length; i++) {

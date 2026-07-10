@@ -70,6 +70,7 @@ class Histogram{
     this.total++;
   }
   percentile(p){
+    if (this.total === 0) return undefined;    // no data, no answer
     const rank = Math.ceil((p / 100) * this.total);
     let cum = 0;
     for (let i = 0; i < this.counts.length; i++){
@@ -276,7 +277,8 @@ async function demoHistogram(){
   const p50 = h.percentile(50), p99 = h.percentile(99), p999 = h.percentile(99.9);
   const mean = (960*8 + 30*45 + 10*400) / 1000;
   const pass = h.total === 1000 && p50 === 10 && p99 === 50 && p999 === 500
-    && h.counts.reduce((a,b)=>a+b,0) === 1000;
+    && h.counts.reduce((a,b)=>a+b,0) === 1000
+    && new Histogram([10]).percentile(99) === undefined;   // empty: no data, no answer
   return { lines: [
     { t: `1,000 samples in ${h.counts.length} counters — bounded memory, mergeable across hosts` },
     { t: `p50 ≤ ${p50}ms · p99 ≤ ${p99}ms · p99.9 ≤ ${p999}ms (bucket upper bounds: never under-reported)` },

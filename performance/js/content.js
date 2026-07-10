@@ -83,7 +83,7 @@ offeredLoad = 100 req/s   // exactly μ. what happens?`,
              "about 12 milliseconds — 1200/100"],
     answer:0,
     whys:[
-      "Right. L = λW holds for any stable system — no assumptions about distributions, scheduling, or independence. Two boring observables (a gauge and a rate) hand you the number the broken panel was for: 12 full seconds.",
+      "Right. L = λW holds for any stable system — no assumptions about distributions, scheduling, or independence. Two boring observables (a gauge and a rate) hand you the number the broken panel was for: 12 full seconds. (Little's law proper speaks of long-run averages; with the gauge roughly steady, this is the honest instantaneous estimate.)",
       "That's the magic of Little's law: it's distribution-free. You don't need the histogram to know the AVERAGE wait — occupancy divided by throughput is the average wait. The histogram tells you how the pain is shared; the law tells you how much pain there is.",
       "Units: requests divided by requests-per-SECOND gives seconds. 12ms would require a completion rate of 100 requests per millisecond — a hundred thousand per second. Dimensional analysis is the five-second sanity check."] },
 
@@ -184,7 +184,7 @@ offeredLoad = 100 req/s   // exactly μ. what happens?`,
              "no backlog — the autoscaler reacts to the first elevated sample"],
     answer:0,
     whys:[
-      "Right. During the lag, excess arrivals queue at (λ−μ) = 100/s for 120s. And the new capacity must then DRAIN 12,000 requests while 250 rps keeps arriving — at 300 rps total capacity that's another two minutes, with peak waits around 40s (12,000/300, by Little).",
+      "Right. During the lag, excess arrivals queue at (λ−μ) = 100/s for 120s. And the new capacity must then DRAIN 12,000 requests while 250 rps keeps arriving — only μ−λ = 50 rps chips at the backlog, so it takes another FOUR minutes: a 2-minute lag buys a 6-minute incident, with peak waits around 40s (12,000/300, by Little).",
       "'Only 100 rps short' × 120 seconds IS the incident: twelve thousand queued users, every one of them experiencing multi-second waits. 'Fixed within two minutes' describes the capacity graph — the users lived in the queue.",
       "The scaler cannot react to one sample: metrics aggregate over a window, evaluation runs on a period, instances take time to boot and warm. Minutes of lag is structural. Spikes measured in seconds must be absorbed by headroom, a bounded queue, or shedding — the scaler arrives afterward."] },
 
@@ -249,7 +249,8 @@ function littleSolve({ L, lambda, W }) {
     this.counts[i]++;
     this.total++;
   }
-  percentile(p) {`,
+  percentile(p) {
+    if (this.total === 0) return undefined;  // no data, no answer`,
       blank:{ q:"The SLO dashboard reads p99 off this histogram. Which body reports a number no real sample beats — instead of one the tail quietly exceeds?",
         options:[
 `    const rank = Math.ceil((p / 100) * this.total);
@@ -568,7 +569,7 @@ function backlogDuringLag(lambdaRps, muRps, lagSec) {`,
 `  return lambdaRps * lagSec;`,
 `  return (lambdaRps - muRps) * lagSec;`],
         answer:0,
-        whys:["Right — only the EXCESS queues: (250 − 150) × 120 = 12,000 requests. That number IS your incident: at 300 rps of post-scale capacity it takes another two minutes to drain, with peak waits near 40s. Headroom, a bounded queue, or shedding must cover it.",
+        whys:["Right — only the EXCESS queues: (250 − 150) × 120 = 12,000 requests. That number IS your incident: even at 300 rps of post-scale capacity, only μ−λ = 50 rps chips at the backlog — another FOUR minutes to drain (a 2-minute lag buys a 6-minute incident), with peak waits near 40s. Headroom, a bounded queue, or shedding must cover it.",
               "Counts every arrival as backlog — 30,000 instead of 12,000 — as if the fleet served nothing during the lag. The 2.5× overestimate becomes permanent 2.5× overprovisioning the first time someone 'fixes' capacity with it.",
               "Without the clamp, normal operation (λ < μ) produces NEGATIVE backlog — and any alert or scaler fed by it learns that quiet hours cancel out future overload. Queues drain to zero; they do not go below it."] },
       post:`}` },
@@ -645,6 +646,7 @@ const BUGHUNT = [
       "  }",
       "",
       "  percentile(p) {",
+      "    if (this.total === 0) return undefined;",
       "    const rank = Math.ceil((p / 100) * this.total);",
       "    let cum = 0;",
       "    for (let i = 0; i < this.counts.length; i++) {",
@@ -659,7 +661,7 @@ const BUGHUNT = [
     explain:"Line 21 returns the bucket's LOWER edge. A sample counted in counts[i] lies in (bounds[i-1], bounds[i]] — every sample in that bucket is allowed to EXCEED the reported value, by up to a full bucket width. With doubling buckets that's a 2× under-report of the tail, which is exactly the gap between the dashboard and the customers. Report the upper bound — `this.bounds[i]`, and Infinity for the overflow slot — so the histogram over-reports by at most a bucket width and never under-reports an SLO breach." },
 
   { id:"bug_loadgen", title:"Load generator", why:"an open loop must not wait for the server", lesson:10,
-    scenario:"The stress test certifies 500 rps at p99 40ms. Production falls over at 300 rps with 30-second latencies. The generator was configured for a fixed request rate — but under any real stall its reported latencies stay mysteriously polite. Which line turns the test into a lie?",
+    scenario:"The stress test certifies 500 rps at p99 40ms. Production falls over at 300 rps with 30-second latencies. The generator was configured for a fixed request rate — but under any real stall its reported latencies stay mysteriously polite. At most one request is ever in flight — which line makes that true?",
     lines:[
       "// drives the target at a configured request rate and",
       "// reports the latency distribution it observed",
@@ -846,7 +848,7 @@ assert(burst.waits.join(",") === "0,10,20", "a burst serializes: 0,10,20 - got "
     hint:"Track `free` (when the server next idles). Per job: start = max(arrival, free); free = start + service; wait = start − arrival; latency = free − arrival." },
 
   { id:"w-histogram", title:"Streaming histogram — write it", why:"answer any percentile from a handful of counters", lesson:9,
-    spec:"Write record(v) and percentile(p). record: find the first bucket whose upper bound holds v (counts[i] covers values ≤ bounds[i]; the extra last slot catches overflow) and count it. percentile: rank = ceil(p/100 × total), walk cumulative counts, and return the UPPER bound of the bucket containing that rank (Infinity for the overflow slot) — never under-report.",
+    spec:"Write record(v) and percentile(p). record: find the first bucket whose upper bound holds v (counts[i] covers values ≤ bounds[i]; the extra last slot catches overflow) and count it. percentile: an EMPTY histogram returns undefined (no data, no answer); otherwise rank = ceil(p/100 × total), walk cumulative counts, and return the UPPER bound of the bucket containing that rank (Infinity for the overflow slot) — never under-report.",
     pre:`class Histogram {
   constructor(bounds) {            // ascending upper bounds
     this.bounds = bounds;
@@ -862,6 +864,7 @@ assert(burst.waits.join(",") === "0,10,20", "a burst serializes: 0,10,20 - got "
       "    this.total++;",
       "  }",
       "  percentile(p) {",
+      "    if (this.total === 0) return undefined;",
       "    const rank = Math.ceil((p / 100) * this.total);",
       "    let cum = 0;",
       "    for (let i = 0; i < this.counts.length; i++) {",
@@ -880,6 +883,7 @@ assert(burst.waits.join(",") === "0,10,20", "a burst serializes: 0,10,20 - got "
         why:"Walks one bucket past the rank: every percentile reports a bucket high, and p100 — where cum can only ever EQUAL total — falls off the end and returns undefined. The rank is reached the moment cum >= rank." },
     ],
     test:`const h = new Histogram([10, 20, 50, 100, 200]);
+assert(h.percentile(99) === undefined, "an EMPTY histogram has no p99 - never report the first bound on no data");
 for (let i = 0; i < 96; i++) h.record(8);
 h.record(60); h.record(60); h.record(150); h.record(180);
 assert(h.total === 100, "100 samples recorded, got " + h.total);

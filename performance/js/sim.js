@@ -159,10 +159,10 @@ function renderQueueSimModule(mod){
   main.appendChild(el(`<div class="card">
     <div class="why">// what to try, in order</div>
     <pre class="code"><span class="cm">// 1. λ=60, S=10  (ρ=0.6): latency ≈ service. boring. good.</span>
-<span class="cm">// 2. λ=85, S=10  (ρ=0.85): same code, 3-6× the latency — pure queueing</span>
+<span class="cm">// 2. λ=85, S=10  (ρ=0.85): same code, 6-7× the latency — pure queueing</span>
 <span class="cm">// 3. λ=110, S=10 (ρ=1.1): the queue only grows. there is no steady state</span>
 <span class="cm">// 4. same, shedding ON: instant errors, bounded tail — overload with a floor</span>
 <span class="ok">// the code never changed. only λ did. that's the hockey stick.</span></pre>
-    <p class="sub" style="margin-bottom:0">The measured numbers wobble around the analytic line — that's variance, not error; a longer run converges. What never wobbles: below the knee the queue forgives, above it the queue compounds, and past ρ&nbsp;=&nbsp;1 the only question is which resource dies first. Shedding doesn't make overload cheap — it makes it <b style="color:var(--text)">bounded</b>.</p>
+    <p class="sub" style="margin-bottom:0">Below the knee the measured numbers hug the analytic line. Near saturation they sit <b style="color:var(--text)">below</b> it — a 600-request run systematically under-measures a steady state that takes thousands of requests to reach, so the real queue is <b style="color:var(--text)">worse</b> than the sample shows. What never wobbles: below the knee the queue forgives, above it the queue compounds, and past ρ&nbsp;=&nbsp;1 the only question is which resource dies first. Shedding doesn't make overload cheap — it makes it <b style="color:var(--text)">bounded</b>.</p>
   </div>`));
 }
