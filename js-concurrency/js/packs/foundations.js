@@ -32,32 +32,32 @@
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">one thread &middot; two tasks, taking turns</div>
       <svg class="estage" viewBox="0 0 340 152" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <text x="170" y="16" fill="#8b90ab" font-size="8.5" text-anchor="middle">ONE THREAD &middot; time &rarr;</text>
-        <rect x="20"  y="58" width="60" height="34" rx="6" fill="rgba(142,134,240,.14)" stroke="#2c3350"/>
-        <rect x="80"  y="58" width="60" height="34" rx="6" fill="rgba(255,154,107,.14)" stroke="#2c3350"/>
-        <rect x="140" y="58" width="60" height="34" rx="6" fill="rgba(142,134,240,.14)" stroke="#2c3350"/>
-        <rect x="200" y="58" width="60" height="34" rx="6" fill="rgba(255,154,107,.14)" stroke="#2c3350"/>
-        <rect x="260" y="58" width="60" height="34" rx="6" fill="rgba(142,134,240,.14)" stroke="#2c3350"/>
-        <text x="50"  y="50" fill="#8e86f0" font-size="9" text-anchor="middle">A</text>
-        <text x="110" y="50" fill="#ff9a6b" font-size="9" text-anchor="middle">B</text>
-        <text x="170" y="50" fill="#8e86f0" font-size="9" text-anchor="middle">A</text>
-        <text x="230" y="50" fill="#ff9a6b" font-size="9" text-anchor="middle">B</text>
-        <text x="290" y="50" fill="#8e86f0" font-size="9" text-anchor="middle">A</text>
-        <text x="50"  y="106" fill="#6a7090" font-size="7" text-anchor="middle">await</text>
-        <text x="110" y="106" fill="#6a7090" font-size="7" text-anchor="middle">await</text>
-        <text x="170" y="106" fill="#6a7090" font-size="7" text-anchor="middle">await</text>
-        <text x="230" y="106" fill="#6a7090" font-size="7" text-anchor="middle">await</text>
-        <circle r="9" cy="75" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <text x="170" y="16" fill="#8ca6b8" font-size="8.5" text-anchor="middle">ONE THREAD &middot; time &rarr;</text>
+        <rect x="20"  y="58" width="60" height="34" rx="6" fill="rgba(78,174,255,.14)" stroke="#244155"/>
+        <rect x="80"  y="58" width="60" height="34" rx="6" fill="rgba(251,146,60,.14)" stroke="#244155"/>
+        <rect x="140" y="58" width="60" height="34" rx="6" fill="rgba(78,174,255,.14)" stroke="#244155"/>
+        <rect x="200" y="58" width="60" height="34" rx="6" fill="rgba(251,146,60,.14)" stroke="#244155"/>
+        <rect x="260" y="58" width="60" height="34" rx="6" fill="rgba(78,174,255,.14)" stroke="#244155"/>
+        <text x="50"  y="50" fill="#4eaeff" font-size="9" text-anchor="middle">A</text>
+        <text x="110" y="50" fill="#fb923c" font-size="9" text-anchor="middle">B</text>
+        <text x="170" y="50" fill="#4eaeff" font-size="9" text-anchor="middle">A</text>
+        <text x="230" y="50" fill="#fb923c" font-size="9" text-anchor="middle">B</text>
+        <text x="290" y="50" fill="#4eaeff" font-size="9" text-anchor="middle">A</text>
+        <text x="50"  y="106" fill="#647c8f" font-size="7" text-anchor="middle">await</text>
+        <text x="110" y="106" fill="#647c8f" font-size="7" text-anchor="middle">await</text>
+        <text x="170" y="106" fill="#647c8f" font-size="7" text-anchor="middle">await</text>
+        <text x="230" y="106" fill="#647c8f" font-size="7" text-anchor="middle">await</text>
+        <circle r="9" cy="75" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.16;0.2;0.36;0.4;0.56;0.6;0.76;0.8;1"
             keyPoints="0;0;0.25;0.25;0.5;0.5;0.75;0.75;1;1"
             path="M 50 0 L 290 0"/>
           <animate attributeName="fill" dur="5s" repeatCount="indefinite"
             keyTimes="0;0.19;0.2;0.39;0.4;0.59;0.6;0.79;0.8;1"
-            values="#8e86f0;#8e86f0;#ff9a6b;#ff9a6b;#8e86f0;#8e86f0;#ff9a6b;#ff9a6b;#8e86f0;#8e86f0"/>
+            values="#4eaeff;#4eaeff;#fb923c;#fb923c;#4eaeff;#4eaeff;#fb923c;#fb923c;#4eaeff;#4eaeff"/>
         </circle>
-        <text x="170" y="128" fill="#6a7090" font-size="8" text-anchor="middle">the thread is the baton &mdash; only one task holds it at a time</text>
-        <text x="170" y="142" fill="#8b90ab" font-size="8" text-anchor="middle">handed off at every await, never shared</text>
+        <text x="170" y="128" fill="#647c8f" font-size="8" text-anchor="middle">the thread is the baton &mdash; only one task holds it at a time</text>
+        <text x="170" y="142" fill="#8ca6b8" font-size="8" text-anchor="middle">handed off at every await, never shared</text>
       </svg>
       <div class="dcols">
         <div class="dcol seq" style="--i:0">
@@ -100,26 +100,26 @@ task("B");                      <span class="cm">// now B runs to ITS await, the
     <div class="diagram anim" style="--step:.8s">
       <div class="dlabel">two tasks reach for one shared cell &middot; across the await gap</div>
       <svg class="estage" viewBox="0 0 340 156" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <text x="170" y="18" fill="#57e0b0" font-size="9" text-anchor="middle">SHARED &middot; count</text>
-        <rect x="146" y="24" width="48" height="38" rx="8" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="170" y="49" font-size="15" text-anchor="middle" fill="#e7e9f3">0
+        <text x="170" y="18" fill="#34d3bf" font-size="9" text-anchor="middle">SHARED &middot; count</text>
+        <rect x="146" y="24" width="48" height="38" rx="8" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="170" y="49" font-size="15" text-anchor="middle" fill="#e2ecf3">0
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.6;0.61;1" values="1;1;0;0"/></text>
-        <text x="170" y="49" font-size="15" text-anchor="middle" fill="#ff9a6b" opacity="0">1
+        <text x="170" y="49" font-size="15" text-anchor="middle" fill="#fb923c" opacity="0">1
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.6;0.61;1" values="0;0;1;1"/></text>
-        <text x="170" y="82" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">two +1s, but count = 1
+        <text x="170" y="82" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">two +1s, but count = 1
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.86;0.92;1" values="0;0;1;1"/></text>
-        <line x1="150" y1="56" x2="66" y2="106" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5"/>
-        <line x1="190" y1="56" x2="274" y2="106" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5"/>
-        <rect x="12" y="106" width="98" height="42" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="61" y="124" fill="#8e86f0" font-size="9" text-anchor="middle">TASK A</text>
-        <text x="61" y="138" fill="#8b90ab" font-size="8" text-anchor="middle">read, await, +1</text>
-        <rect x="230" y="106" width="98" height="42" rx="9" fill="#11131c" stroke="#ff9a6b" stroke-width="1.5"/>
-        <text x="279" y="124" fill="#ff9a6b" font-size="9" text-anchor="middle">TASK B</text>
-        <text x="279" y="138" fill="#8b90ab" font-size="8" text-anchor="middle">read, +1</text>
-        <circle r="6.5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <line x1="150" y1="56" x2="66" y2="106" stroke="#244155" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <line x1="190" y1="56" x2="274" y2="106" stroke="#244155" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <rect x="12" y="106" width="98" height="42" rx="9" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="61" y="124" fill="#4eaeff" font-size="9" text-anchor="middle">TASK A</text>
+        <text x="61" y="138" fill="#8ca6b8" font-size="8" text-anchor="middle">read, await, +1</text>
+        <rect x="230" y="106" width="98" height="42" rx="9" fill="#071726" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="279" y="124" fill="#fb923c" font-size="9" text-anchor="middle">TASK B</text>
+        <text x="279" y="138" fill="#8ca6b8" font-size="8" text-anchor="middle">read, +1</text>
+        <circle r="6.5" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.12;0.74;0.86;1" keyPoints="0;1;1;0;0" path="M 150 56 L 66 106"/></circle>
-        <circle r="6.5" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+        <circle r="6.5" fill="#fb923c" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.22;0.36;0.48;0.6;1" keyPoints="0;0;1;1;0;0" path="M 190 56 L 274 106"/></circle>
       </svg>
@@ -161,27 +161,27 @@ async function bump() {
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">one event loop &middot; three requests, interleaved at their awaits</div>
       <svg class="estage" viewBox="0 0 340 158" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <circle cx="170" cy="52" r="30" fill="none" stroke="#2c3350" stroke-width="1.4" stroke-dasharray="4 5"/>
-        <text x="170" y="49" fill="#8e86f0" font-size="8.5" text-anchor="middle">EVENT</text>
-        <text x="170" y="60" fill="#8e86f0" font-size="8.5" text-anchor="middle">LOOP</text>
-        <text x="24" y="30" fill="#57e0b0" font-size="8" text-anchor="middle">requests</text>
-        <rect x="10" y="38" width="26" height="16" rx="4" fill="#11131c" stroke="#57e0b0" stroke-width="1.2"/><text x="23" y="50" fill="#57e0b0" font-size="8" text-anchor="middle">R1</text>
-        <rect x="10" y="60" width="26" height="16" rx="4" fill="#11131c" stroke="#57e0b0" stroke-width="1.2"/><text x="23" y="72" fill="#57e0b0" font-size="8" text-anchor="middle">R2</text>
-        <rect x="10" y="82" width="26" height="16" rx="4" fill="#11131c" stroke="#57e0b0" stroke-width="1.2"/><text x="23" y="94" fill="#57e0b0" font-size="8" text-anchor="middle">R3</text>
-        <line x1="200" y1="52" x2="250" y2="52" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 4"/>
-        <text x="292" y="30" fill="#8b90ab" font-size="8" text-anchor="middle">shared</text>
-        <rect x="252" y="36" width="80" height="34" rx="8" fill="#11131c" stroke="#ff9a6b" stroke-width="1.4"/>
-        <text x="292" y="50" fill="#ff9a6b" font-size="8.5" text-anchor="middle">DATABASE</text>
-        <text x="292" y="62" fill="#6a7090" font-size="7" text-anchor="middle">pool &middot; rows</text>
-        <circle r="6" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <circle cx="170" cy="52" r="30" fill="none" stroke="#244155" stroke-width="1.4" stroke-dasharray="4 5"/>
+        <text x="170" y="49" fill="#4eaeff" font-size="8.5" text-anchor="middle">EVENT</text>
+        <text x="170" y="60" fill="#4eaeff" font-size="8.5" text-anchor="middle">LOOP</text>
+        <text x="24" y="30" fill="#34d3bf" font-size="8" text-anchor="middle">requests</text>
+        <rect x="10" y="38" width="26" height="16" rx="4" fill="#071726" stroke="#34d3bf" stroke-width="1.2"/><text x="23" y="50" fill="#34d3bf" font-size="8" text-anchor="middle">R1</text>
+        <rect x="10" y="60" width="26" height="16" rx="4" fill="#071726" stroke="#34d3bf" stroke-width="1.2"/><text x="23" y="72" fill="#34d3bf" font-size="8" text-anchor="middle">R2</text>
+        <rect x="10" y="82" width="26" height="16" rx="4" fill="#071726" stroke="#34d3bf" stroke-width="1.2"/><text x="23" y="94" fill="#34d3bf" font-size="8" text-anchor="middle">R3</text>
+        <line x1="200" y1="52" x2="250" y2="52" stroke="#244155" stroke-width="1.2" stroke-dasharray="3 4"/>
+        <text x="292" y="30" fill="#8ca6b8" font-size="8" text-anchor="middle">shared</text>
+        <rect x="252" y="36" width="80" height="34" rx="8" fill="#071726" stroke="#fb923c" stroke-width="1.4"/>
+        <text x="292" y="50" fill="#fb923c" font-size="8.5" text-anchor="middle">DATABASE</text>
+        <text x="292" y="62" fill="#647c8f" font-size="7" text-anchor="middle">pool &middot; rows</text>
+        <circle r="6" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.2;0.5;0.7;1" keyPoints="0;0.5;0.5;1;1"
             path="M 36 46 L 150 52 L 292 52"/></circle>
-        <circle r="6" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <circle r="6" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="5s" begin="-1.6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.2;0.5;0.7;1" keyPoints="0;0.5;0.5;1;1"
             path="M 36 68 L 150 52 L 292 52"/></circle>
-        <circle r="6" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <circle r="6" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="5s" begin="-3.3s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.2;0.5;0.7;1" keyPoints="0;0.5;0.5;1;1"
             path="M 36 90 L 150 52 L 292 52"/></circle>
@@ -226,27 +226,27 @@ app.get("/order/:id", async (req, res) =&gt; {
     <div class="diagram anim" style="--step:.75s">
       <div class="dlabel">load balancer &middot; two instances, private memory, one shared store</div>
       <svg class="estage" viewBox="0 0 340 168" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="132" y="8" width="76" height="24" rx="6" fill="#11131c" stroke="#8e86f0" stroke-width="1.4"/>
-        <text x="170" y="24" fill="#8e86f0" font-size="8.5" text-anchor="middle">LOAD BAL.</text>
-        <line x1="152" y1="32" x2="80" y2="58" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="188" y1="32" x2="260" y2="58" stroke="#2c3350" stroke-width="1.2"/>
-        <rect x="20" y="58" width="120" height="46" rx="9" fill="#11131c" stroke="#57e0b0" stroke-width="1.4"/>
-        <text x="80" y="74" fill="#57e0b0" font-size="8.5" text-anchor="middle">INSTANCE A</text>
-        <text x="80" y="88" fill="#8b90ab" font-size="7.5" text-anchor="middle">own Mutex &middot; own cache</text>
-        <text x="80" y="99" fill="#6a7090" font-size="7" text-anchor="middle">lock held: A only</text>
-        <rect x="200" y="58" width="120" height="46" rx="9" fill="#11131c" stroke="#ff9a6b" stroke-width="1.4"/>
-        <text x="260" y="74" fill="#ff9a6b" font-size="8.5" text-anchor="middle">INSTANCE B</text>
-        <text x="260" y="88" fill="#8b90ab" font-size="7.5" text-anchor="middle">own Mutex &middot; own cache</text>
-        <text x="260" y="99" fill="#6a7090" font-size="7" text-anchor="middle">lock held: B only</text>
-        <line x1="80" y1="104" x2="150" y2="132" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 4"/>
-        <line x1="260" y1="104" x2="190" y2="132" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 4"/>
-        <rect x="118" y="132" width="104" height="30" rx="8" fill="#11131c" stroke="#8e86f0" stroke-width="1.6"/>
-        <text x="170" y="147" fill="#8e86f0" font-size="8.5" text-anchor="middle">SHARED STORE</text>
-        <text x="170" y="158" fill="#6a7090" font-size="7" text-anchor="middle">DB / Valkey &mdash; the only common ground</text>
-        <circle r="6" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <rect x="132" y="8" width="76" height="24" rx="6" fill="#071726" stroke="#4eaeff" stroke-width="1.4"/>
+        <text x="170" y="24" fill="#4eaeff" font-size="8.5" text-anchor="middle">LOAD BAL.</text>
+        <line x1="152" y1="32" x2="80" y2="58" stroke="#244155" stroke-width="1.2"/>
+        <line x1="188" y1="32" x2="260" y2="58" stroke="#244155" stroke-width="1.2"/>
+        <rect x="20" y="58" width="120" height="46" rx="9" fill="#071726" stroke="#34d3bf" stroke-width="1.4"/>
+        <text x="80" y="74" fill="#34d3bf" font-size="8.5" text-anchor="middle">INSTANCE A</text>
+        <text x="80" y="88" fill="#8ca6b8" font-size="7.5" text-anchor="middle">own Mutex &middot; own cache</text>
+        <text x="80" y="99" fill="#647c8f" font-size="7" text-anchor="middle">lock held: A only</text>
+        <rect x="200" y="58" width="120" height="46" rx="9" fill="#071726" stroke="#fb923c" stroke-width="1.4"/>
+        <text x="260" y="74" fill="#fb923c" font-size="8.5" text-anchor="middle">INSTANCE B</text>
+        <text x="260" y="88" fill="#8ca6b8" font-size="7.5" text-anchor="middle">own Mutex &middot; own cache</text>
+        <text x="260" y="99" fill="#647c8f" font-size="7" text-anchor="middle">lock held: B only</text>
+        <line x1="80" y1="104" x2="150" y2="132" stroke="#244155" stroke-width="1.2" stroke-dasharray="3 4"/>
+        <line x1="260" y1="104" x2="190" y2="132" stroke="#244155" stroke-width="1.2" stroke-dasharray="3 4"/>
+        <rect x="118" y="132" width="104" height="30" rx="8" fill="#071726" stroke="#4eaeff" stroke-width="1.6"/>
+        <text x="170" y="147" fill="#4eaeff" font-size="8.5" text-anchor="middle">SHARED STORE</text>
+        <text x="170" y="158" fill="#647c8f" font-size="7" text-anchor="middle">DB / Valkey &mdash; the only common ground</text>
+        <circle r="6" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.3;0.5;0.75;1" keyPoints="0;0.5;0.5;1;1" path="M 80 58 L 80 104 L 168 132"/></circle>
-        <circle r="6" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+        <circle r="6" fill="#fb923c" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="5s" begin="-0.4s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.3;0.5;0.75;1" keyPoints="0;0.5;0.5;1;1" path="M 260 58 L 260 104 L 172 132"/></circle>
       </svg>

@@ -70,9 +70,9 @@ function qsimSparkline(samples, horizon){
     (10 + (t / horizon) * (W - 20)).toFixed(1) + "," + (H - 6 - (d / maxD) * (H - 16)).toFixed(1)
   ).join(" ");
   return `<svg class="estage" viewBox="0 0 ${W} ${H + 14}" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-    <line x1="10" y1="${H - 6}" x2="${W - 10}" y2="${H - 6}" stroke="#2c3350" stroke-width="1"/>
-    <polyline points="${pts}" fill="none" stroke="#8e86f0" stroke-width="1.5"/>
-    <text x="10" y="${H + 8}" fill="#6a7090" font-size="8">queue depth over the run · peak ${maxD}</text>
+    <line x1="10" y1="${H - 6}" x2="${W - 10}" y2="${H - 6}" stroke="#244155" stroke-width="1"/>
+    <polyline points="${pts}" fill="none" stroke="#4eaeff" stroke-width="1.5"/>
+    <text x="10" y="${H + 8}" fill="#647c8f" font-size="8">queue depth over the run · peak ${maxD}</text>
   </svg>`;
 }
 

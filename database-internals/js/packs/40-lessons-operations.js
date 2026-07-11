@@ -18,32 +18,32 @@
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">200 requests &middot; pool of 10 &middot; the queue lives in the app, where it's cheap</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <circle cx="24" cy="50" r="4" fill="#8b90ab"/><circle cx="38" cy="42" r="4" fill="#8b90ab"/>
-        <circle cx="52" cy="52" r="4" fill="#8b90ab"/><circle cx="30" cy="66" r="4" fill="#8b90ab"/>
-        <circle cx="46" cy="68" r="4" fill="#8b90ab"/><circle cx="60" cy="62" r="4" fill="#8b90ab"/>
-        <circle cx="38" cy="80" r="4" fill="#8b90ab"/><circle cx="54" cy="82" r="4" fill="#8b90ab"/>
-        <text x="42" y="30" fill="#e7e9f3" font-size="8" text-anchor="middle">200 requests</text>
-        <rect x="130" y="52" width="84" height="46" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="172" y="70" fill="#8e86f0" font-size="8.5" text-anchor="middle">pool &middot; max 10</text>
-        <text x="172" y="86" fill="#8b90ab" font-size="7.5" text-anchor="middle">190 queue here</text>
-        <rect x="250" y="52" width="84" height="46" rx="9" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="292" y="70" fill="#57e0b0" font-size="8.5" text-anchor="middle">postgres</text>
-        <text x="292" y="86" fill="#8b90ab" font-size="7.5" text-anchor="middle">10 busy backends</text>
-        <line x1="66" y1="70" x2="130" y2="72" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="214" y1="74" x2="250" y2="74" stroke="#2c3350" stroke-width="1.2"/>
-        <circle r="5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <circle cx="24" cy="50" r="4" fill="#8ca6b8"/><circle cx="38" cy="42" r="4" fill="#8ca6b8"/>
+        <circle cx="52" cy="52" r="4" fill="#8ca6b8"/><circle cx="30" cy="66" r="4" fill="#8ca6b8"/>
+        <circle cx="46" cy="68" r="4" fill="#8ca6b8"/><circle cx="60" cy="62" r="4" fill="#8ca6b8"/>
+        <circle cx="38" cy="80" r="4" fill="#8ca6b8"/><circle cx="54" cy="82" r="4" fill="#8ca6b8"/>
+        <text x="42" y="30" fill="#e2ecf3" font-size="8" text-anchor="middle">200 requests</text>
+        <rect x="130" y="52" width="84" height="46" rx="9" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="172" y="70" fill="#4eaeff" font-size="8.5" text-anchor="middle">pool &middot; max 10</text>
+        <text x="172" y="86" fill="#8ca6b8" font-size="7.5" text-anchor="middle">190 queue here</text>
+        <rect x="250" y="52" width="84" height="46" rx="9" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="292" y="70" fill="#34d3bf" font-size="8.5" text-anchor="middle">postgres</text>
+        <text x="292" y="86" fill="#8ca6b8" font-size="7.5" text-anchor="middle">10 busy backends</text>
+        <line x1="66" y1="70" x2="130" y2="72" stroke="#244155" stroke-width="1.2"/>
+        <line x1="214" y1="74" x2="250" y2="74" stroke="#244155" stroke-width="1.2"/>
+        <circle r="5" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.1;0.3;0.55;0.7;1" keyPoints="0;0;0.42;0.42;1;1" path="M 60 66 L 172 66 L 292 66"/>
         </circle>
-        <circle r="5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <circle r="5" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.3;0.5;0.75;0.9;1" keyPoints="0;0;0.42;0.42;1;1" path="M 54 82 L 172 80 L 292 80"/>
         </circle>
-        <text x="172" y="116" fill="#57e0b0" font-size="8" text-anchor="middle" opacity="0">held for the QUERY only &rarr; each conn serves ~50 req/s
+        <text x="172" y="116" fill="#34d3bf" font-size="8" text-anchor="middle" opacity="0">held for the QUERY only &rarr; each conn serves ~50 req/s
           <animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.4;0.46;1" values="0;0;1;1"/></text>
-        <text x="172" y="132" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">vs 200 direct backends: RAM burned, cores context-switching, LESS throughput
+        <text x="172" y="132" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">vs 200 direct backends: RAM burned, cores context-switching, LESS throughput
           <animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.62;0.68;1" values="0;0;1;1"/></text>
-        <text x="172" y="16" fill="#8b90ab" font-size="7.5" text-anchor="middle">waiting in the app: a promise in a queue &middot; waiting in the db: a whole process</text>
+        <text x="172" y="16" fill="#8ca6b8" font-size="7.5" text-anchor="middle">waiting in the app: a promise in a queue &middot; waiting in the db: a whole process</text>
       </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">starting point</div><div class="lstep good seq" style="--i:0">pool &asymp; <b>cores &times; 2 + spindles</b> &mdash; 8 cores + SSD &rarr; ~17, not 200; then measure, don't guess</div>
@@ -196,35 +196,35 @@ CREATE INDEX <span class="ok">CONCURRENTLY</span> orders_region_idx ON orders (r
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">the race &middot; the user's GET vs their own WAL record</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="12" y="52" width="90" height="46" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="57" y="71" fill="#8e86f0" font-size="8.5" text-anchor="middle">primary</text>
-        <text x="57" y="86" fill="#8b90ab" font-size="7.5" text-anchor="middle">commit acked &#10003;</text>
-        <rect x="238" y="52" width="90" height="46" rx="9" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="283" y="71" fill="#57e0b0" font-size="8.5" text-anchor="middle">replica</text>
-        <text x="283" y="86" fill="#8b90ab" font-size="7.5" text-anchor="middle">replaying&hellip;</text>
-        <line x1="102" y1="75" x2="238" y2="75" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="170" y="68" fill="#8b90ab" font-size="7" text-anchor="middle">wal stream &middot; async</text>
-        <rect width="14" height="10" rx="2" fill="#57e0b0">
+        <rect x="12" y="52" width="90" height="46" rx="9" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="57" y="71" fill="#4eaeff" font-size="8.5" text-anchor="middle">primary</text>
+        <text x="57" y="86" fill="#8ca6b8" font-size="7.5" text-anchor="middle">commit acked &#10003;</text>
+        <rect x="238" y="52" width="90" height="46" rx="9" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="283" y="71" fill="#34d3bf" font-size="8.5" text-anchor="middle">replica</text>
+        <text x="283" y="86" fill="#8ca6b8" font-size="7.5" text-anchor="middle">replaying&hellip;</text>
+        <line x1="102" y1="75" x2="238" y2="75" stroke="#244155" stroke-width="1.2"/>
+        <text x="170" y="68" fill="#8ca6b8" font-size="7" text-anchor="middle">wal stream &middot; async</text>
+        <rect width="14" height="10" rx="2" fill="#34d3bf">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.08;0.55;1" keyPoints="0;0;1;1" path="M 95 70 L 231 70"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.06;0.08;0.55;0.6;1" values="0;0;1;1;0;0"/>
         </rect>
-        <text x="20" y="16" fill="#e7e9f3" font-size="8">POST /comment &rarr; primary &middot; commit &middot; redirect</text>
-        <circle r="6" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <text x="20" y="16" fill="#e2ecf3" font-size="8">POST /comment &rarr; primary &middot; commit &middot; redirect</text>
+        <circle r="6" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.14;0.3;0.62;0.74;1" keyPoints="0;0;1;1;1;1" path="M 170 14 L 283 46"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.12;0.14;0.34;0.38;1" values="0;0;1;1;0;0"/>
         </circle>
-        <text x="150" y="116" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">GET arrives BEFORE the record &rarr; "my comment vanished"
+        <text x="150" y="116" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">GET arrives BEFORE the record &rarr; "my comment vanished"
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.32;0.36;0.56;0.6;1" values="0;0;1;1;0;0"/></text>
-        <text x="170" y="116" fill="#8b90ab" font-size="8" text-anchor="middle" opacity="0">record replayed &middot; replay_lsn caught up
+        <text x="170" y="116" fill="#8ca6b8" font-size="8" text-anchor="middle" opacity="0">record replayed &middot; replay_lsn caught up
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.6;0.64;1" values="0;0;1;1"/></text>
-        <circle r="6" fill="#8e86f0" stroke="#11131c" stroke-width="1.5" opacity="0">
+        <circle r="6" fill="#4eaeff" stroke="#071726" stroke-width="1.5" opacity="0">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.68;0.8;1" keyPoints="0;0;1;1" path="M 170 14 L 283 46"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.66;0.68;0.88;0.92;1" values="0;0;1;1;0;0"/>
         </circle>
-        <text x="170" y="134" fill="#57e0b0" font-size="8" text-anchor="middle" opacity="0">refresh &rarr; comment visible &#10003; &mdash; it "reappeared" &middot; support ticket filed anyway
+        <text x="170" y="134" fill="#34d3bf" font-size="8" text-anchor="middle" opacity="0">refresh &rarr; comment visible &#10003; &mdash; it "reappeared" &middot; support ticket filed anyway
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.84;0.88;1" values="0;0;1;1"/></text>
       </svg>
       <div class="lanes">

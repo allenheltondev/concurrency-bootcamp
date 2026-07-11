@@ -18,35 +18,35 @@
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">the commit path &middot; ack before the page ever touches disk</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="8" y="10" width="82" height="28" rx="8" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="49" y="28" fill="#8e86f0" font-size="9" text-anchor="middle">COMMIT;</text>
-        <rect x="8" y="60" width="212" height="30" rx="8" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="16" y="79" fill="#8b90ab" font-size="7.5">wal &middot; append-only &middot; one sequential write</text>
-        <rect x="150" y="65" width="20" height="20" rx="4" fill="#11131c" stroke="#57e0b0" opacity="0">
+        <rect x="8" y="10" width="82" height="28" rx="8" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="49" y="28" fill="#4eaeff" font-size="9" text-anchor="middle">COMMIT;</text>
+        <rect x="8" y="60" width="212" height="30" rx="8" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="16" y="79" fill="#8ca6b8" font-size="7.5">wal &middot; append-only &middot; one sequential write</text>
+        <rect x="150" y="65" width="20" height="20" rx="4" fill="#071726" stroke="#34d3bf" opacity="0">
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.1;0.14;1" values="0;0;1;1"/></rect>
-        <rect x="174" y="65" width="20" height="20" rx="4" fill="#11131c" stroke="#57e0b0" opacity="0">
+        <rect x="174" y="65" width="20" height="20" rx="4" fill="#071726" stroke="#34d3bf" opacity="0">
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.17;0.21;1" values="0;0;1;1"/></rect>
-        <rect x="198" y="65" width="20" height="20" rx="4" fill="#57e0b0" opacity="0">
+        <rect x="198" y="65" width="20" height="20" rx="4" fill="#34d3bf" opacity="0">
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.24;0.28;1" values="0;0;1;1"/></rect>
-        <circle r="6" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <circle r="6" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.04;0.24;1" keyPoints="0;0;1;1" path="M 49 38 L 49 60 L 208 60"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.24;0.28;1" values="1;1;0;0"/>
         </circle>
-        <text x="230" y="56" fill="#57e0b0" font-size="8" opacity="0">fsync &#10003;
+        <text x="230" y="56" fill="#34d3bf" font-size="8" opacity="0">fsync &#10003;
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.32;0.36;1" values="0;0;1;1"/></text>
-        <text x="120" y="28" fill="#57e0b0" font-size="8" opacity="0">&larr; ack &middot; commit is DURABLE now
+        <text x="120" y="28" fill="#34d3bf" font-size="8" opacity="0">&larr; ack &middot; commit is DURABLE now
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.4;0.44;1" values="0;0;1;1"/></text>
-        <rect x="240" y="104" width="92" height="30" rx="8" fill="#11131c" stroke="#ff9a6b" stroke-width="1.5" stroke-dasharray="4 4"/>
-        <text x="286" y="117" fill="#ff9a6b" font-size="8" text-anchor="middle">8 KB heap page</text>
-        <text x="286" y="128" fill="#8b90ab" font-size="7.5" text-anchor="middle">dirty &middot; RAM only</text>
-        <text x="110" y="112" fill="#ff9a6b" font-size="8" opacity="0">CRASH here? the page is gone &mdash;
+        <rect x="240" y="104" width="92" height="30" rx="8" fill="#071726" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <text x="286" y="117" fill="#fb923c" font-size="8" text-anchor="middle">8 KB heap page</text>
+        <text x="286" y="128" fill="#8ca6b8" font-size="7.5" text-anchor="middle">dirty &middot; RAM only</text>
+        <text x="110" y="112" fill="#fb923c" font-size="8" opacity="0">CRASH here? the page is gone &mdash;
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.52;0.56;0.72;0.76;1" values="0;0;1;1;0;0"/></text>
-        <text x="110" y="124" fill="#ff9a6b" font-size="8" opacity="0">the commit is not
+        <text x="110" y="124" fill="#fb923c" font-size="8" opacity="0">the commit is not
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.52;0.56;0.72;0.76;1" values="0;0;1;1;0;0"/></text>
-        <line x1="120" y1="90" x2="240" y2="112" stroke="#57e0b0" stroke-width="1.4" stroke-dasharray="3 4" opacity="0">
+        <line x1="120" y1="90" x2="240" y2="112" stroke="#34d3bf" stroke-width="1.4" stroke-dasharray="3 4" opacity="0">
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.78;0.82;1" values="0;0;1;1"/></line>
-        <text x="110" y="145" fill="#57e0b0" font-size="8" opacity="0">recovery: replay wal from the redo point &rarr; page rebuilt &#10003;
+        <text x="110" y="145" fill="#34d3bf" font-size="8" opacity="0">recovery: replay wal from the redo point &rarr; page rebuilt &#10003;
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.82;0.86;1" values="0;0;1;1"/></text>
       </svg>
       <div class="lanes">
@@ -79,42 +79,42 @@
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">a point lookup is 3 page reads &middot; then a full leaf splits</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="140" y="8" width="60" height="22" rx="6" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="170" y="22" fill="#8e86f0" font-size="8" text-anchor="middle">root</text>
-        <rect x="40" y="54" width="60" height="22" rx="6" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <rect x="140" y="54" width="60" height="22" rx="6" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <rect x="240" y="54" width="60" height="22" rx="6" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="170" y="68" fill="#e7e9f3" font-size="8" text-anchor="middle">internal</text>
-        <rect x="10" y="100" width="66" height="22" rx="6" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <rect x="96" y="100" width="66" height="22" rx="6" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="129" y="114" fill="#57e0b0" font-size="8" text-anchor="middle">leaf &middot; FULL</text>
-        <rect x="182" y="100" width="66" height="22" rx="6" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="160" y1="30" x2="80" y2="54" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="170" y1="30" x2="170" y2="54" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="180" y1="30" x2="270" y2="54" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="155" y1="76" x2="129" y2="100" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="185" y1="76" x2="215" y2="100" stroke="#2c3350" stroke-width="1.2"/>
-        <circle r="6" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <rect x="140" y="8" width="60" height="22" rx="6" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="170" y="22" fill="#4eaeff" font-size="8" text-anchor="middle">root</text>
+        <rect x="40" y="54" width="60" height="22" rx="6" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <rect x="140" y="54" width="60" height="22" rx="6" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <rect x="240" y="54" width="60" height="22" rx="6" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <text x="170" y="68" fill="#e2ecf3" font-size="8" text-anchor="middle">internal</text>
+        <rect x="10" y="100" width="66" height="22" rx="6" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <rect x="96" y="100" width="66" height="22" rx="6" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="129" y="114" fill="#34d3bf" font-size="8" text-anchor="middle">leaf &middot; FULL</text>
+        <rect x="182" y="100" width="66" height="22" rx="6" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <line x1="160" y1="30" x2="80" y2="54" stroke="#244155" stroke-width="1.2"/>
+        <line x1="170" y1="30" x2="170" y2="54" stroke="#244155" stroke-width="1.2"/>
+        <line x1="180" y1="30" x2="270" y2="54" stroke="#244155" stroke-width="1.2"/>
+        <line x1="155" y1="76" x2="129" y2="100" stroke="#244155" stroke-width="1.2"/>
+        <line x1="185" y1="76" x2="215" y2="100" stroke="#244155" stroke-width="1.2"/>
+        <circle r="6" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.05;0.15;0.2;0.3;0.35;0.45;1" keyPoints="0;0;0.33;0.33;0.66;0.66;1;1"
             path="M 170 19 L 170 19 L 170 65 L 170 65 L 129 111 L 129 111 L 129 111"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.45;0.5;1" values="1;1;0;0"/>
         </circle>
-        <text x="10" y="20" fill="#8b90ab" font-size="8" opacity="0">read 1 &middot; root (cached)
+        <text x="10" y="20" fill="#8ca6b8" font-size="8" opacity="0">read 1 &middot; root (cached)
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.06;0.1;1" values="0;0;1;1"/></text>
-        <text x="10" y="32" fill="#8b90ab" font-size="8" opacity="0">read 2 &middot; internal (cached)
+        <text x="10" y="32" fill="#8ca6b8" font-size="8" opacity="0">read 2 &middot; internal (cached)
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.2;0.24;1" values="0;0;1;1"/></text>
-        <text x="10" y="44" fill="#8b90ab" font-size="8" opacity="0">read 3 &middot; leaf &mdash; the one real I/O
+        <text x="10" y="44" fill="#8ca6b8" font-size="8" opacity="0">read 3 &middot; leaf &mdash; the one real I/O
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.36;0.4;1" values="0;0;1;1"/></text>
-        <rect x="268" y="126" width="66" height="20" rx="6" fill="#11131c" stroke="#57e0b0" stroke-width="1.5" stroke-dasharray="4 4" opacity="0">
+        <rect x="268" y="126" width="66" height="20" rx="6" fill="#071726" stroke="#34d3bf" stroke-width="1.5" stroke-dasharray="4 4" opacity="0">
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.6;0.66;1" values="0;0;1;1"/></rect>
-        <text x="301" y="139" fill="#57e0b0" font-size="7.5" text-anchor="middle" opacity="0">new sibling
+        <text x="301" y="139" fill="#34d3bf" font-size="7.5" text-anchor="middle" opacity="0">new sibling
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.6;0.66;1" values="0;0;1;1"/></text>
-        <text x="129" y="140" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">insert &rarr; leaf full &rarr; SPLIT: upper half moves out
+        <text x="129" y="140" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">insert &rarr; leaf full &rarr; SPLIT: upper half moves out
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.55;0.6;1" values="0;0;1;1"/></text>
-        <line x1="200" y1="98" x2="185" y2="78" stroke="#57e0b0" stroke-width="1.4" stroke-dasharray="3 4" opacity="0">
+        <line x1="200" y1="98" x2="185" y2="78" stroke="#34d3bf" stroke-width="1.4" stroke-dasharray="3 4" opacity="0">
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.72;0.78;1" values="0;0;1;1"/></line>
-        <text x="255" y="90" fill="#57e0b0" font-size="8" opacity="0">separator &uarr; parent
+        <text x="255" y="90" fill="#34d3bf" font-size="8" opacity="0">separator &uarr; parent
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.72;0.78;1" values="0;0;1;1"/></text>
       </svg>
       <div class="lanes">
@@ -146,36 +146,36 @@
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">get(k) &middot; newest first &middot; bloom filters skip the dead ends</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="120" y="6" width="120" height="24" rx="7" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="180" y="21" fill="#8e86f0" font-size="8" text-anchor="middle">memtable (RAM)</text>
-        <rect x="96" y="44" width="180" height="24" rx="7" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="186" y="59" fill="#e7e9f3" font-size="8" text-anchor="middle">sstable 3 &middot; newest</text>
-        <rect x="96" y="80" width="180" height="24" rx="7" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="186" y="95" fill="#e7e9f3" font-size="8" text-anchor="middle">sstable 2 &middot; k=7 &rarr; v9</text>
-        <rect x="96" y="116" width="180" height="24" rx="7" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="186" y="131" fill="#8b90ab" font-size="8" text-anchor="middle">sstable 1 &middot; oldest &middot; k=7 &rarr; v2 (shadowed)</text>
-        <rect x="60" y="46" width="30" height="20" rx="5" fill="#11131c" stroke="#57e0b0" stroke-width="1.2"/>
-        <text x="75" y="59" fill="#57e0b0" font-size="7" text-anchor="middle">bloom</text>
-        <rect x="60" y="82" width="30" height="20" rx="5" fill="#11131c" stroke="#57e0b0" stroke-width="1.2"/>
-        <text x="75" y="95" fill="#57e0b0" font-size="7" text-anchor="middle">bloom</text>
-        <rect x="60" y="118" width="30" height="20" rx="5" fill="#11131c" stroke="#57e0b0" stroke-width="1.2"/>
-        <text x="75" y="131" fill="#57e0b0" font-size="7" text-anchor="middle">bloom</text>
-        <circle r="6" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <rect x="120" y="6" width="120" height="24" rx="7" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="180" y="21" fill="#4eaeff" font-size="8" text-anchor="middle">memtable (RAM)</text>
+        <rect x="96" y="44" width="180" height="24" rx="7" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <text x="186" y="59" fill="#e2ecf3" font-size="8" text-anchor="middle">sstable 3 &middot; newest</text>
+        <rect x="96" y="80" width="180" height="24" rx="7" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <text x="186" y="95" fill="#e2ecf3" font-size="8" text-anchor="middle">sstable 2 &middot; k=7 &rarr; v9</text>
+        <rect x="96" y="116" width="180" height="24" rx="7" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <text x="186" y="131" fill="#8ca6b8" font-size="8" text-anchor="middle">sstable 1 &middot; oldest &middot; k=7 &rarr; v2 (shadowed)</text>
+        <rect x="60" y="46" width="30" height="20" rx="5" fill="#071726" stroke="#34d3bf" stroke-width="1.2"/>
+        <text x="75" y="59" fill="#34d3bf" font-size="7" text-anchor="middle">bloom</text>
+        <rect x="60" y="82" width="30" height="20" rx="5" fill="#071726" stroke="#34d3bf" stroke-width="1.2"/>
+        <text x="75" y="95" fill="#34d3bf" font-size="7" text-anchor="middle">bloom</text>
+        <rect x="60" y="118" width="30" height="20" rx="5" fill="#071726" stroke="#34d3bf" stroke-width="1.2"/>
+        <text x="75" y="131" fill="#34d3bf" font-size="7" text-anchor="middle">bloom</text>
+        <circle r="6" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.05;0.15;0.22;0.32;0.38;0.5;1" keyPoints="0;0;0.3;0.3;0.62;0.62;1;1"
             path="M 30 18 L 30 18 L 30 56 L 30 56 L 30 92 L 30 92 L 186 92"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.5;0.56;1" values="1;1;0;0"/>
         </circle>
-        <text x="6" y="12" fill="#8b90ab" font-size="8">get(7)</text>
-        <text x="300" y="21" fill="#8b90ab" font-size="8" text-anchor="middle" opacity="0">miss
+        <text x="6" y="12" fill="#8ca6b8" font-size="8">get(7)</text>
+        <text x="300" y="21" fill="#8ca6b8" font-size="8" text-anchor="middle" opacity="0">miss
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.08;0.12;1" values="0;0;1;1"/></text>
-        <text x="42" y="40" fill="#ff9a6b" font-size="8" opacity="0">bloom: NO &rarr; skip, zero I/O
+        <text x="42" y="40" fill="#fb923c" font-size="8" opacity="0">bloom: NO &rarr; skip, zero I/O
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.22;0.26;1" values="0;0;1;1"/></text>
-        <text x="42" y="76" fill="#57e0b0" font-size="8" opacity="0">bloom: maybe &rarr; probe
+        <text x="42" y="76" fill="#34d3bf" font-size="8" opacity="0">bloom: maybe &rarr; probe
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.38;0.42;1" values="0;0;1;1"/></text>
-        <text x="240" y="76" fill="#57e0b0" font-size="8" opacity="0">HIT v9 &#10003; stop
+        <text x="240" y="76" fill="#34d3bf" font-size="8" opacity="0">HIT v9 &#10003; stop
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.52;0.58;1" values="0;0;1;1"/></text>
-        <text x="186" y="148" fill="#8b90ab" font-size="7.5" text-anchor="middle" opacity="0">sstable 1's v2 is never read &mdash; first hit wins, newest shadows oldest
+        <text x="186" y="148" fill="#8ca6b8" font-size="7.5" text-anchor="middle" opacity="0">sstable 1's v2 is never read &mdash; first hit wins, newest shadows oldest
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.62;0.68;1" values="0;0;1;1"/></text>
       </svg>
       <div class="lanes">
@@ -255,35 +255,35 @@
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">hit vs miss &middot; then a restart empties the pool</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="8" y="52" width="70" height="44" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="43" y="71" fill="#8e86f0" font-size="9" text-anchor="middle">QUERIES</text>
-        <text x="43" y="85" fill="#8b90ab" font-size="7.5" text-anchor="middle">read page N</text>
-        <rect x="122" y="46" width="110" height="56" rx="9" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="177" y="64" fill="#57e0b0" font-size="8.5" text-anchor="middle">buffer pool</text>
-        <text x="177" y="78" fill="#8b90ab" font-size="7.5" text-anchor="middle">shared_buffers</text>
-        <text x="177" y="92" fill="#8b90ab" font-size="7.5" text-anchor="middle">8 KB frames</text>
-        <rect x="262" y="52" width="70" height="44" rx="9" fill="#11131c" stroke="#ff9a6b" stroke-width="1.5"/>
-        <text x="297" y="71" fill="#ff9a6b" font-size="9" text-anchor="middle">DISK</text>
-        <text x="297" y="85" fill="#8b90ab" font-size="7.5" text-anchor="middle">~100 &micro;s&ndash;10 ms</text>
-        <line x1="78" y1="74" x2="122" y2="74" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="232" y1="74" x2="262" y2="74" stroke="#2c3350" stroke-width="1.2"/>
-        <circle r="6" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <rect x="8" y="52" width="70" height="44" rx="9" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="43" y="71" fill="#4eaeff" font-size="9" text-anchor="middle">QUERIES</text>
+        <text x="43" y="85" fill="#8ca6b8" font-size="7.5" text-anchor="middle">read page N</text>
+        <rect x="122" y="46" width="110" height="56" rx="9" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="177" y="64" fill="#34d3bf" font-size="8.5" text-anchor="middle">buffer pool</text>
+        <text x="177" y="78" fill="#8ca6b8" font-size="7.5" text-anchor="middle">shared_buffers</text>
+        <text x="177" y="92" fill="#8ca6b8" font-size="7.5" text-anchor="middle">8 KB frames</text>
+        <rect x="262" y="52" width="70" height="44" rx="9" fill="#071726" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="297" y="71" fill="#fb923c" font-size="9" text-anchor="middle">DISK</text>
+        <text x="297" y="85" fill="#8ca6b8" font-size="7.5" text-anchor="middle">~100 &micro;s&ndash;10 ms</text>
+        <line x1="78" y1="74" x2="122" y2="74" stroke="#244155" stroke-width="1.2"/>
+        <line x1="232" y1="74" x2="262" y2="74" stroke="#244155" stroke-width="1.2"/>
+        <circle r="6" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.08;0.16;0.24;1" keyPoints="0;0;1;0;0" path="M 78 68 L 122 68"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.24;0.28;1" values="1;1;0;0"/>
         </circle>
-        <text x="100" y="36" fill="#57e0b0" font-size="8" opacity="0">HIT &middot; back in ~&micro;s &#10003;
+        <text x="100" y="36" fill="#34d3bf" font-size="8" opacity="0">HIT &middot; back in ~&micro;s &#10003;
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.16;0.2;0.4;0.44;1" values="0;0;1;1;0;0"/></text>
-        <circle r="6" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+        <circle r="6" fill="#fb923c" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.32;0.4;0.56;0.64;0.72;1" keyPoints="0;0;0.3;0.65;1;1;1" path="M 78 80 L 122 80 L 262 80 L 122 80"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.32;0.34;0.72;0.76;1" values="0;0;1;1;0;0"/>
         </circle>
-        <text x="177" y="120" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">MISS &middot; evict a victim &middot; read from disk &middot; 100&ndash;10,000&times; slower
+        <text x="177" y="120" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">MISS &middot; evict a victim &middot; read from disk &middot; 100&ndash;10,000&times; slower
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.45;0.5;0.72;0.76;1" values="0;0;1;1;0;0"/></text>
-        <text x="177" y="136" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">RESTART &rarr; pool empty &rarr; EVERY request takes this path
+        <text x="177" y="136" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">RESTART &rarr; pool empty &rarr; EVERY request takes this path
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.78;0.84;1" values="0;0;1;1"/></text>
-        <text x="177" y="26" fill="#8b90ab" font-size="7.5" text-anchor="middle">p99 is a hit-rate chart wearing a latency costume</text>
+        <text x="177" y="26" fill="#8ca6b8" font-size="7.5" text-anchor="middle">p99 is a hit-rate chart wearing a latency costume</text>
       </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">eviction</div><div class="lstep seq" style="--i:0">~LRU &middot; Postgres uses a <b>clock-sweep</b> approximation: a usage counter per frame, decremented on sweep, victim at zero</div>

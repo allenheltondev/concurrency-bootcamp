@@ -15,44 +15,44 @@
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">episodes stream in &middot; the profile evolves &middot; nothing is re-read</div>
       <svg class="estage" viewBox="0 0 340 160" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="214" y="26" width="118" height="108" rx="10" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="273" y="42" fill="#8e86f0" font-size="8.5" text-anchor="middle">AGGREGATE PROFILE</text>
-        <text x="222" y="62" fill="#e7e9f3" font-size="8">drink:</text>
-        <text x="262" y="62" fill="#57e0b0" font-size="8">coffee ×1
+        <rect x="214" y="26" width="118" height="108" rx="10" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="273" y="42" fill="#4eaeff" font-size="8.5" text-anchor="middle">AGGREGATE PROFILE</text>
+        <text x="222" y="62" fill="#e2ecf3" font-size="8">drink:</text>
+        <text x="262" y="62" fill="#34d3bf" font-size="8">coffee ×1
           <animate attributeName="opacity" dur="7s" repeatCount="indefinite" keyTimes="0;0.14;0.15;0.4;0.41;1" values="0;0;1;1;0;0"/></text>
-        <text x="262" y="62" fill="#57e0b0" font-size="8" opacity="0">coffee ×2
+        <text x="262" y="62" fill="#34d3bf" font-size="8" opacity="0">coffee ×2
           <animate attributeName="opacity" dur="7s" repeatCount="indefinite" keyTimes="0;0.4;0.41;0.68;0.69;1" values="0;0;1;1;0;0"/></text>
-        <text x="262" y="62" fill="#ff9a6b" font-size="8" opacity="0">tea ×1 ⟲
+        <text x="262" y="62" fill="#fb923c" font-size="8" opacity="0">tea ×1 ⟲
           <animate attributeName="opacity" dur="7s" repeatCount="indefinite" keyTimes="0;0.68;0.69;0.97;1" values="0;0;1;1;0"/></text>
-        <text x="222" y="80" fill="#e7e9f3" font-size="8" opacity="0">city: Denver
+        <text x="222" y="80" fill="#e2ecf3" font-size="8" opacity="0">city: Denver
           <animate attributeName="opacity" dur="7s" repeatCount="indefinite" keyTimes="0;0.52;0.53;0.97;1" values="0;0;1;1;0"/></text>
-        <text x="222" y="98" fill="#6a7090" font-size="7.5" opacity="0">history: coffee (×2)
+        <text x="222" y="98" fill="#647c8f" font-size="7.5" opacity="0">history: coffee (×2)
           <animate attributeName="opacity" dur="7s" repeatCount="indefinite" keyTimes="0;0.68;0.69;0.97;1" values="0;0;1;1;0"/></text>
-        <text x="222" y="122" fill="#8b90ab" font-size="7.5">always current &middot; ~20 tokens</text>
-        <rect x="8" y="30" width="128" height="22" rx="7" fill="#11131c" stroke="#57e0b0" stroke-width="1.2"/>
-        <text x="72" y="44" fill="#57e0b0" font-size="7.5" text-anchor="middle">ep1 "coffee before standup"</text>
-        <rect x="8" y="62" width="128" height="22" rx="7" fill="#11131c" stroke="#57e0b0" stroke-width="1.2"/>
-        <text x="72" y="76" fill="#57e0b0" font-size="7.5" text-anchor="middle">ep2 "espresso, as usual"</text>
-        <rect x="8" y="94" width="128" height="22" rx="7" fill="#11131c" stroke="#8e86f0" stroke-width="1.2"/>
-        <text x="72" y="108" fill="#8e86f0" font-size="7.5" text-anchor="middle">ep3 "moved to Denver"</text>
-        <rect x="8" y="126" width="128" height="22" rx="7" fill="#11131c" stroke="#ff9a6b" stroke-width="1.2"/>
-        <text x="72" y="140" fill="#ff9a6b" font-size="7.5" text-anchor="middle">ep4 "switched to tea"</text>
-        <circle r="5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <text x="222" y="122" fill="#8ca6b8" font-size="7.5">always current &middot; ~20 tokens</text>
+        <rect x="8" y="30" width="128" height="22" rx="7" fill="#071726" stroke="#34d3bf" stroke-width="1.2"/>
+        <text x="72" y="44" fill="#34d3bf" font-size="7.5" text-anchor="middle">ep1 "coffee before standup"</text>
+        <rect x="8" y="62" width="128" height="22" rx="7" fill="#071726" stroke="#34d3bf" stroke-width="1.2"/>
+        <text x="72" y="76" fill="#34d3bf" font-size="7.5" text-anchor="middle">ep2 "espresso, as usual"</text>
+        <rect x="8" y="94" width="128" height="22" rx="7" fill="#071726" stroke="#4eaeff" stroke-width="1.2"/>
+        <text x="72" y="108" fill="#4eaeff" font-size="7.5" text-anchor="middle">ep3 "moved to Denver"</text>
+        <rect x="8" y="126" width="128" height="22" rx="7" fill="#071726" stroke="#fb923c" stroke-width="1.2"/>
+        <text x="72" y="140" fill="#fb923c" font-size="7.5" text-anchor="middle">ep4 "switched to tea"</text>
+        <circle r="5" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="7s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.02;0.14;1" keyPoints="0;0;1;1" path="M 136 41 L 214 55"/>
           <animate attributeName="opacity" dur="7s" repeatCount="indefinite" keyTimes="0;0.02;0.13;0.15;1" values="0;1;1;0;0"/>
         </circle>
-        <circle r="5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <circle r="5" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="7s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.28;0.4;1" keyPoints="0;0;1;1" path="M 136 73 L 214 58"/>
           <animate attributeName="opacity" dur="7s" repeatCount="indefinite" keyTimes="0;0.28;0.39;0.41;1" values="0;0;1;0;0"/>
         </circle>
-        <circle r="5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <circle r="5" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="7s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.42;0.52;1" keyPoints="0;0;1;1" path="M 136 105 L 214 76"/>
           <animate attributeName="opacity" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.51;0.53;1" values="0;0;1;0;0"/>
         </circle>
-        <circle r="5" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+        <circle r="5" fill="#fb923c" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="7s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.56;0.68;1" keyPoints="0;0;1;1" path="M 136 137 L 214 60"/>
           <animate attributeName="opacity" dur="7s" repeatCount="indefinite" keyTimes="0;0.56;0.67;0.69;1" values="0;0;1;0;0"/>

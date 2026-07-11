@@ -149,20 +149,20 @@ async function get(key) {
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">same work, two shapes &middot; 20 queries at 1ms RTT</div>
       <svg class="estage" viewBox="0 0 340 128" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="10" y="16" width="60" height="26" rx="7" fill="#11131c" stroke="#ff9a6b" stroke-width="1.2"/>
-        <text x="40" y="33" fill="#ff9a6b" font-size="8" text-anchor="middle">chatty</text>
-        <rect x="10" y="76" width="60" height="26" rx="7" fill="#11131c" stroke="#57e0b0" stroke-width="1.2"/>
-        <text x="40" y="93" fill="#57e0b0" font-size="8" text-anchor="middle">batched</text>
-        <g stroke="#ff9a6b" stroke-width="1">
+        <rect x="10" y="16" width="60" height="26" rx="7" fill="#071726" stroke="#fb923c" stroke-width="1.2"/>
+        <text x="40" y="33" fill="#fb923c" font-size="8" text-anchor="middle">chatty</text>
+        <rect x="10" y="76" width="60" height="26" rx="7" fill="#071726" stroke="#34d3bf" stroke-width="1.2"/>
+        <text x="40" y="93" fill="#34d3bf" font-size="8" text-anchor="middle">batched</text>
+        <g stroke="#fb923c" stroke-width="1">
           <line x1="80" y1="22" x2="120" y2="36"/><line x1="120" y1="36" x2="160" y2="22"/>
           <line x1="160" y1="22" x2="200" y2="36"/><line x1="200" y1="36" x2="240" y2="22"/>
           <line x1="240" y1="22" x2="280" y2="36"/><line x1="280" y1="36" x2="320" y2="22"/>
         </g>
-        <text x="200" y="54" fill="#8b90ab" font-size="8" text-anchor="middle">…20 sequential round trips = 20ms of pure physics</text>
-        <line x1="80" y1="84" x2="320" y2="96" stroke="#57e0b0" stroke-width="1.5"/>
-        <line x1="320" y1="96" x2="80" y2="108" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="200" y="124" fill="#8b90ab" font-size="8" text-anchor="middle">1 batched round trip = 1ms — same queries, 20× less floor</text>
-        <circle r="4" fill="#8e86f0">
+        <text x="200" y="54" fill="#8ca6b8" font-size="8" text-anchor="middle">…20 sequential round trips = 20ms of pure physics</text>
+        <line x1="80" y1="84" x2="320" y2="96" stroke="#34d3bf" stroke-width="1.5"/>
+        <line x1="320" y1="96" x2="80" y2="108" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="200" y="124" fill="#8ca6b8" font-size="8" text-anchor="middle">1 batched round trip = 1ms — same queries, 20× less floor</text>
+        <circle r="4" fill="#4eaeff">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             path="M 80 22 L 120 36 L 160 22 L 200 36 L 240 22 L 280 36 L 320 22"/>
         </circle>

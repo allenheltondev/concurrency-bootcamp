@@ -1,16 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Performance &amp; Queueing Bootcamp">
-  <rect width="512" height="512" fill="#14161f"/>
+  <rect width="512" height="512" fill="#0b1f2e"/>
   <!-- axes: latency vs utilization -->
-  <line x1="88" y1="424" x2="448" y2="424" stroke="#2c3350" stroke-width="16" stroke-linecap="round"/>
-  <line x1="88" y1="424" x2="88" y2="96" stroke="#2c3350" stroke-width="16" stroke-linecap="round"/>
+  <line x1="88" y1="424" x2="448" y2="424" stroke="#244155" stroke-width="16" stroke-linecap="round"/>
+  <line x1="88" y1="424" x2="88" y2="96" stroke="#244155" stroke-width="16" stroke-linecap="round"/>
   <!-- the hockey stick: flat, knee, vertical -->
   <path d="M 88 400 C 220 392 300 384 348 352 C 396 320 416 224 424 120"
-        fill="none" stroke="#8e86f0" stroke-width="30" stroke-linecap="round"/>
+        fill="none" stroke="#4eaeff" stroke-width="30" stroke-linecap="round"/>
   <!-- the queue: jobs waiting along the flat part -->
-  <rect x="120" y="336" width="44" height="44" rx="10" fill="#57e0b0"/>
-  <rect x="180" y="336" width="44" height="44" rx="10" fill="#57e0b0" opacity=".75"/>
-  <rect x="240" y="336" width="44" height="44" rx="10" fill="#57e0b0" opacity=".5"/>
+  <rect x="120" y="336" width="44" height="44" rx="10" fill="#34d3bf"/>
+  <rect x="180" y="336" width="44" height="44" rx="10" fill="#34d3bf" opacity=".75"/>
+  <rect x="240" y="336" width="44" height="44" rx="10" fill="#34d3bf" opacity=".5"/>
   <!-- the request that hit the wall -->
-  <circle cx="424" cy="120" r="34" fill="#ff9a6b"/>
-  <circle cx="424" cy="120" r="14" fill="#14161f"/>
+  <circle cx="424" cy="120" r="34" fill="#fb923c"/>
+  <circle cx="424" cy="120" r="14" fill="#0b1f2e"/>
 </svg>

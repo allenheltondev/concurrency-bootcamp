@@ -989,30 +989,30 @@ const LESSONS = [
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">two calls to the same model &middot; nothing carries over</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="130" y="50" width="80" height="50" rx="10" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="170" y="72" fill="#8e86f0" font-size="9" text-anchor="middle">MODEL</text>
-        <text x="170" y="86" fill="#8b90ab" font-size="7.5" text-anchor="middle">weights frozen</text>
-        <rect x="8" y="14" width="100" height="30" rx="8" fill="#11131c" stroke="#57e0b0" stroke-width="1.2"/>
-        <text x="58" y="32" fill="#57e0b0" font-size="8" text-anchor="middle">req 1: "I'm Priya"</text>
-        <rect x="8" y="106" width="100" height="30" rx="8" fill="#11131c" stroke="#ff9a6b" stroke-width="1.2"/>
-        <text x="58" y="124" fill="#ff9a6b" font-size="8" text-anchor="middle">req 2: "my name?"</text>
-        <line x1="108" y1="29" x2="130" y2="62" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="108" y1="121" x2="130" y2="88" stroke="#2c3350" stroke-width="1.2"/>
-        <circle r="6" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <rect x="130" y="50" width="80" height="50" rx="10" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="170" y="72" fill="#4eaeff" font-size="9" text-anchor="middle">MODEL</text>
+        <text x="170" y="86" fill="#8ca6b8" font-size="7.5" text-anchor="middle">weights frozen</text>
+        <rect x="8" y="14" width="100" height="30" rx="8" fill="#071726" stroke="#34d3bf" stroke-width="1.2"/>
+        <text x="58" y="32" fill="#34d3bf" font-size="8" text-anchor="middle">req 1: "I'm Priya"</text>
+        <rect x="8" y="106" width="100" height="30" rx="8" fill="#071726" stroke="#fb923c" stroke-width="1.2"/>
+        <text x="58" y="124" fill="#fb923c" font-size="8" text-anchor="middle">req 2: "my name?"</text>
+        <line x1="108" y1="29" x2="130" y2="62" stroke="#244155" stroke-width="1.2"/>
+        <line x1="108" y1="121" x2="130" y2="88" stroke="#244155" stroke-width="1.2"/>
+        <circle r="6" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.2;0.45;1" keyPoints="0;1;1;1" path="M 108 29 L 130 62"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.2;0.28;1" values="1;1;0;0"/>
         </circle>
-        <text x="256" y="40" fill="#57e0b0" font-size="8" opacity="0">"hi Priya!"
+        <text x="256" y="40" fill="#34d3bf" font-size="8" opacity="0">"hi Priya!"
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.25;0.3;0.45;0.5;1" values="0;0;1;1;0;0"/></text>
-        <circle r="6" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+        <circle r="6" fill="#fb923c" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.55;0.75;1" keyPoints="0;0;1;1" path="M 108 121 L 130 88"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.55;0.58;0.83;1" values="0;0;1;0;0"/>
         </circle>
-        <text x="258" y="118" fill="#ff9a6b" font-size="8" opacity="0">"…no idea."
+        <text x="258" y="118" fill="#fb923c" font-size="8" opacity="0">"…no idea."
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.8;0.85;0.98;1" values="0;0;1;1;0"/></text>
-        <text x="170" y="145" fill="#6a7090" font-size="8" text-anchor="middle">request 2 contains no trace of request 1 — so neither does the model</text>
+        <text x="170" y="145" fill="#647c8f" font-size="8" text-anchor="middle">request 2 contains no trace of request 1 — so neither does the model</text>
       </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">feels like</div><div class="lstep seq" style="--i:0">"the assistant remembers our conversation"</div>
@@ -1130,25 +1130,25 @@ const reply = await model.chat({
     <div class="diagram anim" style="--step:.75s">
       <div class="dlabel">memories as points &middot; the query lands near its meaning</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="6" y="6" width="328" height="128" rx="10" fill="none" stroke="#2c3350" stroke-dasharray="4 5"/>
-        <text x="170" y="20" fill="#6a7090" font-size="8" text-anchor="middle">EMBEDDING SPACE (2 of 1,536 dimensions shown)</text>
-        <circle cx="70" cy="60" r="5" fill="#57e0b0"/>
-        <text x="70" y="47" fill="#57e0b0" font-size="8" text-anchor="middle">"espresso every morning"</text>
-        <circle cx="96" cy="86" r="5" fill="#57e0b0"/>
-        <text x="99" y="104" fill="#57e0b0" font-size="8" text-anchor="middle">"oat-milk latte order"</text>
-        <circle cx="268" cy="52" r="5" fill="#ff9a6b"/>
-        <text x="268" y="40" fill="#ff9a6b" font-size="8" text-anchor="middle">"deploy pipeline stages"</text>
-        <circle cx="288" cy="98" r="5" fill="#ff9a6b"/>
-        <text x="282" y="116" fill="#ff9a6b" font-size="8" text-anchor="middle">"rotate the API keys"</text>
-        <circle r="6" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <rect x="6" y="6" width="328" height="128" rx="10" fill="none" stroke="#244155" stroke-dasharray="4 5"/>
+        <text x="170" y="20" fill="#647c8f" font-size="8" text-anchor="middle">EMBEDDING SPACE (2 of 1,536 dimensions shown)</text>
+        <circle cx="70" cy="60" r="5" fill="#34d3bf"/>
+        <text x="70" y="47" fill="#34d3bf" font-size="8" text-anchor="middle">"espresso every morning"</text>
+        <circle cx="96" cy="86" r="5" fill="#34d3bf"/>
+        <text x="99" y="104" fill="#34d3bf" font-size="8" text-anchor="middle">"oat-milk latte order"</text>
+        <circle cx="268" cy="52" r="5" fill="#fb923c"/>
+        <text x="268" y="40" fill="#fb923c" font-size="8" text-anchor="middle">"deploy pipeline stages"</text>
+        <circle cx="288" cy="98" r="5" fill="#fb923c"/>
+        <text x="282" y="116" fill="#fb923c" font-size="8" text-anchor="middle">"rotate the API keys"</text>
+        <circle r="6" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.4;1" keyPoints="0;1;1" path="M 210 125 L 84 74"/>
         </circle>
-        <text x="212" y="139" fill="#8e86f0" font-size="8" text-anchor="middle">query: "what coffee does the user drink?"</text>
-        <line x1="84" y1="74" x2="70" y2="60" stroke="#8e86f0" stroke-width="1" stroke-dasharray="2 3" opacity="0">
+        <text x="212" y="139" fill="#4eaeff" font-size="8" text-anchor="middle">query: "what coffee does the user drink?"</text>
+        <line x1="84" y1="74" x2="70" y2="60" stroke="#4eaeff" stroke-width="1" stroke-dasharray="2 3" opacity="0">
           <animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.45;0.5;1" values="0;0;1;1"/>
         </line>
-        <line x1="84" y1="74" x2="96" y2="86" stroke="#8e86f0" stroke-width="1" stroke-dasharray="2 3" opacity="0">
+        <line x1="84" y1="74" x2="96" y2="86" stroke="#4eaeff" stroke-width="1" stroke-dasharray="2 3" opacity="0">
           <animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.45;0.5;1" values="0;0;1;1"/>
         </line>
       </svg>

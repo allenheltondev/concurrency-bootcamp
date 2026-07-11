@@ -1024,23 +1024,23 @@ latency = histogram of (t_done - t_arrived);
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">the universal shape &middot; arrivals &rarr; queue &rarr; server(s)</div>
       <svg class="estage" viewBox="0 0 340 120" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <text x="30" y="20" fill="#8b90ab" font-size="8" text-anchor="middle">arrivals λ</text>
-        <rect x="110" y="40" width="110" height="34" rx="8" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="165" y="30" fill="#8b90ab" font-size="8" text-anchor="middle">queue (the waiting room)</text>
-        <rect x="256" y="34" width="66" height="46" rx="10" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="289" y="53" fill="#8e86f0" font-size="9" text-anchor="middle">SERVER</text>
-        <text x="289" y="67" fill="#8b90ab" font-size="7.5" text-anchor="middle">S ms each</text>
-        <line x1="40" y1="57" x2="110" y2="57" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="220" y1="57" x2="256" y2="57" stroke="#2c3350" stroke-width="1.2"/>
-        <rect x="196" y="49" width="14" height="14" rx="3" fill="#57e0b0" opacity=".9"/>
-        <rect x="176" y="49" width="14" height="14" rx="3" fill="#57e0b0" opacity=".65"/>
-        <rect x="156" y="49" width="14" height="14" rx="3" fill="#57e0b0" opacity=".4"/>
-        <circle r="6" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+        <text x="30" y="20" fill="#8ca6b8" font-size="8" text-anchor="middle">arrivals λ</text>
+        <rect x="110" y="40" width="110" height="34" rx="8" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <text x="165" y="30" fill="#8ca6b8" font-size="8" text-anchor="middle">queue (the waiting room)</text>
+        <rect x="256" y="34" width="66" height="46" rx="10" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="289" y="53" fill="#4eaeff" font-size="9" text-anchor="middle">SERVER</text>
+        <text x="289" y="67" fill="#8ca6b8" font-size="7.5" text-anchor="middle">S ms each</text>
+        <line x1="40" y1="57" x2="110" y2="57" stroke="#244155" stroke-width="1.2"/>
+        <line x1="220" y1="57" x2="256" y2="57" stroke="#244155" stroke-width="1.2"/>
+        <rect x="196" y="49" width="14" height="14" rx="3" fill="#34d3bf" opacity=".9"/>
+        <rect x="176" y="49" width="14" height="14" rx="3" fill="#34d3bf" opacity=".65"/>
+        <rect x="156" y="49" width="14" height="14" rx="3" fill="#34d3bf" opacity=".4"/>
+        <circle r="6" fill="#fb923c" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.35;0.6;1" keyPoints="0;0.45;0.45;1" path="M 30 57 L 340 57"/>
           <animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.92;0.97;1" values="1;1;0;0"/>
         </circle>
-        <text x="170" y="104" fill="#6a7090" font-size="8" text-anchor="middle">the orange request WAITS behind the green backlog — that wait is most of your latency</text>
+        <text x="170" y="104" fill="#647c8f" font-size="8" text-anchor="middle">the orange request WAITS behind the green backlog — that wait is most of your latency</text>
       </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">cpu</div><div class="lstep seq" style="--i:0">run queue &rarr; cores &middot; λ = runnable threads, S = time slice</div>
@@ -1097,22 +1097,22 @@ const system = {
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">mean latency vs utilization &middot; W = S/(1&minus;ρ)</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <line x1="20" y1="130" x2="320" y2="130" stroke="#2c3350" stroke-width="1"/>
-        <line x1="20" y1="130" x2="20" y2="10" stroke="#2c3350" stroke-width="1"/>
-        <text x="170" y="145" fill="#6a7090" font-size="8" text-anchor="middle">utilization ρ &rarr; 1</text>
-        <text x="14" y="70" fill="#6a7090" font-size="8" text-anchor="middle" transform="rotate(-90 14 70)">wait &times; S</text>
+        <line x1="20" y1="130" x2="320" y2="130" stroke="#244155" stroke-width="1"/>
+        <line x1="20" y1="130" x2="20" y2="10" stroke="#244155" stroke-width="1"/>
+        <text x="170" y="145" fill="#647c8f" font-size="8" text-anchor="middle">utilization ρ &rarr; 1</text>
+        <text x="14" y="70" fill="#647c8f" font-size="8" text-anchor="middle" transform="rotate(-90 14 70)">wait &times; S</text>
         <polyline points="20,130 80,128 140,126 170,124 200,120 230,115 260,105 275,94 290,73 299,46 305,10"
-          fill="none" stroke="#8e86f0" stroke-width="2"/>
-        <line x1="260" y1="130" x2="260" y2="105" stroke="#ff9a6b" stroke-width="1" stroke-dasharray="3 3"/>
-        <text x="260" y="100" fill="#ff9a6b" font-size="8" text-anchor="middle">ρ=.8 &rarr; 5&times;</text>
-        <line x1="290" y1="130" x2="290" y2="73" stroke="#ff9a6b" stroke-width="1" stroke-dasharray="3 3"/>
-        <text x="292" y="66" fill="#ff9a6b" font-size="8" text-anchor="middle">.9 &rarr; 10&times;</text>
-        <circle r="5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+          fill="none" stroke="#4eaeff" stroke-width="2"/>
+        <line x1="260" y1="130" x2="260" y2="105" stroke="#fb923c" stroke-width="1" stroke-dasharray="3 3"/>
+        <text x="260" y="100" fill="#fb923c" font-size="8" text-anchor="middle">ρ=.8 &rarr; 5&times;</text>
+        <line x1="290" y1="130" x2="290" y2="73" stroke="#fb923c" stroke-width="1" stroke-dasharray="3 3"/>
+        <text x="292" y="66" fill="#fb923c" font-size="8" text-anchor="middle">.9 &rarr; 10&times;</text>
+        <circle r="5" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             path="M 20 130 L 80 128 L 140 126 L 170 124 L 200 120 L 230 115 L 260 105 L 275 94 L 290 73 L 299 46 L 305 10"/>
         </circle>
-        <text x="120" y="60" fill="#8b90ab" font-size="8">ρ .50 &rarr; 2&times;S &middot; .80 &rarr; 5&times; &middot; .90 &rarr; 10&times;</text>
-        <text x="120" y="74" fill="#8b90ab" font-size="8">.95 &rarr; 20&times; &middot; .99 &rarr; 100&times; &middot; 1.0 &rarr; &infin;</text>
+        <text x="120" y="60" fill="#8ca6b8" font-size="8">ρ .50 &rarr; 2&times;S &middot; .80 &rarr; 5&times; &middot; .90 &rarr; 10&times;</text>
+        <text x="120" y="74" fill="#8ca6b8" font-size="8">.95 &rarr; 20&times; &middot; .99 &rarr; 100&times; &middot; 1.0 &rarr; &infin;</text>
       </svg>
       <div class="qbox macro seq" style="--i:0">
         <div class="dlabel">"we're only at 80% CPU" is not headroom</div>
