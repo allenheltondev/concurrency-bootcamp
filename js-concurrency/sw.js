@@ -3,7 +3,7 @@
    Registered at scope ./ (now /js-concurrency/) so it wins over the root
    kill-switch worker on these pages; ../js/app.js and ../js/account.js (the
    shared engine + account layer) are same-origin and precache fine. */
-const CACHE = "cbootcamp-v11";
+const CACHE = "cbootcamp-v12";
 const SHELL = [
   "./", "./index.html", "./worker.js", "./manifest.webmanifest", "./icon.svg",
   "./js/core.js", "./js/content.js", "./js/sim.js",
@@ -15,6 +15,9 @@ const SHELL = [
   "./js/packs/temporal-map.js",
   "../js/app.js",
   "../js/account.js",
+  "../js/vendor/rsc-nav.global.js",
+  "../js/vendor/rsc-nav.css",
+  "../js/vendor/assets/cloud-logo.svg",
 ];
 
 // Precache the shell so the app opens with no network.

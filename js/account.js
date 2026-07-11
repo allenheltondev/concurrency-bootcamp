@@ -262,16 +262,9 @@ const CloudAccount = (() => {
     --rsc-primary-500:90 139 255; --rsc-primary-600:90 139 255; --rsc-primary-700:120 160 255;
     --rsc-error-50:59 20 30; --rsc-error-200:100 30 45; --rsc-error-300:159 42 67; --rsc-error-600:253 164 175;
   }}
-  .acctbtn{border:1px solid var(--line,#333);background:transparent;color:var(--muted,#aaa);
-    font:inherit;font-size:.72rem;padding:.25rem .6rem;border-radius:999px;cursor:pointer;white-space:nowrap}
-  .acctbtn:hover,.acctbtn:active{background:rgba(142,134,240,.12)}
-  .acctmenu{position:absolute;top:calc(100% + .4rem);right:0;z-index:60;min-width:200px;
-    background:var(--panel,#17171c);border:1px solid var(--line,#333);border-radius:12px;
-    padding:.7rem .8rem;box-shadow:0 8px 30px rgba(0,0,0,.45);font-size:.78rem;color:var(--muted,#aaa)}
-  .acctmenu[hidden]{display:none}
-  .acctmenu .who{color:var(--text,#eee);font-weight:600;margin-bottom:.35rem;overflow:hidden;text-overflow:ellipsis}
-  .acctmenu .stats{display:flex;gap:.8rem;margin:.35rem 0 .6rem}
-  .acctmenu .stats b{color:var(--text,#eee)}
+  /* The account chip + dropdown that used to live here are gone — the shared
+     RSC AppNav (js/vendor/rsc-nav.*) now owns signed-in identity, the profile
+     menu, and sign-out. Only the toast + auth-modal styling stays. */
   .accttoasts{position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);z-index:70;
     display:flex;flex-direction:column;gap:.4rem;align-items:center;pointer-events:none}
   .accttoast{background:var(--panel,#17171c);border:1px solid var(--line,#333);border-radius:999px;
@@ -331,7 +324,8 @@ const CloudAccount = (() => {
   @keyframes rscslideup{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
   @keyframes rscspin{to{transform:rotate(360deg)}}`;
 
-  let btn = null, menu = null, toasts = null, overlay = null, card = null;
+  let toasts = null, overlay = null, card = null;
+  let nav = null;   // the mounted RSC AppNav handle
   let pendingEmail = "";     // carried between sign-up -> confirm, sign-in -> challenge/forgot
   let pendingPassword = "";  // memory only: lets confirm auto-sign-in; never persisted
   let challengeSession = ""; // NEW_PASSWORD_REQUIRED session token
@@ -633,47 +627,82 @@ const CloudAccount = (() => {
     pendingPassword = "";
   }
 
-  /* ---------- account chip + menu ---------- */
-  function refreshUi(stats) {
-    if (!btn) return;
-    if (isSignedIn()) {
-      const c = claims();
-      const name = c.given_name || (c.email || "").split("@")[0] || "account";
-      btn.textContent = "◉ " + String(name).slice(0, 14);
-      btn.setAttribute("aria-label", "account menu");
-    } else {
-      btn.textContent = "sign in";
-      btn.setAttribute("aria-label", "sign in to sync progress");
-      if (menu) menu.hidden = true;
-    }
-    if (stats && menu && !menu.hidden) fillMenu(stats);
+  /* ---------- the shared RSC nav ---------- */
+  const NAV_CSS = "../js/vendor/rsc-nav.css";
+  const NAV_JS = "../js/vendor/rsc-nav.global.js";
+
+  /* Pull in the vendored AppNav build + its scoped styles. Loaded only once
+     accounts are live (boot), so dormant/backend-less deploys stay exactly as
+     they were — no nav, no extra requests. Resolves false if the build can't
+     load (offline first paint, missing asset): the page just runs without it. */
+  function loadNavAssets() {
+    return new Promise((resolve) => {
+      if (typeof rscNav !== "undefined") { resolve(true); return; }
+      if (!document.querySelector(`link[href="${NAV_CSS}"]`)) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet"; link.href = NAV_CSS;
+        document.head.appendChild(link);
+      }
+      const existing = document.querySelector(`script[src="${NAV_JS}"]`);
+      if (existing) { existing.addEventListener("load", () => resolve(true)); return; }
+      const s = document.createElement("script");
+      s.src = NAV_JS;
+      s.onload = () => resolve(true);
+      s.onerror = () => resolve(false);
+      document.head.appendChild(s);
+    });
   }
 
-  function fillMenu(stats) {
+  const displayName = () => {
     const c = claims();
-    menu.innerHTML = "";
-    const w = document.createElement("div"); w.className = "who";
-    w.textContent = c.email || [c.given_name, c.family_name].filter(Boolean).join(" ") || "signed in";
-    const s = document.createElement("div"); s.className = "stats";
-    s.innerHTML = stats
-      ? `<span><b>${stats.xp}</b> xp</span><span><b>${stats.currentStreak}</b>d streak</span>`
-      : "syncing…";
-    const prof = document.createElement("a");
-    prof.className = "acctbtn"; prof.href = "/app/profile"; prof.textContent = "view profile";
-    prof.style.cssText = "display:block;text-align:center;text-decoration:none;margin-bottom:.45rem";
-    const out = document.createElement("button");
-    out.className = "acctbtn"; out.type = "button"; out.textContent = "sign out";
-    out.addEventListener("click", () => { menu.hidden = true; signOut(); });
-    menu.append(w, s, prof, out);
+    return [c.given_name, c.family_name].filter(Boolean).join(" ") || c.email || "";
+  };
+
+  /* The auth-dependent slice of the nav's props — recomputed on every auth
+     change. Signed-out visitors get no gated links; signed-in ones get the
+     hub + profile, plus the avatar/profile menu the package renders. */
+  function navState() {
+    const signed = isSignedIn();
+    return {
+      authState: signed ? "authenticated" : "anonymous",
+      user: signed ? { name: displayName(), email: claims().email } : undefined,
+      navItems: signed
+        ? [
+            { id: "dashboard", label: "Dashboard", href: "/app" },
+            { id: "profile", label: "Profile", href: "/app/profile" }
+          ]
+        : []
+    };
   }
 
-  async function openMenu() {
-    menu.hidden = false;
-    fillMenu(null);
-    try {
-      const res = await api("GET", "/me");
-      if (res && res.ok && !menu.hidden) fillMenu(await res.json());
-    } catch (e) {}
+  /* Reflect the current auth state into the nav. Kept named refreshUi because
+     the sync + auth paths already call it; the stats arg is now ignored (the
+     package profile menu shows identity + sign-out, not xp/streak). */
+  function refreshUi() {
+    if (nav) nav.update(navState());
+  }
+
+  function mountNav() {
+    if (typeof rscNav === "undefined") return;   // asset load failed — page is unaffected
+    let host = document.getElementById("rsc-appnav");
+    if (!host) {
+      host = document.createElement("div");
+      host.id = "rsc-appnav";
+      document.body.insertBefore(host, document.body.firstChild);
+    }
+    const brand = document.querySelector(".brand b");
+    nav = rscNav.mountAppNav(host, {
+      appName: (brand && brand.textContent) || "Bootcamp",
+      homeHref: "/",                    // the platform hub
+      currentServiceId: "bootcamp",
+      theme: "dark",                    // course pages are permanently dark
+      applyThemeToDocument: false,      // never touch the course's own <html>
+      // reuse this layer's in-app auth modal for the sign-in/up entry points
+      signInAction: { label: "Sign in", onClick: () => openModal("signin") },
+      signUpAction: { label: "Create account", onClick: () => openModal("signup") },
+      onSignOut: () => signOut(),
+      ...navState()
+    });
   }
 
   function injectUi() {
@@ -694,22 +723,6 @@ const CloudAccount = (() => {
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !overlay.hidden) closeModal(); });
     document.body.appendChild(overlay);
-
-    const bar = document.querySelector(".hbar");
-    if (!bar) return;
-    const holder = document.createElement("div");
-    holder.style.position = "relative";
-    btn = document.createElement("button");
-    btn.className = "acctbtn"; btn.id = "acctbtn"; btn.type = "button";
-    menu = document.createElement("div");
-    menu.className = "acctmenu"; menu.hidden = true;
-    btn.addEventListener("click", () => {
-      if (!isSignedIn()) { openModal("signin"); return; }
-      menu.hidden ? openMenu() : (menu.hidden = true);
-    });
-    document.addEventListener("click", (e) => { if (menu && !holder.contains(e.target)) menu.hidden = true; });
-    holder.append(btn, menu);
-    bar.appendChild(holder);
   }
 
   /* ---------- boot ---------- */
@@ -723,7 +736,8 @@ const CloudAccount = (() => {
     config.apiBase = config.apiBase || "/api";
 
     injectUi();
-    refreshUi();
+    await loadNavAssets();
+    mountNav();
 
     window.addEventListener("course:progress-changed", () => { if (isSignedIn()) flushSoon(); });
     window.addEventListener("course:progress-reset", async () => {
