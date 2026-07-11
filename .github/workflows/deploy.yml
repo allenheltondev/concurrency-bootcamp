@@ -181,8 +181,19 @@ jobs:
           # old core.js/content.js/sim.js/packs/ objects left in the
           # bucket's js/ prefix by the previous root-course layout; those
           # now live under js-concurrency/js/, uploaded below.
+          # The .js under js/ (engine, account layer, vendored rsc-nav build)
+          # goes up as JavaScript; the vendored nav stylesheet + brand-mark SVG
+          # are excluded here and re-uploaded below with their real MIME types
+          # (a stylesheet served as text/javascript is blocked under nosniff).
           aws s3 sync js/ "s3://${BUCKET}/js/" --delete \
+            --exclude "vendor/rsc-nav.css" --exclude "vendor/assets/*" \
             --content-type "text/javascript; charset=utf-8" \
+            --cache-control "public, max-age=300"
+          aws s3 cp js/vendor/rsc-nav.css "s3://${BUCKET}/js/vendor/rsc-nav.css" \
+            --content-type "text/css; charset=utf-8" \
+            --cache-control "public, max-age=300"
+          aws s3 cp js/vendor/assets/cloud-logo.svg "s3://${BUCKET}/js/vendor/assets/cloud-logo.svg" \
+            --content-type "image/svg+xml" \
             --cache-control "public, max-age=300"
           # JS Concurrency course — relocated from the repo root to its own
           # sibling directory with the same internal layout as
