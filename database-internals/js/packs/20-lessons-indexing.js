@@ -18,49 +18,49 @@
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">one INSERT &middot; five trees &middot; the write tax is per-index</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="8" y="56" width="88" height="40" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="52" y="73" fill="#8e86f0" font-size="8.5" text-anchor="middle">INSERT</text>
-        <text x="52" y="86" fill="#8b90ab" font-size="7.5" text-anchor="middle">1 logical row</text>
-        <rect x="210" y="6" width="122" height="22" rx="6" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="271" y="20" fill="#57e0b0" font-size="7.5" text-anchor="middle">heap page &middot; the row</text>
-        <rect x="210" y="34" width="122" height="22" rx="6" fill="#11131c" stroke="#8e86f0" stroke-width="1.2"/>
-        <text x="271" y="48" fill="#e7e9f3" font-size="7.5" text-anchor="middle">pkey (id)</text>
-        <rect x="210" y="62" width="122" height="22" rx="6" fill="#11131c" stroke="#8e86f0" stroke-width="1.2"/>
-        <text x="271" y="76" fill="#e7e9f3" font-size="7.5" text-anchor="middle">idx (customer_id)</text>
-        <rect x="210" y="90" width="122" height="22" rx="6" fill="#11131c" stroke="#8e86f0" stroke-width="1.2"/>
-        <text x="271" y="104" fill="#e7e9f3" font-size="7.5" text-anchor="middle">idx (status, created_at)</text>
-        <rect x="210" y="118" width="122" height="22" rx="6" fill="#11131c" stroke="#ff9a6b" stroke-width="1.2" stroke-dasharray="4 4"/>
-        <text x="271" y="132" fill="#ff9a6b" font-size="7.5" text-anchor="middle">idx (email) &middot; idx_scan: 0</text>
-        <circle r="5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <rect x="8" y="56" width="88" height="40" rx="9" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="52" y="73" fill="#4eaeff" font-size="8.5" text-anchor="middle">INSERT</text>
+        <text x="52" y="86" fill="#8ca6b8" font-size="7.5" text-anchor="middle">1 logical row</text>
+        <rect x="210" y="6" width="122" height="22" rx="6" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="271" y="20" fill="#34d3bf" font-size="7.5" text-anchor="middle">heap page &middot; the row</text>
+        <rect x="210" y="34" width="122" height="22" rx="6" fill="#071726" stroke="#4eaeff" stroke-width="1.2"/>
+        <text x="271" y="48" fill="#e2ecf3" font-size="7.5" text-anchor="middle">pkey (id)</text>
+        <rect x="210" y="62" width="122" height="22" rx="6" fill="#071726" stroke="#4eaeff" stroke-width="1.2"/>
+        <text x="271" y="76" fill="#e2ecf3" font-size="7.5" text-anchor="middle">idx (customer_id)</text>
+        <rect x="210" y="90" width="122" height="22" rx="6" fill="#071726" stroke="#4eaeff" stroke-width="1.2"/>
+        <text x="271" y="104" fill="#e2ecf3" font-size="7.5" text-anchor="middle">idx (status, created_at)</text>
+        <rect x="210" y="118" width="122" height="22" rx="6" fill="#071726" stroke="#fb923c" stroke-width="1.2" stroke-dasharray="4 4"/>
+        <text x="271" y="132" fill="#fb923c" font-size="7.5" text-anchor="middle">idx (email) &middot; idx_scan: 0</text>
+        <circle r="5" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.06;0.18;1" keyPoints="0;0;1;1" path="M 98 76 L 204 17"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.06;0.08;0.18;0.21;1" values="0;0;1;1;0;0"/>
         </circle>
-        <circle r="5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <circle r="5" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.18;0.3;1" keyPoints="0;0;1;1" path="M 98 76 L 204 45"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.18;0.2;0.3;0.33;1" values="0;0;1;1;0;0"/>
         </circle>
-        <circle r="5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <circle r="5" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.3;0.42;1" keyPoints="0;0;1;1" path="M 98 76 L 204 73"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.3;0.32;0.42;0.45;1" values="0;0;1;1;0;0"/>
         </circle>
-        <circle r="5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <circle r="5" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.42;0.54;1" keyPoints="0;0;1;1" path="M 98 76 L 204 101"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.42;0.44;0.54;0.57;1" values="0;0;1;1;0;0"/>
         </circle>
-        <circle r="5" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+        <circle r="5" fill="#fb923c" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.54;0.66;1" keyPoints="0;0;1;1" path="M 98 76 L 204 129"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.54;0.56;0.66;0.69;1" values="0;0;1;1;0;0"/>
         </circle>
-        <text x="8" y="116" fill="#ff9a6b" font-size="8" opacity="0">1 row in &rarr; 5 page writes,
+        <text x="8" y="116" fill="#fb923c" font-size="8" opacity="0">1 row in &rarr; 5 page writes,
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.7;0.74;1" values="0;0;1;1"/></text>
-        <text x="8" y="128" fill="#ff9a6b" font-size="8" opacity="0">5 WAL records, 5 splits possible
+        <text x="8" y="128" fill="#fb923c" font-size="8" opacity="0">5 WAL records, 5 splits possible
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.74;0.78;1" values="0;0;1;1"/></text>
-        <text x="8" y="142" fill="#57e0b0" font-size="8" opacity="0">the unread one is pure tax &mdash; drop it
+        <text x="8" y="142" fill="#34d3bf" font-size="8" opacity="0">the unread one is pure tax &mdash; drop it
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.8;0.84;1" values="0;0;1;1"/></text>
       </svg>
       <div class="lanes">
@@ -95,53 +95,53 @@ ORDER BY idx_scan;
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">index on (a, b) &middot; a=2 slices a run &middot; b=4 is scattered everywhere</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="118" y="8" width="104" height="15" rx="3" fill="#11131c" stroke="#2c3350" stroke-width="1"/>
-        <text x="170" y="19" fill="#8b90ab" font-size="7.5" text-anchor="middle">a=1 b=4</text>
-        <rect x="118" y="25" width="104" height="15" rx="3" fill="#11131c" stroke="#2c3350" stroke-width="1"/>
-        <text x="170" y="36" fill="#8b90ab" font-size="7.5" text-anchor="middle">a=1 b=7</text>
-        <rect x="118" y="42" width="104" height="15" rx="3" fill="#11131c" stroke="#2c3350" stroke-width="1"/>
-        <text x="170" y="53" fill="#e7e9f3" font-size="7.5" text-anchor="middle">a=2 b=1</text>
-        <rect x="118" y="59" width="104" height="15" rx="3" fill="#11131c" stroke="#2c3350" stroke-width="1"/>
-        <text x="170" y="70" fill="#e7e9f3" font-size="7.5" text-anchor="middle">a=2 b=4</text>
-        <rect x="118" y="76" width="104" height="15" rx="3" fill="#11131c" stroke="#2c3350" stroke-width="1"/>
-        <text x="170" y="87" fill="#e7e9f3" font-size="7.5" text-anchor="middle">a=2 b=9</text>
-        <rect x="118" y="93" width="104" height="15" rx="3" fill="#11131c" stroke="#2c3350" stroke-width="1"/>
-        <text x="170" y="104" fill="#8b90ab" font-size="7.5" text-anchor="middle">a=3 b=3</text>
-        <rect x="118" y="110" width="104" height="15" rx="3" fill="#11131c" stroke="#2c3350" stroke-width="1"/>
-        <text x="170" y="121" fill="#8b90ab" font-size="7.5" text-anchor="middle">a=3 b=8</text>
-        <rect x="118" y="127" width="104" height="15" rx="3" fill="#11131c" stroke="#2c3350" stroke-width="1"/>
-        <text x="170" y="138" fill="#8b90ab" font-size="7.5" text-anchor="middle">a=4 b=4</text>
-        <rect x="118" y="42" width="104" height="49" rx="4" fill="#57e0b0" opacity="0">
+        <rect x="118" y="8" width="104" height="15" rx="3" fill="#071726" stroke="#244155" stroke-width="1"/>
+        <text x="170" y="19" fill="#8ca6b8" font-size="7.5" text-anchor="middle">a=1 b=4</text>
+        <rect x="118" y="25" width="104" height="15" rx="3" fill="#071726" stroke="#244155" stroke-width="1"/>
+        <text x="170" y="36" fill="#8ca6b8" font-size="7.5" text-anchor="middle">a=1 b=7</text>
+        <rect x="118" y="42" width="104" height="15" rx="3" fill="#071726" stroke="#244155" stroke-width="1"/>
+        <text x="170" y="53" fill="#e2ecf3" font-size="7.5" text-anchor="middle">a=2 b=1</text>
+        <rect x="118" y="59" width="104" height="15" rx="3" fill="#071726" stroke="#244155" stroke-width="1"/>
+        <text x="170" y="70" fill="#e2ecf3" font-size="7.5" text-anchor="middle">a=2 b=4</text>
+        <rect x="118" y="76" width="104" height="15" rx="3" fill="#071726" stroke="#244155" stroke-width="1"/>
+        <text x="170" y="87" fill="#e2ecf3" font-size="7.5" text-anchor="middle">a=2 b=9</text>
+        <rect x="118" y="93" width="104" height="15" rx="3" fill="#071726" stroke="#244155" stroke-width="1"/>
+        <text x="170" y="104" fill="#8ca6b8" font-size="7.5" text-anchor="middle">a=3 b=3</text>
+        <rect x="118" y="110" width="104" height="15" rx="3" fill="#071726" stroke="#244155" stroke-width="1"/>
+        <text x="170" y="121" fill="#8ca6b8" font-size="7.5" text-anchor="middle">a=3 b=8</text>
+        <rect x="118" y="127" width="104" height="15" rx="3" fill="#071726" stroke="#244155" stroke-width="1"/>
+        <text x="170" y="138" fill="#8ca6b8" font-size="7.5" text-anchor="middle">a=4 b=4</text>
+        <rect x="118" y="42" width="104" height="49" rx="4" fill="#34d3bf" opacity="0">
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.16;0.2;1" values="0;0;0.16;0.16"/></rect>
-        <text x="8" y="18" fill="#57e0b0" font-size="8">WHERE a=2</text>
-        <circle r="5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <text x="8" y="18" fill="#34d3bf" font-size="8">WHERE a=2</text>
+        <circle r="5" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.05;0.16;0.2;0.32;1" keyPoints="0;0;0.71;0.71;1;1" path="M 34 26 L 112 49 L 112 84"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.05;0.07;0.32;0.36;1" values="0;0;1;1;0;0"/>
         </circle>
-        <text x="8" y="52" fill="#57e0b0" font-size="7.5" opacity="0">1 seek &rarr;
+        <text x="8" y="52" fill="#34d3bf" font-size="7.5" opacity="0">1 seek &rarr;
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.34;0.38;1" values="0;0;1;1"/></text>
-        <text x="8" y="63" fill="#57e0b0" font-size="7.5" opacity="0">contiguous run,
+        <text x="8" y="63" fill="#34d3bf" font-size="7.5" opacity="0">contiguous run,
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.34;0.38;1" values="0;0;1;1"/></text>
-        <text x="8" y="74" fill="#8b90ab" font-size="7.5" opacity="0">stop at a=3
+        <text x="8" y="74" fill="#8ca6b8" font-size="7.5" opacity="0">stop at a=3
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.38;0.42;1" values="0;0;1;1"/></text>
-        <text x="234" y="18" fill="#ff9a6b" font-size="8">WHERE b=4</text>
-        <circle r="5" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+        <text x="234" y="18" fill="#fb923c" font-size="8">WHERE b=4</text>
+        <circle r="5" fill="#fb923c" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.5;0.86;1" keyPoints="0;0;1;1" path="M 228 14 L 228 133"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.5;0.52;0.86;0.9;1" values="0;0;1;1;0;0"/>
         </circle>
-        <rect x="118" y="8" width="104" height="15" rx="3" fill="#ff9a6b" opacity="0">
+        <rect x="118" y="8" width="104" height="15" rx="3" fill="#fb923c" opacity="0">
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.5;0.53;1" values="0;0;0.22;0.22"/></rect>
-        <rect x="118" y="59" width="104" height="15" rx="3" fill="#ff9a6b" opacity="0">
+        <rect x="118" y="59" width="104" height="15" rx="3" fill="#fb923c" opacity="0">
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.65;0.68;1" values="0;0;0.22;0.22"/></rect>
-        <rect x="118" y="127" width="104" height="15" rx="3" fill="#ff9a6b" opacity="0">
+        <rect x="118" y="127" width="104" height="15" rx="3" fill="#fb923c" opacity="0">
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.83;0.86;1" values="0;0;0.22;0.22"/></rect>
-        <text x="234" y="52" fill="#ff9a6b" font-size="7.5" opacity="0">no leftmost a:
+        <text x="234" y="52" fill="#fb923c" font-size="7.5" opacity="0">no leftmost a:
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.88;0.91;1" values="0;0;1;1"/></text>
-        <text x="234" y="63" fill="#ff9a6b" font-size="7.5" opacity="0">nothing to seek,
+        <text x="234" y="63" fill="#fb923c" font-size="7.5" opacity="0">nothing to seek,
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.88;0.91;1" values="0;0;1;1"/></text>
-        <text x="234" y="74" fill="#8b90ab" font-size="7.5" opacity="0">check all 8
+        <text x="234" y="74" fill="#8ca6b8" font-size="7.5" opacity="0">check all 8
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.91;0.94;1" values="0;0;1;1"/></text>
       </svg>
       <div class="lanes">
@@ -268,43 +268,43 @@ ANALYZE orders;                              <span class="cm">-- finer histogram
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">index on (email) &middot; anchored prefix seeks &middot; '%suffix' sweeps everything</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="12" y="62" width="36" height="26" rx="5" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="30" y="78" fill="#8b90ab" font-size="7" text-anchor="middle">adam</text>
-        <rect x="52" y="62" width="36" height="26" rx="5" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="70" y="78" fill="#e7e9f3" font-size="7" text-anchor="middle">anna</text>
-        <rect x="92" y="62" width="36" height="26" rx="5" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="110" y="78" fill="#8b90ab" font-size="7" text-anchor="middle">bree</text>
-        <rect x="132" y="62" width="36" height="26" rx="5" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="150" y="78" fill="#8b90ab" font-size="7" text-anchor="middle">carl</text>
-        <rect x="172" y="62" width="36" height="26" rx="5" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="190" y="78" fill="#8b90ab" font-size="7" text-anchor="middle">dena</text>
-        <rect x="212" y="62" width="36" height="26" rx="5" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="230" y="78" fill="#8b90ab" font-size="7" text-anchor="middle">erin</text>
-        <rect x="252" y="62" width="36" height="26" rx="5" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="270" y="78" fill="#8b90ab" font-size="7" text-anchor="middle">kate</text>
-        <rect x="292" y="62" width="36" height="26" rx="5" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="310" y="78" fill="#8b90ab" font-size="7" text-anchor="middle">zoe</text>
-        <text x="12" y="16" fill="#57e0b0" font-size="8">LIKE 'ann%'</text>
-        <text x="12" y="28" fill="#8b90ab" font-size="7.5">a range: 'ann' &le; email &lt; 'ano'</text>
-        <circle r="5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <rect x="12" y="62" width="36" height="26" rx="5" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <text x="30" y="78" fill="#8ca6b8" font-size="7" text-anchor="middle">adam</text>
+        <rect x="52" y="62" width="36" height="26" rx="5" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <text x="70" y="78" fill="#e2ecf3" font-size="7" text-anchor="middle">anna</text>
+        <rect x="92" y="62" width="36" height="26" rx="5" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <text x="110" y="78" fill="#8ca6b8" font-size="7" text-anchor="middle">bree</text>
+        <rect x="132" y="62" width="36" height="26" rx="5" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <text x="150" y="78" fill="#8ca6b8" font-size="7" text-anchor="middle">carl</text>
+        <rect x="172" y="62" width="36" height="26" rx="5" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <text x="190" y="78" fill="#8ca6b8" font-size="7" text-anchor="middle">dena</text>
+        <rect x="212" y="62" width="36" height="26" rx="5" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <text x="230" y="78" fill="#8ca6b8" font-size="7" text-anchor="middle">erin</text>
+        <rect x="252" y="62" width="36" height="26" rx="5" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <text x="270" y="78" fill="#8ca6b8" font-size="7" text-anchor="middle">kate</text>
+        <rect x="292" y="62" width="36" height="26" rx="5" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <text x="310" y="78" fill="#8ca6b8" font-size="7" text-anchor="middle">zoe</text>
+        <text x="12" y="16" fill="#34d3bf" font-size="8">LIKE 'ann%'</text>
+        <text x="12" y="28" fill="#8ca6b8" font-size="7.5">a range: 'ann' &le; email &lt; 'ano'</text>
+        <circle r="5" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.06;0.16;1" keyPoints="0;0;1;1" path="M 56 34 L 70 58"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.06;0.08;0.16;0.2;1" values="0;0;1;1;0;0"/>
         </circle>
-        <rect x="52" y="62" width="36" height="26" rx="5" fill="#57e0b0" opacity="0">
+        <rect x="52" y="62" width="36" height="26" rx="5" fill="#34d3bf" opacity="0">
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.16;0.2;1" values="0;0;0.25;0.25"/></rect>
-        <text x="140" y="34" fill="#57e0b0" font-size="7.5" opacity="0">seek: 3 page reads, done &#10003;
+        <text x="140" y="34" fill="#34d3bf" font-size="7.5" opacity="0">seek: 3 page reads, done &#10003;
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.2;0.24;1" values="0;0;1;1"/></text>
-        <rect x="12" y="96" width="0" height="4" rx="2" fill="#ff9a6b">
+        <rect x="12" y="96" width="0" height="4" rx="2" fill="#fb923c">
           <animate attributeName="width" dur="6s" repeatCount="indefinite" keyTimes="0;0.45;0.85;1" values="0;0;316;316"/></rect>
-        <circle r="5" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+        <circle r="5" fill="#fb923c" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.45;0.85;1" keyPoints="0;0;1;1" path="M 12 98 L 328 98"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.45;0.47;0.85;0.89;1" values="0;0;1;1;0;0"/>
         </circle>
-        <text x="12" y="120" fill="#ff9a6b" font-size="8">LIKE '%gmail.com'</text>
-        <text x="12" y="132" fill="#8b90ab" font-size="7.5">no left anchor &mdash; the sort order can't help</text>
-        <text x="210" y="120" fill="#ff9a6b" font-size="7.5" opacity="0">every leaf checked
+        <text x="12" y="120" fill="#fb923c" font-size="8">LIKE '%gmail.com'</text>
+        <text x="12" y="132" fill="#8ca6b8" font-size="7.5">no left anchor &mdash; the sort order can't help</text>
+        <text x="210" y="120" fill="#fb923c" font-size="7.5" opacity="0">every leaf checked
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.86;0.9;1" values="0;0;1;1"/></text>
       </svg>
       <div class="lanes">

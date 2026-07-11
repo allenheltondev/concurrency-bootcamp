@@ -93,28 +93,28 @@
     <div class="diagram anim" style="--step:.72s">
       <div class="dlabel">pull, one at a time &middot; vs a push firehose stacking up</div>
       <svg class="estage" viewBox="0 0 340 156" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <text x="83" y="15" fill="#57e0b0" font-size="9" text-anchor="middle">PULL &middot; for await</text>
-        <line x1="20" y1="46" x2="150" y2="46" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5"/>
-        <rect x="8" y="30" width="34" height="32" rx="7" fill="#11131c" stroke="#8e86f0" stroke-width="1.4"/>
-        <text x="25" y="50" fill="#8e86f0" font-size="8" text-anchor="middle">gen</text>
-        <rect x="128" y="30" width="34" height="32" rx="7" fill="#11131c" stroke="#57e0b0" stroke-width="1.4"/>
-        <text x="145" y="50" fill="#57e0b0" font-size="8" text-anchor="middle">for</text>
-        <circle r="6" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <text x="83" y="15" fill="#34d3bf" font-size="9" text-anchor="middle">PULL &middot; for await</text>
+        <line x1="20" y1="46" x2="150" y2="46" stroke="#244155" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <rect x="8" y="30" width="34" height="32" rx="7" fill="#071726" stroke="#4eaeff" stroke-width="1.4"/>
+        <text x="25" y="50" fill="#4eaeff" font-size="8" text-anchor="middle">gen</text>
+        <rect x="128" y="30" width="34" height="32" rx="7" fill="#071726" stroke="#34d3bf" stroke-width="1.4"/>
+        <text x="145" y="50" fill="#34d3bf" font-size="8" text-anchor="middle">for</text>
+        <circle r="6" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="4.2s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.4;0.5;0.9;1" keyPoints="0;1;1;0;0" path="M 42 46 L 128 46"/></circle>
-        <text x="85" y="76" fill="#6a7090" font-size="7.5" text-anchor="middle">next() only when ready</text>
-        <line x1="170" y1="20" x2="170" y2="140" stroke="#2c3350" stroke-width="1"/>
-        <text x="256" y="15" fill="#ff9a6b" font-size="9" text-anchor="middle">PUSH &middot; emitter</text>
-        <rect x="186" y="30" width="34" height="32" rx="7" fill="#11131c" stroke="#8e86f0" stroke-width="1.4"/>
-        <text x="203" y="50" fill="#8e86f0" font-size="8" text-anchor="middle">src</text>
-        <rect x="298" y="30" width="34" height="32" rx="7" fill="#11131c" stroke="#ff9a6b" stroke-width="1.4"/>
-        <text x="315" y="50" fill="#ff9a6b" font-size="8" text-anchor="middle">cb</text>
+        <text x="85" y="76" fill="#647c8f" font-size="7.5" text-anchor="middle">next() only when ready</text>
+        <line x1="170" y1="20" x2="170" y2="140" stroke="#244155" stroke-width="1"/>
+        <text x="256" y="15" fill="#fb923c" font-size="9" text-anchor="middle">PUSH &middot; emitter</text>
+        <rect x="186" y="30" width="34" height="32" rx="7" fill="#071726" stroke="#4eaeff" stroke-width="1.4"/>
+        <text x="203" y="50" fill="#4eaeff" font-size="8" text-anchor="middle">src</text>
+        <rect x="298" y="30" width="34" height="32" rx="7" fill="#071726" stroke="#fb923c" stroke-width="1.4"/>
+        <text x="315" y="50" fill="#fb923c" font-size="8" text-anchor="middle">cb</text>
         <g>
-          <circle cx="240" cy="88" r="5.5" fill="#ff9a6b" stroke="#11131c" stroke-width="1.3"><animate attributeName="opacity" dur="4.2s" repeatCount="indefinite" keyTimes="0;0.1;0.85;1" values="0;1;1;1"/></circle>
-          <circle cx="255" cy="88" r="5.5" fill="#ff9a6b" stroke="#11131c" stroke-width="1.3"><animate attributeName="opacity" dur="4.2s" begin="-0.5s" repeatCount="indefinite" keyTimes="0;0.1;0.85;1" values="0;1;1;1"/></circle>
-          <circle cx="270" cy="88" r="5.5" fill="#ff9a6b" stroke="#11131c" stroke-width="1.3"><animate attributeName="opacity" dur="4.2s" begin="-1s" repeatCount="indefinite" keyTimes="0;0.1;0.85;1" values="0;1;1;1"/></circle>
-          <circle cx="285" cy="88" r="5.5" fill="#ff9a6b" stroke="#11131c" stroke-width="1.3"><animate attributeName="opacity" dur="4.2s" begin="-1.5s" repeatCount="indefinite" keyTimes="0;0.1;0.85;1" values="0;1;1;1"/></circle>
+          <circle cx="240" cy="88" r="5.5" fill="#fb923c" stroke="#071726" stroke-width="1.3"><animate attributeName="opacity" dur="4.2s" repeatCount="indefinite" keyTimes="0;0.1;0.85;1" values="0;1;1;1"/></circle>
+          <circle cx="255" cy="88" r="5.5" fill="#fb923c" stroke="#071726" stroke-width="1.3"><animate attributeName="opacity" dur="4.2s" begin="-0.5s" repeatCount="indefinite" keyTimes="0;0.1;0.85;1" values="0;1;1;1"/></circle>
+          <circle cx="270" cy="88" r="5.5" fill="#fb923c" stroke="#071726" stroke-width="1.3"><animate attributeName="opacity" dur="4.2s" begin="-1s" repeatCount="indefinite" keyTimes="0;0.1;0.85;1" values="0;1;1;1"/></circle>
+          <circle cx="285" cy="88" r="5.5" fill="#fb923c" stroke="#071726" stroke-width="1.3"><animate attributeName="opacity" dur="4.2s" begin="-1.5s" repeatCount="indefinite" keyTimes="0;0.1;0.85;1" values="0;1;1;1"/></circle>
         </g>
-        <text x="256" y="110" fill="#6a7090" font-size="7.5" text-anchor="middle">fires regardless — backlog grows</text>
+        <text x="256" y="110" fill="#647c8f" font-size="7.5" text-anchor="middle">fires regardless — backlog grows</text>
       </svg>
       <div class="lanes" style="margin-top:6px">
         <div class="lanehead seq" style="--i:0">pull</div><div class="lstep good seq" style="--i:0">next() &rarr; yield &rarr; await body &rarr; next() &mdash; paced by the consumer</div>
@@ -161,24 +161,24 @@ class Channel {
     <div class="diagram anim" style="--step:.78s">
       <div class="dlabel">race N tagged next() promises &middot; re-arm the winner only</div>
       <svg class="estage" viewBox="0 0 340 152" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="8" y="20" width="70" height="24" rx="6" fill="#11131c" stroke="#8e86f0" stroke-width="1.3"/>
-        <text x="43" y="36" fill="#8e86f0" font-size="8.5" text-anchor="middle">src 0 · next</text>
-        <rect x="8" y="60" width="70" height="24" rx="6" fill="#11131c" stroke="#57e0b0" stroke-width="1.6"/>
-        <text x="43" y="76" fill="#57e0b0" font-size="8.5" text-anchor="middle">src 1 · next</text>
-        <rect x="8" y="100" width="70" height="24" rx="6" fill="#11131c" stroke="#8e86f0" stroke-width="1.3"/>
-        <text x="43" y="116" fill="#8e86f0" font-size="8.5" text-anchor="middle">src 2 · next</text>
-        <path d="M 78 32 Q 150 32 160 66" fill="none" stroke="#2c3350" stroke-width="1.2"/>
-        <path d="M 78 72 L 152 72" fill="none" stroke="#57e0b0" stroke-width="1.6"/>
-        <path d="M 78 112 Q 150 112 160 78" fill="none" stroke="#2c3350" stroke-width="1.2"/>
-        <rect x="152" y="56" width="54" height="32" rx="8" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="179" y="70" fill="#57e0b0" font-size="8" text-anchor="middle">race</text>
-        <text x="179" y="82" fill="#8b90ab" font-size="7.5" text-anchor="middle">first ready</text>
-        <line x1="206" y1="72" x2="262" y2="72" stroke="#57e0b0" stroke-width="1.6" stroke-dasharray="3 4"/>
-        <rect x="262" y="56" width="66" height="32" rx="8" fill="#11131c" stroke="#ff9a6b" stroke-width="1.4"/>
-        <text x="295" y="70" fill="#ff9a6b" font-size="8" text-anchor="middle">yield v</text>
-        <text x="295" y="82" fill="#8b90ab" font-size="7.5" text-anchor="middle">re-arm src 1</text>
-        <path d="M 295 88 Q 295 138 170 138 Q 92 138 86 90" fill="none" stroke="#ff9a6b" stroke-width="1.2" stroke-dasharray="2 4"/>
-        <text x="170" y="147" fill="#6a7090" font-size="7.5" text-anchor="middle">only the winner gets a fresh next() — the others keep their in-flight one</text>
+        <rect x="8" y="20" width="70" height="24" rx="6" fill="#071726" stroke="#4eaeff" stroke-width="1.3"/>
+        <text x="43" y="36" fill="#4eaeff" font-size="8.5" text-anchor="middle">src 0 · next</text>
+        <rect x="8" y="60" width="70" height="24" rx="6" fill="#071726" stroke="#34d3bf" stroke-width="1.6"/>
+        <text x="43" y="76" fill="#34d3bf" font-size="8.5" text-anchor="middle">src 1 · next</text>
+        <rect x="8" y="100" width="70" height="24" rx="6" fill="#071726" stroke="#4eaeff" stroke-width="1.3"/>
+        <text x="43" y="116" fill="#4eaeff" font-size="8.5" text-anchor="middle">src 2 · next</text>
+        <path d="M 78 32 Q 150 32 160 66" fill="none" stroke="#244155" stroke-width="1.2"/>
+        <path d="M 78 72 L 152 72" fill="none" stroke="#34d3bf" stroke-width="1.6"/>
+        <path d="M 78 112 Q 150 112 160 78" fill="none" stroke="#244155" stroke-width="1.2"/>
+        <rect x="152" y="56" width="54" height="32" rx="8" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="179" y="70" fill="#34d3bf" font-size="8" text-anchor="middle">race</text>
+        <text x="179" y="82" fill="#8ca6b8" font-size="7.5" text-anchor="middle">first ready</text>
+        <line x1="206" y1="72" x2="262" y2="72" stroke="#34d3bf" stroke-width="1.6" stroke-dasharray="3 4"/>
+        <rect x="262" y="56" width="66" height="32" rx="8" fill="#071726" stroke="#fb923c" stroke-width="1.4"/>
+        <text x="295" y="70" fill="#fb923c" font-size="8" text-anchor="middle">yield v</text>
+        <text x="295" y="82" fill="#8ca6b8" font-size="7.5" text-anchor="middle">re-arm src 1</text>
+        <path d="M 295 88 Q 295 138 170 138 Q 92 138 86 90" fill="none" stroke="#fb923c" stroke-width="1.2" stroke-dasharray="2 4"/>
+        <text x="170" y="147" fill="#647c8f" font-size="7.5" text-anchor="middle">only the winner gets a fresh next() — the others keep their in-flight one</text>
       </svg>
       <div class="lanes" style="margin-top:6px">
         <div class="lanehead seq" style="--i:0">race</div><div class="lstep good seq" style="--i:0">src 1 resolves first &rarr; yield its value</div>

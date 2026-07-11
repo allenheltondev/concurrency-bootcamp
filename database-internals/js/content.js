@@ -987,29 +987,29 @@ const LESSONS = [
     <div class="diagram anim" style="--step:.75s">
       <div class="dlabel">one table on disk &middot; a row's address is (page, slot)</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="8" y="26" width="94" height="112" rx="9" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="55" y="18" fill="#8b90ab" font-size="8" text-anchor="middle">page 0 &middot; 8 KB</text>
-        <rect x="116" y="26" width="94" height="112" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="163" y="18" fill="#8e86f0" font-size="8" text-anchor="middle">page 1 &middot; 8 KB</text>
-        <rect x="224" y="26" width="94" height="112" rx="9" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="271" y="18" fill="#8b90ab" font-size="8" text-anchor="middle">page 2 &middot; 8 KB</text>
-        <rect x="16" y="36" width="78" height="14" rx="4" fill="#181c2b" stroke="#2c3350"/>
-        <rect x="16" y="54" width="78" height="14" rx="4" fill="#181c2b" stroke="#2c3350"/>
-        <rect x="16" y="72" width="78" height="14" rx="4" fill="#181c2b" stroke="#2c3350"/>
-        <rect x="124" y="36" width="78" height="14" rx="4" fill="#181c2b" stroke="#2c3350"/>
-        <rect x="124" y="54" width="78" height="14" rx="4" fill="#11131c" stroke="#57e0b0" stroke-width="1.3"/>
-        <text x="163" y="64.5" fill="#57e0b0" font-size="7.5" text-anchor="middle">tuple (1,2) &middot; ada&hellip;</text>
-        <rect x="124" y="72" width="78" height="14" rx="4" fill="#181c2b" stroke="#2c3350"/>
-        <rect x="232" y="36" width="78" height="14" rx="4" fill="#181c2b" stroke="#2c3350"/>
-        <rect x="232" y="54" width="78" height="14" rx="4" fill="#181c2b" stroke="#2c3350"/>
-        <text x="163" y="132" fill="#8b90ab" font-size="7.5" text-anchor="middle">header &middot; slot array &middot; tuples grow from the end</text>
-        <circle r="6" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <rect x="8" y="26" width="94" height="112" rx="9" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <text x="55" y="18" fill="#8ca6b8" font-size="8" text-anchor="middle">page 0 &middot; 8 KB</text>
+        <rect x="116" y="26" width="94" height="112" rx="9" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="163" y="18" fill="#4eaeff" font-size="8" text-anchor="middle">page 1 &middot; 8 KB</text>
+        <rect x="224" y="26" width="94" height="112" rx="9" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <text x="271" y="18" fill="#8ca6b8" font-size="8" text-anchor="middle">page 2 &middot; 8 KB</text>
+        <rect x="16" y="36" width="78" height="14" rx="4" fill="#0e2233" stroke="#244155"/>
+        <rect x="16" y="54" width="78" height="14" rx="4" fill="#0e2233" stroke="#244155"/>
+        <rect x="16" y="72" width="78" height="14" rx="4" fill="#0e2233" stroke="#244155"/>
+        <rect x="124" y="36" width="78" height="14" rx="4" fill="#0e2233" stroke="#244155"/>
+        <rect x="124" y="54" width="78" height="14" rx="4" fill="#071726" stroke="#34d3bf" stroke-width="1.3"/>
+        <text x="163" y="64.5" fill="#34d3bf" font-size="7.5" text-anchor="middle">tuple (1,2) &middot; ada&hellip;</text>
+        <rect x="124" y="72" width="78" height="14" rx="4" fill="#0e2233" stroke="#244155"/>
+        <rect x="232" y="36" width="78" height="14" rx="4" fill="#0e2233" stroke="#244155"/>
+        <rect x="232" y="54" width="78" height="14" rx="4" fill="#0e2233" stroke="#244155"/>
+        <text x="163" y="132" fill="#8ca6b8" font-size="7.5" text-anchor="middle">header &middot; slot array &middot; tuples grow from the end</text>
+        <circle r="6" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.3;0.5;1" keyPoints="0;1;1;1" path="M 20 146 L 163 100"/>
           <animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.3;0.36;1" values="1;1;0;0"/>
         </circle>
-        <text x="20" y="147" fill="#8e86f0" font-size="8">ctid (1,2) &mdash; "page 1, slot 2"</text>
-        <text x="240" y="147" fill="#57e0b0" font-size="8" opacity="0">1 page read &#10003;
+        <text x="20" y="147" fill="#4eaeff" font-size="8">ctid (1,2) &mdash; "page 1, slot 2"</text>
+        <text x="240" y="147" fill="#34d3bf" font-size="8" opacity="0">1 page read &#10003;
           <animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.4;0.46;1" values="0;0;1;1"/></text>
       </svg>
       <div class="lanes">
@@ -1040,20 +1040,20 @@ SELECT relpages, reltuples::bigint FROM pg_class
     <div class="diagram anim" style="--step:.75s">
       <div class="dlabel">same 10,000 rows &middot; two access patterns</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <text x="10" y="16" fill="#57e0b0" font-size="8.5">sequential &middot; one long run</text>
-        <rect x="10" y="24" width="320" height="18" rx="5" fill="#11131c" stroke="#2c3350"/>
-        <rect x="12" y="26" width="0" height="14" rx="4" fill="#57e0b0" opacity=".85">
+        <text x="10" y="16" fill="#34d3bf" font-size="8.5">sequential &middot; one long run</text>
+        <rect x="10" y="24" width="320" height="18" rx="5" fill="#071726" stroke="#244155"/>
+        <rect x="12" y="26" width="0" height="14" rx="4" fill="#34d3bf" opacity=".85">
           <animate attributeName="width" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.35;1" values="0;316;316"/>
         </rect>
-        <text x="10" y="66" fill="#ff9a6b" font-size="8.5">random &middot; a hop per row</text>
-        <rect x="10" y="74" width="320" height="18" rx="5" fill="#11131c" stroke="#2c3350"/>
-        <circle r="5" fill="#ff9a6b" stroke="#11131c" stroke-width="1">
+        <text x="10" y="66" fill="#fb923c" font-size="8.5">random &middot; a hop per row</text>
+        <rect x="10" y="74" width="320" height="18" rx="5" fill="#071726" stroke="#244155"/>
+        <circle r="5" fill="#fb923c" stroke="#071726" stroke-width="1">
           <animateMotion dur="5.5s" repeatCount="indefinite" calcMode="linear"
             path="M 40 83 L 290 83 L 90 83 L 240 83 L 60 83 L 300 83 L 140 83 L 200 83 L 30 83 L 270 83"/>
         </circle>
-        <text x="10" y="116" fill="#8b90ab" font-size="8">HDD: ~5-10 ms per seek vs ~200 MB/s streaming &mdash; roughly a million-fold gap per byte</text>
-        <text x="10" y="130" fill="#8b90ab" font-size="8">NVMe SSD: no head to move, but 4 KB random reads still lose to streaming &mdash;</text>
-        <text x="10" y="143" fill="#8b90ab" font-size="8">and random 8 KB WRITES pay read-modify-erase on flash blocks</text>
+        <text x="10" y="116" fill="#8ca6b8" font-size="8">HDD: ~5-10 ms per seek vs ~200 MB/s streaming &mdash; roughly a million-fold gap per byte</text>
+        <text x="10" y="130" fill="#8ca6b8" font-size="8">NVMe SSD: no head to move, but 4 KB random reads still lose to streaming &mdash;</text>
+        <text x="10" y="143" fill="#8ca6b8" font-size="8">and random 8 KB WRITES pay read-modify-erase on flash blocks</text>
       </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">loves streams</div><div class="lstep good seq" style="--i:0">the WAL (append-only) &middot; seq scans &middot; SSTable flushes &amp; compaction &middot; replication shipping</div>

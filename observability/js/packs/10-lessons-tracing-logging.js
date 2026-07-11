@@ -72,20 +72,20 @@ tracer.startSpan("charge.consume", <span class="ok">{ parent }</span>);</pre>
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">GET /checkout &middot; 420ms &middot; read the shapes</div>
       <svg class="estage" viewBox="0 0 340 132" width="100%" style="max-width:380px" font-family="ui-monospace,monospace">
-        <rect x="10" y="10" width="320" height="14" rx="4" fill="#11131c" stroke="#8e86f0"/>
-        <text x="16" y="21" fill="#8e86f0" font-size="8">GET /checkout · 420ms</text>
-        <rect x="10" y="32" width="30" height="12" rx="3" fill="#11131c" stroke="#2c3350"/>
-        <text x="14" y="42" fill="#8b90ab" font-size="7.5">auth 40</text>
-        <rect x="42" y="50" width="62" height="12" rx="3" fill="#11131c" stroke="#2c3350"/>
-        <text x="46" y="60" fill="#8b90ab" font-size="7.5">cart.load 80</text>
-        <rect x="106" y="68" width="221" height="12" rx="3" fill="#11131c" stroke="#ff9a6b"/>
-        <text x="110" y="78" fill="#ff9a6b" font-size="7.5">charge 290 — critical path</text>
-        <rect x="114" y="86" width="205" height="12" rx="3" fill="#11131c" stroke="#ff9a6b" stroke-dasharray="3 2"/>
-        <text x="118" y="96" fill="#ff9a6b" font-size="7.5">stripe.post 270</text>
-        <line x1="40" y1="44" x2="42" y2="50" stroke="#57e0b0" stroke-width="1"/>
-        <line x1="104" y1="62" x2="106" y2="68" stroke="#57e0b0" stroke-width="1"/>
-        <text x="46" y="118" fill="#57e0b0" font-size="8">stairs: auth → cart never overlap — could they?</text>
-        <circle r="4" fill="#8e86f0">
+        <rect x="10" y="10" width="320" height="14" rx="4" fill="#071726" stroke="#4eaeff"/>
+        <text x="16" y="21" fill="#4eaeff" font-size="8">GET /checkout · 420ms</text>
+        <rect x="10" y="32" width="30" height="12" rx="3" fill="#071726" stroke="#244155"/>
+        <text x="14" y="42" fill="#8ca6b8" font-size="7.5">auth 40</text>
+        <rect x="42" y="50" width="62" height="12" rx="3" fill="#071726" stroke="#244155"/>
+        <text x="46" y="60" fill="#8ca6b8" font-size="7.5">cart.load 80</text>
+        <rect x="106" y="68" width="221" height="12" rx="3" fill="#071726" stroke="#fb923c"/>
+        <text x="110" y="78" fill="#fb923c" font-size="7.5">charge 290 — critical path</text>
+        <rect x="114" y="86" width="205" height="12" rx="3" fill="#071726" stroke="#fb923c" stroke-dasharray="3 2"/>
+        <text x="118" y="96" fill="#fb923c" font-size="7.5">stripe.post 270</text>
+        <line x1="40" y1="44" x2="42" y2="50" stroke="#34d3bf" stroke-width="1"/>
+        <line x1="104" y1="62" x2="106" y2="68" stroke="#34d3bf" stroke-width="1"/>
+        <text x="46" y="118" fill="#34d3bf" font-size="8">stairs: auth → cart never overlap — could they?</text>
+        <circle r="4" fill="#4eaeff">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.18;0.42;0.75;1" keyPoints="0;0.15;0.35;1;1"
             path="M 12 17 L 330 17"/>

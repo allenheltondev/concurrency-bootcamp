@@ -18,23 +18,23 @@
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">node's loop &middot; one trip through the phases</div>
       <svg viewBox="0 0 320 222" width="100%" style="max-width:344px;display:block;margin:2px auto 0" font-family="ui-monospace,monospace">
-        <path d="M 160 30 L 286 96 L 236 196 L 84 196 L 34 96 Z" fill="none" stroke="#2c3350" stroke-width="1.4" stroke-dasharray="4 5"/>
-        <rect x="112" y="14" width="96" height="34" rx="8" fill="#11131c" stroke="#ff9a6b"/>
-        <text x="160" y="30" fill="#ff9a6b" font-size="8.5" text-anchor="middle">TIMERS</text>
-        <text x="160" y="42" fill="#8b90ab" font-size="7.5" text-anchor="middle">setTimeout / setInterval</text>
-        <rect x="238" y="80" width="78" height="32" rx="8" fill="#11131c" stroke="#2c3350"/>
-        <text x="277" y="94" fill="#8b90ab" font-size="8" text-anchor="middle">PENDING</text>
-        <text x="277" y="105" fill="#6a7090" font-size="7" text-anchor="middle">system cbs</text>
-        <rect x="190" y="182" width="92" height="34" rx="8" fill="#11131c" stroke="#8e86f0"/>
-        <text x="236" y="198" fill="#8e86f0" font-size="8.5" text-anchor="middle">POLL</text>
-        <text x="236" y="210" fill="#8b90ab" font-size="7.5" text-anchor="middle">I/O &middot; fs &middot; sockets</text>
-        <rect x="38" y="182" width="92" height="34" rx="8" fill="#11131c" stroke="#57e0b0"/>
-        <text x="84" y="198" fill="#57e0b0" font-size="8.5" text-anchor="middle">CHECK</text>
-        <text x="84" y="210" fill="#8b90ab" font-size="7.5" text-anchor="middle">setImmediate</text>
-        <rect x="4" y="80" width="78" height="32" rx="8" fill="#11131c" stroke="#2c3350"/>
-        <text x="43" y="94" fill="#8b90ab" font-size="8" text-anchor="middle">CLOSE</text>
-        <text x="43" y="105" fill="#6a7090" font-size="7" text-anchor="middle">'close' cbs</text>
-        <circle r="7" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <path d="M 160 30 L 286 96 L 236 196 L 84 196 L 34 96 Z" fill="none" stroke="#244155" stroke-width="1.4" stroke-dasharray="4 5"/>
+        <rect x="112" y="14" width="96" height="34" rx="8" fill="#071726" stroke="#fb923c"/>
+        <text x="160" y="30" fill="#fb923c" font-size="8.5" text-anchor="middle">TIMERS</text>
+        <text x="160" y="42" fill="#8ca6b8" font-size="7.5" text-anchor="middle">setTimeout / setInterval</text>
+        <rect x="238" y="80" width="78" height="32" rx="8" fill="#071726" stroke="#244155"/>
+        <text x="277" y="94" fill="#8ca6b8" font-size="8" text-anchor="middle">PENDING</text>
+        <text x="277" y="105" fill="#647c8f" font-size="7" text-anchor="middle">system cbs</text>
+        <rect x="190" y="182" width="92" height="34" rx="8" fill="#071726" stroke="#4eaeff"/>
+        <text x="236" y="198" fill="#4eaeff" font-size="8.5" text-anchor="middle">POLL</text>
+        <text x="236" y="210" fill="#8ca6b8" font-size="7.5" text-anchor="middle">I/O &middot; fs &middot; sockets</text>
+        <rect x="38" y="182" width="92" height="34" rx="8" fill="#071726" stroke="#34d3bf"/>
+        <text x="84" y="198" fill="#34d3bf" font-size="8.5" text-anchor="middle">CHECK</text>
+        <text x="84" y="210" fill="#8ca6b8" font-size="7.5" text-anchor="middle">setImmediate</text>
+        <rect x="4" y="80" width="78" height="32" rx="8" fill="#071726" stroke="#244155"/>
+        <text x="43" y="94" fill="#8ca6b8" font-size="8" text-anchor="middle">CLOSE</text>
+        <text x="43" y="105" fill="#647c8f" font-size="7" text-anchor="middle">'close' cbs</text>
+        <circle r="7" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear"
             path="M 160 30 L 286 96 L 236 196 L 84 196 L 34 96 Z"/>
         </circle>

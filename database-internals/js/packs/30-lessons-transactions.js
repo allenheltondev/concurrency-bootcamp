@@ -49,36 +49,36 @@ ROLLBACK;
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">one row &middot; two versions &middot; two snapshots see different truths</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="14" y="60" width="140" height="38" rx="8" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="84" y="76" fill="#e7e9f3" font-size="8" text-anchor="middle">v1 &middot; balance=100</text>
-        <text x="84" y="90" fill="#8b90ab" font-size="7.5" text-anchor="middle">xmin=812 &middot; xmax=951</text>
-        <rect x="196" y="60" width="130" height="38" rx="8" fill="#11131c" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="261" y="76" fill="#e7e9f3" font-size="8" text-anchor="middle">v2 &middot; balance=40</text>
-        <text x="261" y="90" fill="#8b90ab" font-size="7.5" text-anchor="middle">xmin=951 &middot; xmax=&mdash;</text>
-        <line x1="154" y1="79" x2="196" y2="79" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="175" y="74" fill="#8b90ab" font-size="7" text-anchor="middle">951</text>
-        <text x="14" y="14" fill="#57e0b0" font-size="8">snapshot A &middot; taken while 951 was in progress</text>
-        <circle r="6" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <rect x="14" y="60" width="140" height="38" rx="8" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <text x="84" y="76" fill="#e2ecf3" font-size="8" text-anchor="middle">v1 &middot; balance=100</text>
+        <text x="84" y="90" fill="#8ca6b8" font-size="7.5" text-anchor="middle">xmin=812 &middot; xmax=951</text>
+        <rect x="196" y="60" width="130" height="38" rx="8" fill="#071726" stroke="#244155" stroke-width="1.2"/>
+        <text x="261" y="76" fill="#e2ecf3" font-size="8" text-anchor="middle">v2 &middot; balance=40</text>
+        <text x="261" y="90" fill="#8ca6b8" font-size="7.5" text-anchor="middle">xmin=951 &middot; xmax=&mdash;</text>
+        <line x1="154" y1="79" x2="196" y2="79" stroke="#244155" stroke-width="1.2"/>
+        <text x="175" y="74" fill="#8ca6b8" font-size="7" text-anchor="middle">951</text>
+        <text x="14" y="14" fill="#34d3bf" font-size="8">snapshot A &middot; taken while 951 was in progress</text>
+        <circle r="6" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.06;0.18;1" keyPoints="0;0;1;1" path="M 40 20 L 84 52"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.42;0.46;1" values="1;1;0;0"/>
         </circle>
-        <text x="14" y="30" fill="#57e0b0" font-size="8" opacity="0">A sees v1 &rarr; balance=100 &#10003;
+        <text x="14" y="30" fill="#34d3bf" font-size="8" opacity="0">A sees v1 &rarr; balance=100 &#10003;
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.2;0.24;1" values="0;0;1;1"/></text>
-        <text x="14" y="42" fill="#ff9a6b" font-size="8" opacity="0">v2 invisible: 951 &isin; A.inProgress
+        <text x="14" y="42" fill="#fb923c" font-size="8" opacity="0">v2 invisible: 951 &isin; A.inProgress
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.3;0.34;1" values="0;0;1;1"/></text>
-        <text x="180" y="116" fill="#8e86f0" font-size="8" opacity="0">snapshot B &middot; taken after 951 committed
+        <text x="180" y="116" fill="#4eaeff" font-size="8" opacity="0">snapshot B &middot; taken after 951 committed
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.44;0.48;1" values="0;0;1;1"/></text>
-        <circle r="6" fill="#8e86f0" stroke="#11131c" stroke-width="1.5" opacity="0">
+        <circle r="6" fill="#4eaeff" stroke="#071726" stroke-width="1.5" opacity="0">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.5;0.62;1" keyPoints="0;0;1;1" path="M 300 120 L 261 106"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.5;0.52;0.9;0.94;1" values="0;0;1;1;0;0"/>
         </circle>
-        <text x="180" y="130" fill="#8e86f0" font-size="8" opacity="0">B sees v2 &rarr; balance=40 &#10003;
+        <text x="180" y="130" fill="#4eaeff" font-size="8" opacity="0">B sees v2 &rarr; balance=40 &#10003;
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.62;0.66;1" values="0;0;1;1"/></text>
-        <text x="180" y="142" fill="#ff9a6b" font-size="8" opacity="0">v1 invisible: deleter 951 committed
+        <text x="180" y="142" fill="#fb923c" font-size="8" opacity="0">v1 invisible: deleter 951 committed
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.7;0.74;1" values="0;0;1;1"/></text>
-        <text x="14" y="142" fill="#8b90ab" font-size="7.5" opacity="0">A still live &rarr; v1 must stay &middot; vacuum waits
+        <text x="14" y="142" fill="#8ca6b8" font-size="7.5" opacity="0">A still live &rarr; v1 must stay &middot; vacuum waits
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.8;0.84;1" values="0;0;1;1"/></text>
       </svg>
       <div class="lanes">
@@ -223,29 +223,29 @@ COMMIT;                                       <span class="cm">-- crash before t
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">the wait-for cycle forms &middot; the detector snips one edge</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <circle cx="75" cy="72" r="22" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="75" y="76" fill="#8e86f0" font-size="9" text-anchor="middle">T1</text>
-        <circle cx="265" cy="72" r="22" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="265" y="76" fill="#8e86f0" font-size="9" text-anchor="middle">T2</text>
-        <text x="75" y="108" fill="#8b90ab" font-size="7.5" text-anchor="middle">holds row A</text>
-        <text x="265" y="108" fill="#8b90ab" font-size="7.5" text-anchor="middle">holds row B</text>
-        <path d="M 97 60 C 140 34, 200 34, 243 60" fill="none" stroke="#ff9a6b" stroke-width="1.6" opacity="0">
+        <circle cx="75" cy="72" r="22" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="75" y="76" fill="#4eaeff" font-size="9" text-anchor="middle">T1</text>
+        <circle cx="265" cy="72" r="22" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="265" y="76" fill="#4eaeff" font-size="9" text-anchor="middle">T2</text>
+        <text x="75" y="108" fill="#8ca6b8" font-size="7.5" text-anchor="middle">holds row A</text>
+        <text x="265" y="108" fill="#8ca6b8" font-size="7.5" text-anchor="middle">holds row B</text>
+        <path d="M 97 60 C 140 34, 200 34, 243 60" fill="none" stroke="#fb923c" stroke-width="1.6" opacity="0">
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.1;0.14;1" values="0;0;1;1"/></path>
-        <text x="170" y="30" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">T1 waits for row B &rarr;
+        <text x="170" y="30" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">T1 waits for row B &rarr;
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.1;0.14;1" values="0;0;1;1"/></text>
-        <path d="M 243 84 C 200 110, 140 110, 97 84" fill="none" stroke="#ff9a6b" stroke-width="1.6" opacity="0">
+        <path d="M 243 84 C 200 110, 140 110, 97 84" fill="none" stroke="#fb923c" stroke-width="1.6" opacity="0">
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.24;0.28;0.6;0.64;1" values="0;0;1;1;0;0"/></path>
-        <text x="170" y="128" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">&larr; T2 waits for row A &middot; CYCLE
+        <text x="170" y="128" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">&larr; T2 waits for row A &middot; CYCLE
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.24;0.28;0.6;0.64;1" values="0;0;1;1;0;0"/></text>
-        <text x="170" y="52" fill="#8b90ab" font-size="8" text-anchor="middle" opacity="0">deadlock_timeout 1 s elapses &rarr; run cycle detection
+        <text x="170" y="52" fill="#8ca6b8" font-size="8" text-anchor="middle" opacity="0">deadlock_timeout 1 s elapses &rarr; run cycle detection
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.42;0.46;1" values="0;0;1;1"/></text>
-        <circle cx="265" cy="72" r="22" fill="none" stroke="#ff9a6b" stroke-width="2" opacity="0">
+        <circle cx="265" cy="72" r="22" fill="none" stroke="#fb923c" stroke-width="2" opacity="0">
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.6;0.64;1" values="0;0;1;1"/></circle>
-        <text x="265" y="140" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">T2 ABORTED &middot; 40P01
+        <text x="265" y="140" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">T2 ABORTED &middot; 40P01
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.6;0.64;1" values="0;0;1;1"/></text>
-        <text x="75" y="140" fill="#57e0b0" font-size="8" text-anchor="middle" opacity="0">T1 gets row B &rarr; COMMIT &#10003;
+        <text x="75" y="140" fill="#34d3bf" font-size="8" text-anchor="middle" opacity="0">T1 gets row B &rarr; COMMIT &#10003;
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.72;0.76;1" values="0;0;1;1"/></text>
-        <text x="170" y="76" fill="#8b90ab" font-size="7.5" text-anchor="middle" opacity="0">app retries T2 &mdash; the survivor already finished
+        <text x="170" y="76" fill="#8ca6b8" font-size="7.5" text-anchor="middle" opacity="0">app retries T2 &mdash; the survivor already finished
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.84;0.88;1" values="0;0;1;1"/></text>
       </svg>
       <div class="lanes">

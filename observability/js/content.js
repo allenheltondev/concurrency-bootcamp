@@ -947,25 +947,25 @@ const LESSONS = [
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">a request you'll never see again &middot; only its telemetry survives</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="10" y="30" width="80" height="34" rx="8" fill="#11131c" stroke="#2c3350"/>
-        <text x="50" y="51" fill="#e7e9f3" font-size="9" text-anchor="middle">edge</text>
-        <rect x="130" y="30" width="80" height="34" rx="8" fill="#11131c" stroke="#2c3350"/>
-        <text x="170" y="51" fill="#e7e9f3" font-size="9" text-anchor="middle">api</text>
-        <rect x="250" y="30" width="80" height="34" rx="8" fill="#11131c" stroke="#2c3350"/>
-        <text x="290" y="51" fill="#e7e9f3" font-size="9" text-anchor="middle">db</text>
-        <line x1="90" y1="47" x2="130" y2="47" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="210" y1="47" x2="250" y2="47" stroke="#2c3350" stroke-width="1.2"/>
-        <rect x="60" y="108" width="220" height="30" rx="8" fill="#11131c" stroke="#8e86f0" stroke-width="1.3"/>
-        <text x="170" y="127" fill="#8e86f0" font-size="8.5" text-anchor="middle">telemetry store — the only witness left</text>
-        <circle r="6" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <rect x="10" y="30" width="80" height="34" rx="8" fill="#071726" stroke="#244155"/>
+        <text x="50" y="51" fill="#e2ecf3" font-size="9" text-anchor="middle">edge</text>
+        <rect x="130" y="30" width="80" height="34" rx="8" fill="#071726" stroke="#244155"/>
+        <text x="170" y="51" fill="#e2ecf3" font-size="9" text-anchor="middle">api</text>
+        <rect x="250" y="30" width="80" height="34" rx="8" fill="#071726" stroke="#244155"/>
+        <text x="290" y="51" fill="#e2ecf3" font-size="9" text-anchor="middle">db</text>
+        <line x1="90" y1="47" x2="130" y2="47" stroke="#244155" stroke-width="1.2"/>
+        <line x1="210" y1="47" x2="250" y2="47" stroke="#244155" stroke-width="1.2"/>
+        <rect x="60" y="108" width="220" height="30" rx="8" fill="#071726" stroke="#4eaeff" stroke-width="1.3"/>
+        <text x="170" y="127" fill="#4eaeff" font-size="8.5" text-anchor="middle">telemetry store — the only witness left</text>
+        <circle r="6" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="5.5s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.3;0.6;1" keyPoints="0;0.5;1;1" path="M 50 47 L 170 47 L 290 47"/>
           <animate attributeName="opacity" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.6;0.68;1" values="1;1;0;0"/>
         </circle>
-        <circle r="3" fill="#8e86f0"><animateMotion dur="5.5s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.1;0.3;1" keyPoints="0;0;1;1" path="M 50 64 L 100 108"/><animate attributeName="opacity" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.1;0.28;0.3;1" values="0;1;1;0;0"/></circle>
-        <circle r="3" fill="#8e86f0"><animateMotion dur="5.5s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.36;0.56;1" keyPoints="0;0;1;1" path="M 170 64 L 170 108"/><animate attributeName="opacity" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.36;0.54;0.56;1" values="0;1;1;0;0"/></circle>
-        <circle r="3" fill="#8e86f0"><animateMotion dur="5.5s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.62;0.82;1" keyPoints="0;0;1;1" path="M 290 64 L 240 108"/><animate attributeName="opacity" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.62;0.8;0.82;1" values="0;1;1;0;0"/></circle>
-        <text x="170" y="16" fill="#ff9a6b" font-size="8.5" text-anchor="middle">✗ no debugger &middot; ✗ no breakpoint &middot; ✗ no reproducing it locally</text>
+        <circle r="3" fill="#4eaeff"><animateMotion dur="5.5s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.1;0.3;1" keyPoints="0;0;1;1" path="M 50 64 L 100 108"/><animate attributeName="opacity" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.1;0.28;0.3;1" values="0;1;1;0;0"/></circle>
+        <circle r="3" fill="#4eaeff"><animateMotion dur="5.5s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.36;0.56;1" keyPoints="0;0;1;1" path="M 170 64 L 170 108"/><animate attributeName="opacity" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.36;0.54;0.56;1" values="0;1;1;0;0"/></circle>
+        <circle r="3" fill="#4eaeff"><animateMotion dur="5.5s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.62;0.82;1" keyPoints="0;0;1;1" path="M 290 64 L 240 108"/><animate attributeName="opacity" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.62;0.8;0.82;1" values="0;1;1;0;0"/></circle>
+        <text x="170" y="16" fill="#fb923c" font-size="8.5" text-anchor="middle">✗ no debugger &middot; ✗ no breakpoint &middot; ✗ no reproducing it locally</text>
       </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">axiom 1</div><div class="lstep seq" style="--i:0">you can only ask questions of telemetry you <b>emitted in advance</b></div>

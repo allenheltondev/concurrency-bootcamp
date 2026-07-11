@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Observability Bootcamp">
-  <rect width="512" height="512" fill="#14161f"/>
+  <rect width="512" height="512" fill="#0b1f2e"/>
   <!-- the pulse: a latency line with one spike — the p99 the average hid -->
   <polyline points="56,196 140,196 176,120 212,272 248,150 296,196 456,196"
-            fill="none" stroke="#57e0b0" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="212" cy="272" r="26" fill="#ff9a6b"/>
+            fill="none" stroke="#34d3bf" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="212" cy="272" r="26" fill="#fb923c"/>
   <!-- the waterfall: a trace under the pulse — parent, two children, the culprit hop -->
-  <rect x="72"  y="336" width="368" height="34" rx="12" fill="#8e86f0"/>
-  <rect x="112" y="392" width="130" height="34" rx="12" fill="#8e86f0" opacity=".55"/>
-  <rect x="258" y="392" width="182" height="34" rx="12" fill="#ff9a6b"/>
-  <rect x="298" y="448" width="142" height="30" rx="11" fill="#ff9a6b" opacity=".55"/>
+  <rect x="72"  y="336" width="368" height="34" rx="12" fill="#4eaeff"/>
+  <rect x="112" y="392" width="130" height="34" rx="12" fill="#4eaeff" opacity=".55"/>
+  <rect x="258" y="392" width="182" height="34" rx="12" fill="#fb923c"/>
+  <rect x="298" y="448" width="142" height="30" rx="11" fill="#fb923c" opacity=".55"/>
 </svg>

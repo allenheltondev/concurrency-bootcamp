@@ -94,44 +94,44 @@
       <div class="dlabel">three producers &middot; B is silent &middot; what may cross?</div>
       <svg class="estage" viewBox="0 0 340 168" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
         <g font-size="9" text-anchor="middle">
-          <text x="22" y="40" fill="#8e86f0">A</text>
-          <text x="22" y="80" fill="#ff9a6b">B</text>
-          <text x="22" y="120" fill="#8e86f0">C</text>
+          <text x="22" y="40" fill="#4eaeff">A</text>
+          <text x="22" y="80" fill="#fb923c">B</text>
+          <text x="22" y="120" fill="#4eaeff">C</text>
         </g>
-        <g stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5">
+        <g stroke="#244155" stroke-width="1.2" stroke-dasharray="3 5">
           <line x1="34" y1="36" x2="196" y2="36"/>
           <line x1="34" y1="76" x2="196" y2="76"/>
           <line x1="34" y1="116" x2="196" y2="116"/>
         </g>
         <g font-size="10" text-anchor="middle">
-          <rect x="120" y="26" width="28" height="20" rx="5" fill="#11131c" stroke="#3a4160"/>
-          <text x="134" y="40" fill="#cdd2e6">5</text>
-          <rect x="156" y="26" width="28" height="20" rx="5" fill="#11131c" stroke="#8e86f0"/>
-          <text x="170" y="40" fill="#cdd2e6">3</text>
-          <rect x="156" y="106" width="28" height="20" rx="5" fill="#11131c" stroke="#8e86f0"/>
-          <text x="170" y="120" fill="#cdd2e6">4</text>
+          <rect x="120" y="26" width="28" height="20" rx="5" fill="#071726" stroke="#315066"/>
+          <text x="134" y="40" fill="#c6d8e6">5</text>
+          <rect x="156" y="26" width="28" height="20" rx="5" fill="#071726" stroke="#4eaeff"/>
+          <text x="170" y="40" fill="#c6d8e6">3</text>
+          <rect x="156" y="106" width="28" height="20" rx="5" fill="#071726" stroke="#4eaeff"/>
+          <text x="170" y="120" fill="#c6d8e6">4</text>
         </g>
-        <rect x="156" y="66" width="28" height="20" rx="5" fill="none" stroke="#ff9a6b" stroke-dasharray="3 3">
+        <rect x="156" y="66" width="28" height="20" rx="5" fill="none" stroke="#fb923c" stroke-dasharray="3 3">
           <animate attributeName="opacity" dur="7s" repeatCount="indefinite" keyTimes="0;0.36;0.40;0.94;1" values="1;1;0;0;1"/></rect>
-        <text x="170" y="80" fill="#ff9a6b" font-size="10" text-anchor="middle">?
+        <text x="170" y="80" fill="#fb923c" font-size="10" text-anchor="middle">?
           <animate attributeName="opacity" dur="7s" repeatCount="indefinite" keyTimes="0;0.36;0.40;0.94;1" values="1;1;0;0;1"/></text>
-        <line x1="206" y1="22" x2="206" y2="134" stroke="#ff9a6b" stroke-width="1.5" stroke-dasharray="4 4"/>
-        <text x="206" y="14" fill="#ff9a6b" font-size="8" text-anchor="middle">watermark</text>
-        <text x="170" y="150" fill="#6a7090" font-size="7.5" text-anchor="middle">emit only up to the min open head &mdash; and B's head is unknown</text>
-        <rect x="222" y="22" width="108" height="112" rx="9" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="276" y="38" fill="#57e0b0" font-size="9" text-anchor="middle">MERGED</text>
-        <text x="196" y="58" fill="#ff9a6b" font-size="10" text-anchor="middle" opacity="0">&#10007;
+        <line x1="206" y1="22" x2="206" y2="134" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <text x="206" y="14" fill="#fb923c" font-size="8" text-anchor="middle">watermark</text>
+        <text x="170" y="150" fill="#647c8f" font-size="7.5" text-anchor="middle">emit only up to the min open head &mdash; and B's head is unknown</text>
+        <rect x="222" y="22" width="108" height="112" rx="9" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="276" y="38" fill="#34d3bf" font-size="9" text-anchor="middle">MERGED</text>
+        <text x="196" y="58" fill="#fb923c" font-size="10" text-anchor="middle" opacity="0">&#10007;
           <animate attributeName="opacity" dur="7s" repeatCount="indefinite" keyTimes="0;0.08;0.12;0.30;0.34;1" values="0;0;1;1;0;0"/></text>
-        <text x="38" y="58" fill="#8b90ab" font-size="7.5" text-anchor="start" opacity="0">3 held &mdash; B may owe older
+        <text x="38" y="58" fill="#8ca6b8" font-size="7.5" text-anchor="start" opacity="0">3 held &mdash; B may owe older
           <animate attributeName="opacity" dur="7s" repeatCount="indefinite" keyTimes="0;0.08;0.12;0.30;0.34;1" values="0;0;1;1;0;0"/></text>
         <g opacity="0">
           <animate attributeName="opacity" dur="7s" repeatCount="indefinite" keyTimes="0;0.36;0.40;0.94;1" values="0;0;1;1;0"/>
-          <rect x="156" y="66" width="28" height="20" rx="5" fill="rgba(87,224,176,.15)" stroke="#57e0b0"/>
-          <text x="170" y="80" fill="#57e0b0" font-size="10" text-anchor="middle">1</text>
+          <rect x="156" y="66" width="28" height="20" rx="5" fill="rgba(52,211,191,.15)" stroke="#34d3bf"/>
+          <text x="170" y="80" fill="#34d3bf" font-size="10" text-anchor="middle">1</text>
           <animateTransform attributeName="transform" type="translate" dur="7s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.48;0.60;1" values="0 0;0 0;92 -14;92 -14"/>
         </g>
-        <text x="38" y="97" fill="#ff9a6b" font-size="7.5" text-anchor="start" opacity="0">B empty again &mdash; the world stalls
+        <text x="38" y="97" fill="#fb923c" font-size="7.5" text-anchor="start" opacity="0">B empty again &mdash; the world stalls
           <animate attributeName="opacity" dur="7s" repeatCount="indefinite" keyTimes="0;0.66;0.70;0.96;1" values="0;0;1;1;0"/></text>
       </svg>
       <div class="lanes" style="margin-top:8px">

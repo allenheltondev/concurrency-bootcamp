@@ -2,7 +2,7 @@
    Bump CACHE on every content change so clients pick up the new build.
    Registered at scope ./ ; ../js/app.js (the shared engine) is same-origin
    and precaches fine. */
-const CACHE = "dbi-v2";
+const CACHE = "dbi-v3";
 const SHELL = [
   "./", "./index.html", "./manifest.webmanifest", "./icon.svg",
   "./js/core.js", "./js/content.js", "./js/sim.js",

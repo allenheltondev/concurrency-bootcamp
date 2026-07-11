@@ -1,17 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Distributed Systems Bootcamp">
-  <rect width="512" height="512" fill="#14161f"/>
+  <rect width="512" height="512" fill="#0b1f2e"/>
   <!-- five nodes, mostly connected -->
-  <line x1="256" y1="116" x2="116" y2="236" stroke="#8e86f0" stroke-width="22"/>
-  <line x1="256" y1="116" x2="396" y2="236" stroke="#8e86f0" stroke-width="22"/>
-  <line x1="116" y1="236" x2="176" y2="396" stroke="#8e86f0" stroke-width="22"/>
-  <line x1="396" y1="236" x2="336" y2="396" stroke="#8e86f0" stroke-width="22"/>
-  <line x1="176" y1="396" x2="336" y2="396" stroke="#8e86f0" stroke-width="22"/>
+  <line x1="256" y1="116" x2="116" y2="236" stroke="#4eaeff" stroke-width="22"/>
+  <line x1="256" y1="116" x2="396" y2="236" stroke="#4eaeff" stroke-width="22"/>
+  <line x1="116" y1="236" x2="176" y2="396" stroke="#4eaeff" stroke-width="22"/>
+  <line x1="396" y1="236" x2="336" y2="396" stroke="#4eaeff" stroke-width="22"/>
+  <line x1="176" y1="396" x2="336" y2="396" stroke="#4eaeff" stroke-width="22"/>
   <!-- the partitioned link: messages are being lost here -->
-  <line x1="116" y1="236" x2="396" y2="236" stroke="#ff9a6b" stroke-width="20" stroke-dasharray="34 30"/>
+  <line x1="116" y1="236" x2="396" y2="236" stroke="#fb923c" stroke-width="20" stroke-dasharray="34 30"/>
   <!-- the nodes: a healthy majority (green) and the leader (purple) -->
-  <circle cx="256" cy="116" r="52" fill="#8e86f0"/>
-  <circle cx="116" cy="236" r="46" fill="#57e0b0"/>
-  <circle cx="396" cy="236" r="46" fill="#57e0b0"/>
-  <circle cx="176" cy="396" r="46" fill="#57e0b0"/>
-  <circle cx="336" cy="396" r="46" fill="#ff9a6b"/>
+  <circle cx="256" cy="116" r="52" fill="#4eaeff"/>
+  <circle cx="116" cy="236" r="46" fill="#34d3bf"/>
+  <circle cx="396" cy="236" r="46" fill="#34d3bf"/>
+  <circle cx="176" cy="396" r="46" fill="#34d3bf"/>
+  <circle cx="336" cy="396" r="46" fill="#fb923c"/>
 </svg>

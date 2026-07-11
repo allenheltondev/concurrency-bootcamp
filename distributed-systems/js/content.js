@@ -1004,29 +1004,29 @@ const LESSONS = [
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">one request &middot; three replicas &middot; one is having a bad day</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="10" y="55" width="76" height="40" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="48" y="72" fill="#8e86f0" font-size="9" text-anchor="middle">CLIENT</text>
-        <text x="48" y="86" fill="#8b90ab" font-size="8" text-anchor="middle">needs an answer</text>
-        <rect x="244" y="8" width="86" height="34" rx="8" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="287" y="29" fill="#57e0b0" font-size="9" text-anchor="middle">REPLICA A ✓</text>
-        <rect x="244" y="58" width="86" height="34" rx="8" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="287" y="79" fill="#57e0b0" font-size="9" text-anchor="middle">REPLICA B ✓</text>
-        <rect x="244" y="108" width="86" height="34" rx="8" fill="#11131c" stroke="#ff9a6b" stroke-width="1.5" stroke-dasharray="4 4"/>
-        <text x="287" y="129" fill="#ff9a6b" font-size="9" text-anchor="middle">REPLICA C ✗</text>
-        <line x1="86" y1="66" x2="244" y2="25" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="86" y1="75" x2="244" y2="75" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="86" y1="84" x2="244" y2="125" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5"/>
-        <circle r="6" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <rect x="10" y="55" width="76" height="40" rx="9" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="48" y="72" fill="#4eaeff" font-size="9" text-anchor="middle">CLIENT</text>
+        <text x="48" y="86" fill="#8ca6b8" font-size="8" text-anchor="middle">needs an answer</text>
+        <rect x="244" y="8" width="86" height="34" rx="8" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="287" y="29" fill="#34d3bf" font-size="9" text-anchor="middle">REPLICA A ✓</text>
+        <rect x="244" y="58" width="86" height="34" rx="8" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="287" y="79" fill="#34d3bf" font-size="9" text-anchor="middle">REPLICA B ✓</text>
+        <rect x="244" y="108" width="86" height="34" rx="8" fill="#071726" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <text x="287" y="129" fill="#fb923c" font-size="9" text-anchor="middle">REPLICA C ✗</text>
+        <line x1="86" y1="66" x2="244" y2="25" stroke="#244155" stroke-width="1.2"/>
+        <line x1="86" y1="75" x2="244" y2="75" stroke="#244155" stroke-width="1.2"/>
+        <line x1="86" y1="84" x2="244" y2="125" stroke="#244155" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <circle r="6" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.25;0.5;1" keyPoints="0;1;1;1" path="M 86 66 L 244 25"/>
           <animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.5;0.55;1" values="1;1;0;0"/>
         </circle>
-        <circle r="6" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <circle r="6" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.25;0.5;1" keyPoints="0;1;1;1" path="M 86 75 L 244 75"/>
           <animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.5;0.55;1" values="1;1;0;0"/>
         </circle>
-        <circle r="6" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+        <circle r="6" fill="#fb923c" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.25;0.42;1" keyPoints="0;1;1;1" path="M 86 84 L 170 105"/>
           <animate attributeName="opacity" dur="5s" repeatCount="indefinite" keyTimes="0;0.25;0.4;0.42;1" values="1;1;.6;0;0"/>
@@ -1058,31 +1058,31 @@ else throw new Error("not enough replicas reachable");</pre>
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">five fates of a message &middot; A sends, B may or may not receive</div>
       <svg class="estage" viewBox="0 0 340 168" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="10" y="62" width="60" height="40" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="40" y="86" fill="#8e86f0" font-size="10" text-anchor="middle">A</text>
-        <rect x="270" y="62" width="60" height="40" rx="9" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="300" y="86" fill="#57e0b0" font-size="10" text-anchor="middle">B</text>
-        <rect x="120" y="8" width="100" height="148" rx="10" fill="none" stroke="#2c3350" stroke-dasharray="4 5"/>
-        <text x="170" y="22" fill="#6a7090" font-size="8" text-anchor="middle">THE NETWORK</text>
-        <circle r="6" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <rect x="10" y="62" width="60" height="40" rx="9" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="40" y="86" fill="#4eaeff" font-size="10" text-anchor="middle">A</text>
+        <rect x="270" y="62" width="60" height="40" rx="9" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="300" y="86" fill="#34d3bf" font-size="10" text-anchor="middle">B</text>
+        <rect x="120" y="8" width="100" height="148" rx="10" fill="none" stroke="#244155" stroke-dasharray="4 5"/>
+        <text x="170" y="22" fill="#647c8f" font-size="8" text-anchor="middle">THE NETWORK</text>
+        <circle r="6" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.18;1" keyPoints="0;1;1" path="M 70 74 L 270 74"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.18;0.22;1" values="1;1;0;0"/>
         </circle>
-        <circle r="6" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+        <circle r="6" fill="#fb923c" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.2;0.38;1" keyPoints="0;0;0.55;0.55" path="M 70 88 L 270 88"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.2;0.36;0.4;1" values="0;1;.7;0;0"/>
         </circle>
-        <text x="182" y="102" fill="#ff9a6b" font-size="8" opacity="0">✗ lost
+        <text x="182" y="102" fill="#fb923c" font-size="8" opacity="0">✗ lost
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.38;0.42;0.6;0.62;1" values="0;0;1;1;0;0"/></text>
-        <circle r="6" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <circle r="6" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.45;0.98;1" keyPoints="0;0;1;1" path="M 70 74 L 270 74"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.45;0.5;0.97;1" values="0;0;1;1;0"/>
         </circle>
-        <text x="170" y="132" fill="#8b90ab" font-size="8" text-anchor="middle">delivered &middot; lost &middot; delayed &middot; duplicated &middot; reordered</text>
-        <text x="170" y="146" fill="#6a7090" font-size="8" text-anchor="middle">the sender sees the same silence in every case</text>
+        <text x="170" y="132" fill="#8ca6b8" font-size="8" text-anchor="middle">delivered &middot; lost &middot; delayed &middot; duplicated &middot; reordered</text>
+        <text x="170" y="146" fill="#647c8f" font-size="8" text-anchor="middle">the sender sees the same silence in every case</text>
       </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">you</div><div class="lstep seq" style="--i:0">send("charge the card") &hellip; start a 2s timer</div>

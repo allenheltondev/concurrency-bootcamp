@@ -15,43 +15,43 @@
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">async replication &middot; follower B is lagged &middot; guess where your read lands</div>
       <svg class="estage" viewBox="0 0 340 164" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="10" y="62" width="62" height="40" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="41" y="79" fill="#8e86f0" font-size="9" text-anchor="middle">YOU</text>
-        <text x="41" y="93" fill="#8b90ab" font-size="8" text-anchor="middle">write, then read</text>
-        <rect x="126" y="62" width="70" height="40" rx="9" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="161" y="79" fill="#57e0b0" font-size="9" text-anchor="middle">LEADER</text>
-        <text x="161" y="93" fill="#e7e9f3" font-size="8" text-anchor="middle">log: &hellip;v2</text>
-        <rect x="250" y="10" width="80" height="36" rx="8" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="290" y="25" fill="#57e0b0" font-size="9" text-anchor="middle">FOLLOWER A</text>
-        <text x="290" y="39" fill="#8b90ab" font-size="8" text-anchor="middle">caught up &middot; v2</text>
-        <rect x="250" y="118" width="80" height="36" rx="8" fill="#11131c" stroke="#ff9a6b" stroke-width="1.5" stroke-dasharray="4 4"/>
-        <text x="290" y="133" fill="#ff9a6b" font-size="9" text-anchor="middle">FOLLOWER B</text>
-        <text x="290" y="147" fill="#8b90ab" font-size="8" text-anchor="middle">lagged &middot; still v1</text>
-        <line x1="72" y1="82" x2="126" y2="82" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="196" y1="72" x2="250" y2="30" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="196" y1="92" x2="250" y2="134" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5"/>
-        <line x1="52" y1="102" x2="250" y2="142" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5"/>
-        <circle r="6" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <rect x="10" y="62" width="62" height="40" rx="9" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="41" y="79" fill="#4eaeff" font-size="9" text-anchor="middle">YOU</text>
+        <text x="41" y="93" fill="#8ca6b8" font-size="8" text-anchor="middle">write, then read</text>
+        <rect x="126" y="62" width="70" height="40" rx="9" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="161" y="79" fill="#34d3bf" font-size="9" text-anchor="middle">LEADER</text>
+        <text x="161" y="93" fill="#e2ecf3" font-size="8" text-anchor="middle">log: &hellip;v2</text>
+        <rect x="250" y="10" width="80" height="36" rx="8" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="290" y="25" fill="#34d3bf" font-size="9" text-anchor="middle">FOLLOWER A</text>
+        <text x="290" y="39" fill="#8ca6b8" font-size="8" text-anchor="middle">caught up &middot; v2</text>
+        <rect x="250" y="118" width="80" height="36" rx="8" fill="#071726" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <text x="290" y="133" fill="#fb923c" font-size="9" text-anchor="middle">FOLLOWER B</text>
+        <text x="290" y="147" fill="#8ca6b8" font-size="8" text-anchor="middle">lagged &middot; still v1</text>
+        <line x1="72" y1="82" x2="126" y2="82" stroke="#244155" stroke-width="1.2"/>
+        <line x1="196" y1="72" x2="250" y2="30" stroke="#244155" stroke-width="1.2"/>
+        <line x1="196" y1="92" x2="250" y2="134" stroke="#244155" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <line x1="52" y1="102" x2="250" y2="142" stroke="#244155" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <circle r="6" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.03;0.12;1" keyPoints="0;0;1;1" path="M 72 82 L 126 82"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.12;0.16;1" values="1;1;0;0"/>
         </circle>
-        <circle r="6" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <circle r="6" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.16;0.3;1" keyPoints="0;0;1;1" path="M 196 72 L 250 30"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.16;0.18;0.3;0.34;1" values="0;0;1;1;0;0"/>
         </circle>
-        <circle r="6" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+        <circle r="6" fill="#fb923c" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.16;0.85;1" keyPoints="0;0;1;1" path="M 196 92 L 250 134"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.16;0.18;0.85;0.9;1" values="0;0;1;1;0;0"/>
         </circle>
-        <circle r="6" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <circle r="6" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.42;0.58;1" keyPoints="0;0;1;1" path="M 52 102 L 250 142"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.42;0.44;0.58;0.62;1" values="0;0;1;1;0;0"/>
         </circle>
-        <text x="150" y="128" fill="#ff9a6b" font-size="8" opacity="0">&#10007; read beats the replication &mdash; B answers v1
+        <text x="150" y="128" fill="#fb923c" font-size="8" opacity="0">&#10007; read beats the replication &mdash; B answers v1
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.6;0.65;0.95;1" values="0;0;1;1;0"/></text>
       </svg>
       <div class="lanes">
@@ -146,34 +146,34 @@ async get(key) {
     <div class="diagram anim" style="--step:.75s">
       <div class="dlabel">the read that noticed &mdash; and healed the replica it caught</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="10" y="56" width="72" height="40" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="46" y="73" fill="#8e86f0" font-size="9" text-anchor="middle">READER</text>
-        <text x="46" y="87" fill="#8b90ab" font-size="8" text-anchor="middle">quorum read</text>
-        <rect x="248" y="8" width="82" height="30" rx="8" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="289" y="27" fill="#57e0b0" font-size="9" text-anchor="middle">A &middot; v2</text>
-        <rect x="248" y="60" width="82" height="30" rx="8" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="289" y="79" fill="#57e0b0" font-size="9" text-anchor="middle">B &middot; v2</text>
-        <rect x="248" y="112" width="82" height="30" rx="8" fill="#11131c" stroke="#ff9a6b" stroke-width="1.5" stroke-dasharray="4 4"/>
-        <text x="289" y="131" fill="#ff9a6b" font-size="9" text-anchor="middle" opacity="1">C &middot; v1 (stale)
+        <rect x="10" y="56" width="72" height="40" rx="9" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="46" y="73" fill="#4eaeff" font-size="9" text-anchor="middle">READER</text>
+        <text x="46" y="87" fill="#8ca6b8" font-size="8" text-anchor="middle">quorum read</text>
+        <rect x="248" y="8" width="82" height="30" rx="8" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="289" y="27" fill="#34d3bf" font-size="9" text-anchor="middle">A &middot; v2</text>
+        <rect x="248" y="60" width="82" height="30" rx="8" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="289" y="79" fill="#34d3bf" font-size="9" text-anchor="middle">B &middot; v2</text>
+        <rect x="248" y="112" width="82" height="30" rx="8" fill="#071726" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <text x="289" y="131" fill="#fb923c" font-size="9" text-anchor="middle" opacity="1">C &middot; v1 (stale)
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.78;0.8;1" values="1;1;0;0"/></text>
-        <text x="289" y="131" fill="#57e0b0" font-size="9" text-anchor="middle" opacity="0">C &middot; v2 &#10003; healed
+        <text x="289" y="131" fill="#34d3bf" font-size="9" text-anchor="middle" opacity="0">C &middot; v2 &#10003; healed
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.78;0.8;1" values="0;0;1;1"/></text>
-        <line x1="82" y1="66" x2="248" y2="23" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="82" y1="76" x2="248" y2="75" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="82" y1="88" x2="248" y2="127" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5"/>
-        <circle r="5.5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <line x1="82" y1="66" x2="248" y2="23" stroke="#244155" stroke-width="1.2"/>
+        <line x1="82" y1="76" x2="248" y2="75" stroke="#244155" stroke-width="1.2"/>
+        <line x1="82" y1="88" x2="248" y2="127" stroke="#244155" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <circle r="5.5" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.05;0.25;1" keyPoints="1;1;0;0" path="M 82 66 L 248 23"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.05;0.25;0.3;1" values="0;1;1;0;0"/>
         </circle>
-        <circle r="5.5" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+        <circle r="5.5" fill="#fb923c" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.08;0.32;1" keyPoints="1;1;0;0" path="M 82 88 L 248 127"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.08;0.32;0.37;1" values="0;1;1;0;0"/>
         </circle>
-        <text x="150" y="112" fill="#8b90ab" font-size="8" text-anchor="middle" opacity="0">v2 vs v1 &rarr; newest wins &middot; C is provably behind
+        <text x="150" y="112" fill="#8ca6b8" font-size="8" text-anchor="middle" opacity="0">v2 vs v1 &rarr; newest wins &middot; C is provably behind
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.36;0.4;0.62;0.66;1" values="0;0;1;1;0;0"/></text>
-        <circle r="5.5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <circle r="5.5" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.55;0.78;1" keyPoints="0;0;1;1" path="M 82 88 L 248 127"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.55;0.57;0.78;0.82;1" values="0;0;1;1;0;0"/>
@@ -282,32 +282,32 @@ const fast = await anyReplica.get("like-count");
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">a 5-node cluster splits 3 | 2 &middot; the minority must pick a personality</div>
       <svg class="estage" viewBox="0 0 340 168" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <text x="70" y="16" fill="#57e0b0" font-size="8">MAJORITY &middot; 3 of 5</text>
-        <text x="240" y="16" fill="#ff9a6b" font-size="8">MINORITY &middot; 2 of 5</text>
-        <rect x="14" y="26" width="56" height="26" rx="7" fill="#11131c" stroke="#57e0b0" stroke-width="1.4"/>
-        <text x="42" y="43" fill="#57e0b0" font-size="9" text-anchor="middle">n1</text>
-        <rect x="80" y="26" width="56" height="26" rx="7" fill="#11131c" stroke="#57e0b0" stroke-width="1.4"/>
-        <text x="108" y="43" fill="#57e0b0" font-size="9" text-anchor="middle">n2</text>
-        <rect x="46" y="64" width="56" height="26" rx="7" fill="#11131c" stroke="#57e0b0" stroke-width="1.4"/>
-        <text x="74" y="81" fill="#57e0b0" font-size="9" text-anchor="middle">n3</text>
-        <text x="74" y="112" fill="#8b90ab" font-size="8" text-anchor="middle">quorum intact &middot; keeps</text>
-        <text x="74" y="124" fill="#8b90ab" font-size="8" text-anchor="middle">electing, keeps writing</text>
-        <path d="M 172 10 L 160 48 L 178 86 L 162 124 L 174 160" fill="none" stroke="#ff9a6b" stroke-width="1.6" stroke-dasharray="5 4"/>
-        <rect x="216" y="26" width="52" height="26" rx="7" fill="#11131c" stroke="#ff9a6b" stroke-width="1.4" stroke-dasharray="4 4"/>
-        <text x="242" y="43" fill="#ff9a6b" font-size="9" text-anchor="middle">n4</text>
-        <rect x="276" y="26" width="52" height="26" rx="7" fill="#11131c" stroke="#ff9a6b" stroke-width="1.4" stroke-dasharray="4 4"/>
-        <text x="302" y="43" fill="#ff9a6b" font-size="9" text-anchor="middle">n5</text>
-        <rect x="228" y="128" width="88" height="32" rx="8" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="272" y="148" fill="#8e86f0" font-size="9" text-anchor="middle">CLIENT</text>
-        <line x1="266" y1="128" x2="244" y2="52" stroke="#2c3350" stroke-width="1.2"/>
-        <circle r="6" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <text x="70" y="16" fill="#34d3bf" font-size="8">MAJORITY &middot; 3 of 5</text>
+        <text x="240" y="16" fill="#fb923c" font-size="8">MINORITY &middot; 2 of 5</text>
+        <rect x="14" y="26" width="56" height="26" rx="7" fill="#071726" stroke="#34d3bf" stroke-width="1.4"/>
+        <text x="42" y="43" fill="#34d3bf" font-size="9" text-anchor="middle">n1</text>
+        <rect x="80" y="26" width="56" height="26" rx="7" fill="#071726" stroke="#34d3bf" stroke-width="1.4"/>
+        <text x="108" y="43" fill="#34d3bf" font-size="9" text-anchor="middle">n2</text>
+        <rect x="46" y="64" width="56" height="26" rx="7" fill="#071726" stroke="#34d3bf" stroke-width="1.4"/>
+        <text x="74" y="81" fill="#34d3bf" font-size="9" text-anchor="middle">n3</text>
+        <text x="74" y="112" fill="#8ca6b8" font-size="8" text-anchor="middle">quorum intact &middot; keeps</text>
+        <text x="74" y="124" fill="#8ca6b8" font-size="8" text-anchor="middle">electing, keeps writing</text>
+        <path d="M 172 10 L 160 48 L 178 86 L 162 124 L 174 160" fill="none" stroke="#fb923c" stroke-width="1.6" stroke-dasharray="5 4"/>
+        <rect x="216" y="26" width="52" height="26" rx="7" fill="#071726" stroke="#fb923c" stroke-width="1.4" stroke-dasharray="4 4"/>
+        <text x="242" y="43" fill="#fb923c" font-size="9" text-anchor="middle">n4</text>
+        <rect x="276" y="26" width="52" height="26" rx="7" fill="#071726" stroke="#fb923c" stroke-width="1.4" stroke-dasharray="4 4"/>
+        <text x="302" y="43" fill="#fb923c" font-size="9" text-anchor="middle">n5</text>
+        <rect x="228" y="128" width="88" height="32" rx="8" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="272" y="148" fill="#4eaeff" font-size="9" text-anchor="middle">CLIENT</text>
+        <line x1="266" y1="128" x2="244" y2="52" stroke="#244155" stroke-width="1.2"/>
+        <circle r="6" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.04;0.16;0.5;0.54;0.66;1" keyPoints="0;0;1;1;0;1;1" path="M 266 128 L 244 52"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.04;0.16;0.2;0.54;0.66;0.7;1" values="0;1;1;0;0;1;0;0"/>
         </circle>
-        <text x="222" y="76" fill="#ff9a6b" font-size="8" opacity="0">CP: "no quorum &mdash; try later" &#10007; refused
+        <text x="222" y="76" fill="#fb923c" font-size="8" opacity="0">CP: "no quorum &mdash; try later" &#10007; refused
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.2;0.24;0.46;0.5;1" values="0;0;1;1;0;0"/></text>
-        <text x="222" y="76" fill="#57e0b0" font-size="8" opacity="0">AP: "here's v1" &#10003; served &mdash; maybe stale
+        <text x="222" y="76" fill="#34d3bf" font-size="8" opacity="0">AP: "here's v1" &#10003; served &mdash; maybe stale
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.7;0.74;0.96;1" values="0;0;1;1;0"/></text>
       </svg>
       <div class="lanes">
@@ -342,37 +342,37 @@ await ap.put("likes", 42);
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">the lost-ack ambiguity &middot; one charge, two applications</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="10" y="56" width="70" height="42" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="45" y="74" fill="#8e86f0" font-size="9" text-anchor="middle">CLIENT</text>
-        <text x="45" y="88" fill="#8b90ab" font-size="8" text-anchor="middle">charge $50</text>
-        <rect x="252" y="56" width="78" height="42" rx="9" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="291" y="74" fill="#57e0b0" font-size="9" text-anchor="middle">SERVER</text>
-        <text x="291" y="88" fill="#e7e9f3" font-size="8" text-anchor="middle" opacity="0">applied &times;1
+        <rect x="10" y="56" width="70" height="42" rx="9" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="45" y="74" fill="#4eaeff" font-size="9" text-anchor="middle">CLIENT</text>
+        <text x="45" y="88" fill="#8ca6b8" font-size="8" text-anchor="middle">charge $50</text>
+        <rect x="252" y="56" width="78" height="42" rx="9" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="291" y="74" fill="#34d3bf" font-size="9" text-anchor="middle">SERVER</text>
+        <text x="291" y="88" fill="#e2ecf3" font-size="8" text-anchor="middle" opacity="0">applied &times;1
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.2;0.22;0.74;0.76;1" values="0;0;1;1;0;0"/></text>
-        <text x="291" y="88" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">applied &times;2 (!)
+        <text x="291" y="88" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">applied &times;2 (!)
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.74;0.76;1" values="0;0;1;1"/></text>
-        <line x1="80" y1="70" x2="252" y2="70" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="252" y1="86" x2="80" y2="86" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5"/>
-        <circle r="6" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <line x1="80" y1="70" x2="252" y2="70" stroke="#244155" stroke-width="1.2"/>
+        <line x1="252" y1="86" x2="80" y2="86" stroke="#244155" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <circle r="6" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.04;0.2;1" keyPoints="0;0;1;1" path="M 80 70 L 252 70"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.04;0.2;0.23;1" values="0;1;1;0;0"/>
         </circle>
-        <circle r="6" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <circle r="6" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.26;0.4;1" keyPoints="0;0;0.5;0.5" path="M 252 86 L 80 86"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.26;0.38;0.42;1" values="0;1;.6;0;0"/>
         </circle>
-        <text x="166" y="104" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">&#10007; ack lost
+        <text x="166" y="104" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">&#10007; ack lost
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.4;0.44;0.6;0.64;1" values="0;0;1;1;0;0"/></text>
-        <text x="45" y="118" fill="#8b90ab" font-size="8" text-anchor="middle" opacity="0">timeout &rarr; retry
+        <text x="45" y="118" fill="#8ca6b8" font-size="8" text-anchor="middle" opacity="0">timeout &rarr; retry
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.52;0.56;0.72;0.76;1" values="0;0;1;1;0;0"/></text>
-        <circle r="6" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+        <circle r="6" fill="#fb923c" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.58;0.74;1" keyPoints="0;0;1;1" path="M 80 70 L 252 70"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.58;0.6;0.74;0.78;1" values="0;0;1;1;0;0"/>
         </circle>
-        <text x="170" y="140" fill="#6a7090" font-size="8" text-anchor="middle">the retry was CORRECT &mdash; the server just couldn't tell it was a retry</text>
+        <text x="170" y="140" fill="#647c8f" font-size="8" text-anchor="middle">the retry was CORRECT &mdash; the server just couldn't tell it was a retry</text>
       </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">at-most-once</div><div class="lstep seq" style="--i:0">fire and forget &mdash; a lost message is silently gone (fine for metrics)</div>
@@ -522,46 +522,46 @@ for (const e of await db.query("outbox WHERE sent = false")) {
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">producer &gt; consumer &middot; depth climbs &middot; the poison message gets parked</div>
       <svg class="estage" viewBox="0 0 340 168" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="10" y="52" width="66" height="40" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="43" y="69" fill="#8e86f0" font-size="9" text-anchor="middle">PRODUCER</text>
-        <text x="43" y="83" fill="#8b90ab" font-size="8" text-anchor="middle">fast</text>
-        <rect x="120" y="46" width="94" height="52" rx="9" fill="#11131c" stroke="#2c3350" stroke-width="1.5"/>
-        <text x="167" y="62" fill="#8b90ab" font-size="8" text-anchor="middle">QUEUE</text>
-        <text x="167" y="84" fill="#e7e9f3" font-size="9" text-anchor="middle" opacity="0">depth: 2
+        <rect x="10" y="52" width="66" height="40" rx="9" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="43" y="69" fill="#4eaeff" font-size="9" text-anchor="middle">PRODUCER</text>
+        <text x="43" y="83" fill="#8ca6b8" font-size="8" text-anchor="middle">fast</text>
+        <rect x="120" y="46" width="94" height="52" rx="9" fill="#071726" stroke="#244155" stroke-width="1.5"/>
+        <text x="167" y="62" fill="#8ca6b8" font-size="8" text-anchor="middle">QUEUE</text>
+        <text x="167" y="84" fill="#e2ecf3" font-size="9" text-anchor="middle" opacity="0">depth: 2
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.05;0.3;0.32;1" values="0;1;1;0;0"/></text>
-        <text x="167" y="84" fill="#e7e9f3" font-size="9" text-anchor="middle" opacity="0">depth: 5
+        <text x="167" y="84" fill="#e2ecf3" font-size="9" text-anchor="middle" opacity="0">depth: 5
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.3;0.32;0.6;0.62;1" values="0;0;1;1;0;0"/></text>
-        <text x="167" y="84" fill="#ff9a6b" font-size="9" text-anchor="middle" opacity="0">depth: 9 &uarr;
+        <text x="167" y="84" fill="#fb923c" font-size="9" text-anchor="middle" opacity="0">depth: 9 &uarr;
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.6;0.62;1" values="0;0;1;1"/></text>
-        <rect x="258" y="52" width="72" height="40" rx="9" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="294" y="69" fill="#57e0b0" font-size="9" text-anchor="middle">CONSUMER</text>
-        <text x="294" y="83" fill="#8b90ab" font-size="8" text-anchor="middle">slow</text>
-        <rect x="120" y="126" width="94" height="34" rx="8" fill="#11131c" stroke="#ff9a6b" stroke-width="1.5" stroke-dasharray="4 4"/>
-        <text x="167" y="147" fill="#ff9a6b" font-size="9" text-anchor="middle">DLQ &middot; parked</text>
-        <line x1="76" y1="72" x2="120" y2="72" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="214" y1="72" x2="258" y2="72" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="167" y1="98" x2="167" y2="126" stroke="#2c3350" stroke-width="1.2" stroke-dasharray="3 5"/>
-        <circle r="5.5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <rect x="258" y="52" width="72" height="40" rx="9" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="294" y="69" fill="#34d3bf" font-size="9" text-anchor="middle">CONSUMER</text>
+        <text x="294" y="83" fill="#8ca6b8" font-size="8" text-anchor="middle">slow</text>
+        <rect x="120" y="126" width="94" height="34" rx="8" fill="#071726" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <text x="167" y="147" fill="#fb923c" font-size="9" text-anchor="middle">DLQ &middot; parked</text>
+        <line x1="76" y1="72" x2="120" y2="72" stroke="#244155" stroke-width="1.2"/>
+        <line x1="214" y1="72" x2="258" y2="72" stroke="#244155" stroke-width="1.2"/>
+        <line x1="167" y1="98" x2="167" y2="126" stroke="#244155" stroke-width="1.2" stroke-dasharray="3 5"/>
+        <circle r="5.5" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="2s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.4;1" keyPoints="0;1;1" path="M 76 72 L 120 72"/>
           <animate attributeName="opacity" dur="2s" repeatCount="indefinite" keyTimes="0;0.4;0.5;1" values="1;1;0;0"/>
         </circle>
-        <circle r="5.5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <circle r="5.5" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="2s" begin="-1s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.4;1" keyPoints="0;1;1" path="M 76 72 L 120 72"/>
           <animate attributeName="opacity" dur="2s" repeatCount="indefinite" keyTimes="0;0.4;0.5;1" values="1;1;0;0"/>
         </circle>
-        <circle r="5.5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <circle r="5.5" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.35;1" keyPoints="0;1;1" path="M 214 72 L 258 72"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.35;0.42;1" values="1;1;0;0"/>
         </circle>
-        <circle r="5.5" fill="#ff9a6b" stroke="#11131c" stroke-width="1.5">
+        <circle r="5.5" fill="#fb923c" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.5;0.6;0.7;0.84;1" keyPoints="0;0;0.21;0.21;1;1" path="M 214 72 L 250 72 L 250 106 L 167 106 L 167 126"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.5;0.52;0.86;0.92;1" values="0;0;1;1;0;0"/>
         </circle>
-        <text x="252" y="112" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">&#10007;&#10007;&#10007; fails every retry
+        <text x="252" y="112" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">&#10007;&#10007;&#10007; fails every retry
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.52;0.56;0.72;0.76;1" values="0;0;1;1;0;0"/></text>
       </svg>
       <div class="lanes">

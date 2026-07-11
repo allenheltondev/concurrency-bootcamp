@@ -17,34 +17,34 @@
     <div class="diagram anim" style="--step:.7s">
       <div class="dlabel">heartbeats &middot; then silence &middot; the node is paused, not dead</div>
       <svg class="estage" viewBox="0 0 340 150" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="10" y="55" width="76" height="40" rx="9" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="48" y="72" fill="#57e0b0" font-size="9" text-anchor="middle">NODE N</text>
-        <text x="48" y="86" fill="#8b90ab" font-size="8" text-anchor="middle">beating&hellip;</text>
-        <text x="48" y="112" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">GC pause — still alive
+        <rect x="10" y="55" width="76" height="40" rx="9" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="48" y="72" fill="#34d3bf" font-size="9" text-anchor="middle">NODE N</text>
+        <text x="48" y="86" fill="#8ca6b8" font-size="8" text-anchor="middle">beating&hellip;</text>
+        <text x="48" y="112" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">GC pause — still alive
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.48;0.53;1" values="0;0;1;1"/></text>
-        <rect x="250" y="55" width="80" height="40" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="290" y="72" fill="#8e86f0" font-size="9" text-anchor="middle">DETECTOR</text>
-        <text x="290" y="86" fill="#57e0b0" font-size="8" text-anchor="middle">N: alive ✓
+        <rect x="250" y="55" width="80" height="40" rx="9" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="290" y="72" fill="#4eaeff" font-size="9" text-anchor="middle">DETECTOR</text>
+        <text x="290" y="86" fill="#34d3bf" font-size="8" text-anchor="middle">N: alive ✓
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.6;0.63;1" values="1;1;0;0"/></text>
-        <text x="290" y="86" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">N: SUSPECT?
+        <text x="290" y="86" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">N: SUSPECT?
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.6;0.63;1" values="0;0;1;1"/></text>
-        <line x1="86" y1="75" x2="250" y2="75" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="168" y="66" fill="#6a7090" font-size="8" text-anchor="middle">heartbeat every 10ms</text>
-        <circle r="5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <line x1="86" y1="75" x2="250" y2="75" stroke="#244155" stroke-width="1.2"/>
+        <text x="168" y="66" fill="#647c8f" font-size="8" text-anchor="middle">heartbeat every 10ms</text>
+        <circle r="5" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.1;1" keyPoints="0;1;1" path="M 86 75 L 250 75"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.1;0.12;1" values="1;1;0;0"/>
         </circle>
-        <circle r="5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <circle r="5" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.16;0.26;1" keyPoints="0;0;1;1" path="M 86 75 L 250 75"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.16;0.26;0.28;1" values="0;1;1;0;0"/>
         </circle>
-        <circle r="5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <circle r="5" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.32;0.42;1" keyPoints="0;0;1;1" path="M 86 75 L 250 75"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.32;0.42;0.44;1" values="0;1;1;0;0"/>
         </circle>
-        <text x="168" y="102" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">&hellip;silence&hellip;
+        <text x="168" y="102" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">&hellip;silence&hellip;
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.48;0.52;1" values="0;0;1;1"/></text>
-        <text x="170" y="136" fill="#6a7090" font-size="8" text-anchor="middle">timeout fires &rarr; verdict flips — and the node is fine</text>
+        <text x="170" y="136" fill="#647c8f" font-size="8" text-anchor="middle">timeout fires &rarr; verdict flips — and the node is fine</text>
       </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">crashed</div><div class="lstep seq" style="--i:0">no heartbeat arrives</div>
@@ -224,48 +224,48 @@
     <div class="diagram anim" style="--step:.8s">
       <div class="dlabel">votes flow in &middot; the coordinator dies at the decision point</div>
       <svg class="estage" viewBox="0 0 340 170" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="127" y="8" width="86" height="32" rx="8" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="170" y="28" fill="#8e86f0" font-size="9" text-anchor="middle">COORD</text>
-        <rect x="127" y="8" width="86" height="32" rx="8" fill="none" stroke="#ff9a6b" stroke-width="1.5" stroke-dasharray="4 4" opacity="0">
+        <rect x="127" y="8" width="86" height="32" rx="8" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="170" y="28" fill="#4eaeff" font-size="9" text-anchor="middle">COORD</text>
+        <rect x="127" y="8" width="86" height="32" rx="8" fill="none" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="4 4" opacity="0">
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.5;0.54;1" values="0;0;1;1"/></rect>
-        <text x="170" y="56" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">✗ dies before deciding
+        <text x="170" y="56" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">✗ dies before deciding
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.5;0.54;1" values="0;0;1;1"/></text>
-        <rect x="16" y="116" width="86" height="34" rx="8" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="59" y="137" fill="#57e0b0" font-size="9" text-anchor="middle">P1: yes</text>
-        <rect x="127" y="116" width="86" height="34" rx="8" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="170" y="137" fill="#57e0b0" font-size="9" text-anchor="middle">P2: yes</text>
-        <rect x="238" y="116" width="86" height="34" rx="8" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="281" y="137" fill="#57e0b0" font-size="9" text-anchor="middle">P3: yes</text>
-        <line x1="59" y1="116" x2="160" y2="40" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="170" y1="116" x2="170" y2="40" stroke="#2c3350" stroke-width="1.2"/>
-        <line x1="281" y1="116" x2="180" y2="40" stroke="#2c3350" stroke-width="1.2"/>
-        <circle r="5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <rect x="16" y="116" width="86" height="34" rx="8" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="59" y="137" fill="#34d3bf" font-size="9" text-anchor="middle">P1: yes</text>
+        <rect x="127" y="116" width="86" height="34" rx="8" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="170" y="137" fill="#34d3bf" font-size="9" text-anchor="middle">P2: yes</text>
+        <rect x="238" y="116" width="86" height="34" rx="8" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="281" y="137" fill="#34d3bf" font-size="9" text-anchor="middle">P3: yes</text>
+        <line x1="59" y1="116" x2="160" y2="40" stroke="#244155" stroke-width="1.2"/>
+        <line x1="170" y1="116" x2="170" y2="40" stroke="#244155" stroke-width="1.2"/>
+        <line x1="281" y1="116" x2="180" y2="40" stroke="#244155" stroke-width="1.2"/>
+        <circle r="5" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.14;1" keyPoints="0;1;1" path="M 160 40 L 59 116"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.14;0.16;1" values="1;1;0;0"/>
         </circle>
-        <circle r="5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <circle r="5" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.14;1" keyPoints="0;1;1" path="M 170 40 L 170 116"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.14;0.16;1" values="1;1;0;0"/>
         </circle>
-        <circle r="5" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <circle r="5" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.14;1" keyPoints="0;1;1" path="M 180 40 L 281 116"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.14;0.16;1" values="1;1;0;0"/>
         </circle>
-        <circle r="5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <circle r="5" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.24;0.42;1" keyPoints="0;0;1;1" path="M 59 116 L 160 40"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.24;0.42;0.44;1" values="0;1;1;0;0"/>
         </circle>
-        <circle r="5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <circle r="5" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.24;0.42;1" keyPoints="0;0;1;1" path="M 170 116 L 170 40"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.24;0.42;0.44;1" values="0;1;1;0;0"/>
         </circle>
-        <circle r="5" fill="#57e0b0" stroke="#11131c" stroke-width="1.5">
+        <circle r="5" fill="#34d3bf" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear" keyTimes="0;0.24;0.42;1" keyPoints="0;0;1;1" path="M 281 116 L 180 40"/>
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.24;0.42;0.44;1" values="0;1;1;0;0"/>
         </circle>
-        <text x="170" y="164" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">prepared &middot; locks held &middot; can't commit, can't abort &middot; waiting&hellip;
+        <text x="170" y="164" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">prepared &middot; locks held &middot; can't commit, can't abort &middot; waiting&hellip;
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.58;0.62;1" values="0;0;1;1"/></text>
-        <text x="170" y="76" fill="#6a7090" font-size="8" text-anchor="middle">phase 1: prepare &darr; &middot; votes &uarr; &middot; phase 2: never arrives</text>
+        <text x="170" y="76" fill="#647c8f" font-size="8" text-anchor="middle">phase 1: prepare &darr; &middot; votes &uarr; &middot; phase 2: never arrives</text>
       </svg>
       <div class="dnote seq" style="--i:0">Every participant voted yes, so none may unilaterally abort &mdash; the coordinator might have committed others. None may commit &mdash; it might have aborted. <b style="color:var(--race)">They are stuck, locks held, until the coordinator recovers.</b></div>
     </div>
@@ -334,35 +334,35 @@
     <div class="diagram anim" style="--step:.8s">
       <div class="dlabel">the ring &middot; a key walks clockwise &middot; its owner leaves</div>
       <svg class="estage" viewBox="0 0 340 170" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <circle cx="170" cy="85" r="58" fill="none" stroke="#2c3350" stroke-width="1.5"/>
-        <circle cx="170" cy="27" r="7" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="170" y="16" fill="#57e0b0" font-size="8" text-anchor="middle">n1</text>
-        <circle cx="228" cy="85" r="7" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="246" y="88" fill="#57e0b0" font-size="8" text-anchor="start">n2</text>
-        <circle cx="228" cy="85" r="11" fill="none" stroke="#ff9a6b" stroke-width="1.5" stroke-dasharray="3 3" opacity="0">
+        <circle cx="170" cy="85" r="58" fill="none" stroke="#244155" stroke-width="1.5"/>
+        <circle cx="170" cy="27" r="7" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="170" y="16" fill="#34d3bf" font-size="8" text-anchor="middle">n1</text>
+        <circle cx="228" cy="85" r="7" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="246" y="88" fill="#34d3bf" font-size="8" text-anchor="start">n2</text>
+        <circle cx="228" cy="85" r="11" fill="none" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="3 3" opacity="0">
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.46;0.5;1" values="0;0;1;1"/></circle>
-        <circle cx="170" cy="143" r="7" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="170" y="161" fill="#57e0b0" font-size="8" text-anchor="middle">n3</text>
-        <circle cx="112" cy="85" r="7" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="94" y="88" fill="#57e0b0" font-size="8" text-anchor="end">n4</text>
-        <circle cx="211" cy="44" r="3" fill="none" stroke="#8e86f0" stroke-width="1.2"/>
-        <text x="222" y="36" fill="#8b90ab" font-size="8" text-anchor="start">key K hashes here</text>
-        <circle r="6" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <circle cx="170" cy="143" r="7" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="170" y="161" fill="#34d3bf" font-size="8" text-anchor="middle">n3</text>
+        <circle cx="112" cy="85" r="7" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="94" y="88" fill="#34d3bf" font-size="8" text-anchor="end">n4</text>
+        <circle cx="211" cy="44" r="3" fill="none" stroke="#4eaeff" stroke-width="1.2"/>
+        <text x="222" y="36" fill="#8ca6b8" font-size="8" text-anchor="start">key K hashes here</text>
+        <circle r="6" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.12;0.3;0.5;0.7;1" keyPoints="0;0;0.33;0.33;1;1"
             path="M 211 44 A 58 58 0 0 1 228 85 A 58 58 0 0 1 170 143"/>
         </circle>
-        <text x="262" y="104" fill="#57e0b0" font-size="8" text-anchor="middle" opacity="0">owner: n2 ✓
+        <text x="262" y="104" fill="#34d3bf" font-size="8" text-anchor="middle" opacity="0">owner: n2 ✓
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.3;0.34;0.46;0.5;1" values="0;0;1;1;0;0"/></text>
-        <text x="262" y="104" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">n2 leaves ✗
+        <text x="262" y="104" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">n2 leaves ✗
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.46;0.5;1" values="0;0;1;1"/></text>
-        <text x="230" y="146" fill="#57e0b0" font-size="8" text-anchor="start" opacity="0">new owner: n3 ✓
+        <text x="230" y="146" fill="#34d3bf" font-size="8" text-anchor="start" opacity="0">new owner: n3 ✓
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.7;0.74;1" values="0;0;1;1"/></text>
-        <text x="52" y="52" fill="#6a7090" font-size="8" text-anchor="middle">only n2's arc
+        <text x="52" y="52" fill="#647c8f" font-size="8" text-anchor="middle">only n2's arc
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.7;0.74;1" values="0;0;1;1"/></text>
-        <text x="52" y="63" fill="#6a7090" font-size="8" text-anchor="middle">reassigns — the
+        <text x="52" y="63" fill="#647c8f" font-size="8" text-anchor="middle">reassigns — the
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.7;0.74;1" values="0;0;1;1"/></text>
-        <text x="52" y="74" fill="#6a7090" font-size="8" text-anchor="middle">rest never move
+        <text x="52" y="74" fill="#647c8f" font-size="8" text-anchor="middle">rest never move
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.7;0.74;1" values="0;0;1;1"/></text>
       </svg>
       <div class="lanes">
@@ -431,29 +431,29 @@
     <div class="diagram anim" style="--step:.8s">
       <div class="dlabel">the breaker state machine &middot; one full lap</div>
       <svg class="estage" viewBox="0 0 340 175" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-        <rect x="20" y="30" width="86" height="34" rx="9" fill="#11131c" stroke="#57e0b0" stroke-width="1.5"/>
-        <text x="63" y="51" fill="#57e0b0" font-size="9" text-anchor="middle">CLOSED</text>
-        <rect x="234" y="30" width="86" height="34" rx="9" fill="#11131c" stroke="#ff9a6b" stroke-width="1.5"/>
-        <text x="277" y="51" fill="#ff9a6b" font-size="9" text-anchor="middle">OPEN</text>
-        <rect x="122" y="120" width="100" height="34" rx="9" fill="#11131c" stroke="#8e86f0" stroke-width="1.5"/>
-        <text x="172" y="141" fill="#8e86f0" font-size="9" text-anchor="middle">HALF-OPEN</text>
-        <line x1="106" y1="47" x2="234" y2="47" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="170" y="40" fill="#8b90ab" font-size="8" text-anchor="middle">failures hit threshold</text>
-        <line x1="250" y1="64" x2="196" y2="120" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="258" y="98" fill="#8b90ab" font-size="8" text-anchor="start">cooldown ends</text>
-        <line x1="140" y1="120" x2="80" y2="64" stroke="#2c3350" stroke-width="1.2"/>
-        <text x="82" y="98" fill="#8b90ab" font-size="8" text-anchor="end">probe succeeds</text>
-        <text x="277" y="76" fill="#6a7090" font-size="7" text-anchor="middle">probe fails &rarr; re-opens</text>
-        <circle r="6" fill="#8e86f0" stroke="#11131c" stroke-width="1.5">
+        <rect x="20" y="30" width="86" height="34" rx="9" fill="#071726" stroke="#34d3bf" stroke-width="1.5"/>
+        <text x="63" y="51" fill="#34d3bf" font-size="9" text-anchor="middle">CLOSED</text>
+        <rect x="234" y="30" width="86" height="34" rx="9" fill="#071726" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="277" y="51" fill="#fb923c" font-size="9" text-anchor="middle">OPEN</text>
+        <rect x="122" y="120" width="100" height="34" rx="9" fill="#071726" stroke="#4eaeff" stroke-width="1.5"/>
+        <text x="172" y="141" fill="#4eaeff" font-size="9" text-anchor="middle">HALF-OPEN</text>
+        <line x1="106" y1="47" x2="234" y2="47" stroke="#244155" stroke-width="1.2"/>
+        <text x="170" y="40" fill="#8ca6b8" font-size="8" text-anchor="middle">failures hit threshold</text>
+        <line x1="250" y1="64" x2="196" y2="120" stroke="#244155" stroke-width="1.2"/>
+        <text x="258" y="98" fill="#8ca6b8" font-size="8" text-anchor="start">cooldown ends</text>
+        <line x1="140" y1="120" x2="80" y2="64" stroke="#244155" stroke-width="1.2"/>
+        <text x="82" y="98" fill="#8ca6b8" font-size="8" text-anchor="end">probe succeeds</text>
+        <text x="277" y="76" fill="#647c8f" font-size="7" text-anchor="middle">probe fails &rarr; re-opens</text>
+        <circle r="6" fill="#4eaeff" stroke="#071726" stroke-width="1.5">
           <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
             keyTimes="0;0.12;0.3;0.46;0.6;0.74;0.92;1" keyPoints="0;0;0.434;0.434;0.714;0.714;1;1"
             path="M 63 47 L 277 47 L 172 137 L 63 47"/>
         </circle>
-        <text x="170" y="170" fill="#57e0b0" font-size="8" text-anchor="middle">traffic flows &middot; failures counted
+        <text x="170" y="170" fill="#34d3bf" font-size="8" text-anchor="middle">traffic flows &middot; failures counted
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.12;0.3;0.34;1" values="1;1;1;0;0"/></text>
-        <text x="170" y="170" fill="#ff9a6b" font-size="8" text-anchor="middle" opacity="0">every call fast-fails &middot; the dependency gets silence
+        <text x="170" y="170" fill="#fb923c" font-size="8" text-anchor="middle" opacity="0">every call fast-fails &middot; the dependency gets silence
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.34;0.38;0.6;0.64;1" values="0;0;1;1;0;0"/></text>
-        <text x="170" y="170" fill="#8e86f0" font-size="8" text-anchor="middle" opacity="0">ONE probe asks — the crowd waits
+        <text x="170" y="170" fill="#4eaeff" font-size="8" text-anchor="middle" opacity="0">ONE probe asks — the crowd waits
           <animate attributeName="opacity" dur="6s" repeatCount="indefinite" keyTimes="0;0.64;0.68;0.92;0.96;1" values="0;0;1;1;0;0"/></text>
       </svg>
       <div class="dnote seq" style="--i:0">Half-open is the clever state: recovery gets discovered by <b style="color:var(--ordered)">one careful probe</b>, not rediscovered by 100% of traffic slamming a service that's barely back on its feet.</div>
