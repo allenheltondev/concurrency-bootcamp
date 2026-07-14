@@ -3,6 +3,7 @@
    directly (no account needed; the gated dashboard lives at /app). All
    copy is plain-spoken on purpose: the goodwill IS the pitch. */
 import { Link } from "react-router-dom";
+import ImmersiveDemo from "../components/ImmersiveDemo";
 import { courseHref } from "../lib/courses";
 import { TAGLINES, useCatalog } from "../lib/catalog";
 import { useConfigured } from "../lib/useConfigured";
@@ -53,25 +54,30 @@ export default function Landing() {
   return (
     <div>
       {/* ---- hero ---- */}
-      <header className="mx-auto max-w-3xl px-6 pb-16 pt-16 text-center">
-        <h1 className="text-4xl font-bold leading-tight text-foreground sm:text-5xl">
-          Learn the hard stuff by actually doing it.
-        </h1>
-        <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
-          Free, hands-on bootcamps for the concepts engineers usually only
-          pretend to know — concurrency, distributed systems, and more.
-          Animated lessons, drills that run real code, and honest grading,
-          all built for your thumb.
-        </p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-          <a href="#courses" className="btn-primary px-6 py-2.5 text-base">
-            Start a course
-          </a>
-          {configured !== false && (
-            <Link to="/app" className="btn border-border text-foreground hover:bg-muted px-6 py-2.5 text-base">
-              Open your dashboard
-            </Link>
-          )}
+      <header className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-6 pb-16 pt-16 lg:grid-cols-2 lg:gap-16 lg:pb-24 lg:pt-24">
+        <div className="text-center lg:text-left">
+          <h1 className="text-4xl font-bold leading-tight text-foreground sm:text-5xl">
+            Learn the hard stuff by actually doing it.
+          </h1>
+          <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground lg:mx-0">
+            Free, hands-on bootcamps for the concepts that are easy to nod
+            along to and hard to actually hold — concurrency, distributed
+            systems, and more. Animated lessons, drills that run real code, and
+            honest grading, all built for your thumb.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4 lg:justify-start">
+            <a href="#courses" className="btn-primary px-6 py-2.5 text-base">
+              Start a course
+            </a>
+            {configured !== false && (
+              <Link to="/app" className="btn border-border text-foreground hover:bg-muted px-6 py-2.5 text-base">
+                Open your dashboard
+              </Link>
+            )}
+          </div>
+        </div>
+        <div className="animate-fade-in">
+          <ImmersiveDemo />
         </div>
       </header>
 
@@ -80,14 +86,15 @@ export default function Landing() {
         <div className="mx-auto max-w-3xl px-6 py-14 text-center">
           <h2 className="text-2xl font-bold text-foreground">Why is this free?</h2>
           <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
-            Because good engineering education shouldn't have a paywall in
-            front of it. Ready, Set, Cloud is a goodwill project: no ads, no
-            tracking, no trial that expires, no &ldquo;premium tier&rdquo;
-            hiding the good parts. These courses exist to make hard concepts
-            genuinely learnable — the kind of deep fundamentals that make you
-            better at your job and calmer in your interviews. If they help
-            you, pass the help along to another engineer. That's the whole
-            business model.
+            Mostly because these are the courses I wished existed, so I built
+            them. Ready, Set, Cloud is a goodwill project, not a business:
+            no ads, no tracking, no trial that expires, nothing held back for
+            a paid tier. They're my best attempt at making a few genuinely
+            hard concepts a little easier to sit with &mdash; not the last
+            word on any of them, and probably still rough in spots. If working
+            through one saves you an afternoon of head-scratching, that's more
+            than enough. And if it helps, the only thing I'd ask is that you
+            point another engineer this way.
           </p>
         </div>
       </section>
@@ -107,11 +114,11 @@ export default function Landing() {
 
       {/* ---- differentiators ---- */}
       <section aria-label="what makes it different" className="border-t border-border bg-surface">
-        <div className="mx-auto max-w-4xl px-6 py-14">
+        <div className="mx-auto max-w-5xl px-6 py-14">
           <h2 className="text-center text-2xl font-bold text-foreground">
             What makes these different
           </h2>
-          <div className="mt-10 grid gap-5 sm:grid-cols-2">
+          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((f) => (
               <div key={f.title} className="card">
                 <div className="card-body">
@@ -128,13 +135,13 @@ export default function Landing() {
       </section>
 
       {/* ---- the courses ---- */}
-      <section id="courses" aria-label="course catalog" className="mx-auto max-w-3xl px-6 py-14">
+      <section id="courses" aria-label="course catalog" className="mx-auto max-w-4xl px-6 py-14">
         <h2 className="text-center text-2xl font-bold text-foreground">The courses</h2>
         <p className="mx-auto mt-3 max-w-xl text-center text-sm text-muted-foreground">
           Jump straight in — no account needed. Each one opens with
           foundations and ends with a scored test mode.
         </p>
-        <div className="mt-8 grid gap-5">
+        <div className="mt-8 grid gap-5 sm:grid-cols-2">
           {courses.map((course) => (
             <a
               key={course.id}
