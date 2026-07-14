@@ -1,5 +1,5 @@
-/* Component tests for /profile: stat tiles, a course card joined with the
-   catalog, and earned vs locked badges — all from a mocked api module and a
+/* Component tests for /profile: the shared BadgeChest (mocked to its data) and a
+   course card joined with the catalog — from a mocked api + badges module and a
    real rsc:auth session document (so claims() is exercised for real). */
 
 import { render, screen } from "@testing-library/react";
@@ -7,7 +7,13 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 vi.mock("../lib/config", () => ({
-  getConfig: vi.fn(async () => ({ clientId: "client-1", region: "us-east-1", apiBase: "/api" }))
+  CORE_API_DEFAULT: "https://api.readysetcloud.io",
+  getConfig: vi.fn(async () => ({
+    clientId: "client-1",
+    region: "us-east-1",
+    apiBase: "/api",
+    coreApiBase: "https://api.readysetcloud.io"
+  }))
 }));
 
 vi.mock("../lib/api", async (importOriginal) => {
@@ -15,18 +21,35 @@ vi.mock("../lib/api", async (importOriginal) => {
   return { ...actual, get: vi.fn() };
 });
 
+/* The badge chest comes from the central Core API via lib/badges; stub it so the
+   test doesn't reach the network or depend on <BadgeChest>'s internals. */
+vi.mock("../lib/badges", () => ({
+  getChest: vi.fn(),
+  recordVisit: vi.fn(async () => {})
+}));
+
+/* Stub only <BadgeChest> from the design system; AppNav etc. stay real. */
+vi.mock("@readysetcloud/ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@readysetcloud/ui")>();
+  return {
+    ...actual,
+    BadgeChest: (props: { points?: number; levelName?: string; badges?: { id: string; name: string }[] }) => (
+      <div>
+        <p>{props.points} points</p>
+        <p>{props.levelName}</p>
+        {(props.badges ?? []).map((b) => (
+          <span key={b.id}>{b.name}</span>
+        ))}
+      </div>
+    )
+  };
+});
+
 import App from "../App";
 import { get } from "../lib/api";
+import { getChest } from "../lib/badges";
 
 const FIXTURES: Record<string, unknown> = {
-  "/me": {
-    xp: 1250,
-    currentStreak: 4,
-    longestStreak: 9,
-    lastActivityDate: "2026-07-08",
-    createdAt: "2026-06-01T00:00:00Z",
-    lastSeenAt: "2026-07-08T00:00:00Z"
-  },
   "/me/courses": {
     courses: [
       {
@@ -52,16 +75,15 @@ const FIXTURES: Record<string, unknown> = {
         contentVersion: 3
       }
     ]
-  },
-  "/badges": {
-    badges: [
-      { id: "first-solve", name: "First Solve", icon: "🥇", description: "Solve your first exercise", criteria: {} },
-      { id: "night-owl", name: "Night Owl", icon: "🦉", description: "Solve one after midnight", criteria: {} }
-    ]
-  },
-  "/me/badges": {
-    badges: [{ id: "first-solve", name: "First Solve", icon: "🥇", earnedAt: "2026-07-01T12:00:00Z" }]
   }
+};
+
+const CHEST = {
+  points: 320,
+  level: 3,
+  levelName: "Cloud Builder",
+  badges: [{ id: "bug-hunter", name: "Bug Hunter", icon: "🐛" }],
+  inProgress: []
 };
 
 const idToken = `header.${btoa(
@@ -78,26 +100,25 @@ beforeEach(() => {
     if (path in FIXTURES) return FIXTURES[path];
     throw new Error(`unexpected path ${path}`);
   });
+  (getChest as Mock).mockReset().mockResolvedValue(CHEST);
 });
 
 describe("profile page", () => {
-  it("renders the header, stat tiles, a joined course card, and earned/locked badges", async () => {
+  it("renders the header, the central badge chest, and a joined course card", async () => {
     render(
       <MemoryRouter initialEntries={["/profile"]}>
         <App />
       </MemoryRouter>
     );
 
-    // page title (identity + sign-out now live in the shared AppNav)
+    // page title (identity + sign-out live in the shared AppNav)
     expect(await screen.findByRole("heading", { name: "Your progress" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open profile menu" })).toBeInTheDocument();
 
-    // stat tiles
-    expect(await screen.findByText("1250")).toBeInTheDocument();
-    expect(screen.getByText("4")).toBeInTheDocument();
-    expect(screen.getByText("9")).toBeInTheDocument();
-    expect(screen.getByText("Current streak")).toBeInTheDocument();
-    expect(screen.getByText("Longest streak")).toBeInTheDocument();
+    // central chest: points, level, and an earned badge
+    expect(await screen.findByText("320 points")).toBeInTheDocument();
+    expect(screen.getByText("Cloud Builder")).toBeInTheDocument();
+    expect(screen.getByText("Bug Hunter")).toBeInTheDocument();
 
     // course card joined with the catalog
     expect(screen.getByText("JavaScript Concurrency Bootcamp")).toBeInTheDocument();
@@ -105,12 +126,6 @@ describe("profile page", () => {
     expect(screen.getByText("in progress")).toBeInTheDocument();
     const resume = screen.getByRole("link", { name: "Resume →" });
     expect(resume).toHaveAttribute("href", "/js-concurrency/");
-
-    // badges: earned in full color with its date, the rest locked with hint
-    expect(screen.getByText("First Solve")).toBeInTheDocument();
-    expect(screen.getByText(/^Earned /)).toBeInTheDocument();
-    expect(screen.getByText("Night Owl")).toBeInTheDocument();
-    expect(screen.getByText(/Solve one after midnight/)).toBeInTheDocument();
   });
 
   it("shows the friendly empty state when no courses are started", async () => {
