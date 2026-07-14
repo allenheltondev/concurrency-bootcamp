@@ -24,23 +24,12 @@ const check = (name, cond, extra = "") => {
   if (!cond) failures++;
 };
 
-/* ---- seed the catalogs the way the deploy step would ---- */
+/* ---- seed the course catalog the way the deploy step would (badges are
+   authored in the shared rsc-core catalog, not this backend) ---- */
 store.set("COURSES|COURSE#js-concurrency", {
   pk: "COURSES", sk: "COURSE#js-concurrency", type: "course",
   id: "js-concurrency", title: "T", description: "d", status: "active", totalItems: 4
 });
-for (const b of [
-  { id: "first-solve", criteria: { type: "total-solved", count: 1 } },
-  { id: "js-concurrency-halfway", criteria: { type: "percent-complete", courseId: "js-concurrency", threshold: 50 } },
-  { id: "js-concurrency-complete", criteria: { type: "course-completed", courseId: "js-concurrency" } },
-  { id: "first-course", criteria: { type: "courses-completed", count: 1 } },
-  { id: "streak-3", criteria: { type: "streak", days: 3 } }
-]) {
-  store.set(`BADGES|BADGE#${b.id}`, {
-    pk: "BADGES", sk: `BADGE#${b.id}`, type: "badge",
-    name: b.id, icon: "x", description: "d", ...b
-  });
-}
 
 /* ---- synthetic HTTP API v2 events through the real handler ---- */
 const lambdaCtx = {
@@ -119,8 +108,6 @@ r = await invoke("GET", "/api/courses/js-concurrency");
 check("single course fetch", parse(r).totalItems === 4);
 r = await invoke("GET", "/api/courses/unknown-course");
 check("unknown course 404", r.statusCode === 404);
-r = await invoke("GET", "/api/badges");
-check("badge catalog lists 5", parse(r).badges.length === 5);
 
 // ---- public catalog routes must not 500 when API GW omits the authorizer
 // (template.yaml's Auth: Authorizer: NONE means it always will) ----
@@ -128,8 +115,6 @@ r = await invokeNoAuthorizer("GET", "/api/courses");
 check("public /courses works with no authorizer block", r.statusCode === 200 && parse(r).courses.length === 1, r.body);
 r = await invokeNoAuthorizer("GET", "/api/courses/js-concurrency");
 check("public /courses/:id works with no authorizer block", r.statusCode === 200 && parse(r).totalItems === 4, r.body);
-r = await invokeNoAuthorizer("GET", "/api/badges");
-check("public /badges works with no authorizer block", r.statusCode === 200 && parse(r).badges.length === 5, r.body);
 
 r = await invoke("GET", "/api/nope");
 check("unknown route 404", r.statusCode === 404);
@@ -151,10 +136,7 @@ let d = parse(r);
 check("first PUT 200", r.statusCode === 200, r.body);
 check("version 1", d.version === 1);
 check("25% in-progress", d.summary.percentComplete === 25 && d.summary.status === "in-progress");
-check("xp 10", d.stats.xp === 10, JSON.stringify(d.stats));
-check("streak starts at 1", d.stats.currentStreak === 1);
-check("first-solve awarded", d.newBadges.some((b) => b.id === "first-solve"));
-check("halfway NOT awarded", !d.newBadges.some((b) => b.id === "js-concurrency-halfway"));
+check("no gamification in response", d.stats === undefined && d.newBadges === undefined, r.body);
 
 r = await invoke("PUT", "/api/me/courses/js-concurrency", putBody({ solved: { a: true, b: true } }, 0));
 check("stale PUT 409", r.statusCode === 409, r.body);
@@ -163,14 +145,11 @@ check("409 carries current version", parse(r).current.version === 1);
 r = await invoke("PUT", "/api/me/courses/js-concurrency", putBody({ solved: { a: true, b: true } }, 1));
 d = parse(r);
 check("second PUT 200, version 2", r.statusCode === 200 && d.version === 2);
-check("halfway awarded once", d.newBadges.length === 1 && d.newBadges[0].id === "js-concurrency-halfway");
-check("xp 20", d.stats.xp === 20);
+check("50% in-progress", d.summary.percentComplete === 50 && d.summary.status === "in-progress");
 
 r = await invoke("PUT", "/api/me/courses/js-concurrency", putBody({ solved: { a: true, b: true, c: true, d: 1 } }, 2));
 d = parse(r);
 check("completed at 100%", d.summary.status === "completed" && d.summary.percentComplete === 100);
-check("completion badges", ["js-concurrency-complete", "first-course"].every((id) => d.newBadges.some((b) => b.id === id)));
-check("xp includes completion bonus", d.stats.xp === 290, d.stats.xp);
 check("completedAt set", !!d.summary.completedAt);
 const completedAt = d.summary.completedAt;
 
@@ -178,7 +157,6 @@ r = await invoke("PUT", "/api/me/courses/js-concurrency", putBody({ solved: { a:
 d = parse(r);
 check("regress keeps completedAt", d.summary.completedAt === completedAt);
 check("regress -> in-progress", d.summary.status === "in-progress");
-check("xp recomputed down", d.stats.xp === 10, d.stats.xp);
 
 /* ---- reads ---- */
 r = await invoke("GET", "/api/me/courses");
@@ -189,9 +167,7 @@ check("get my course: detail present", parse(r).detail.solved.a === true);
 r = await invoke("GET", "/api/me/courses/other-course");
 check("no progress 404", r.statusCode === 404);
 r = await invoke("GET", "/api/me");
-check("profile xp", parse(r).xp === 10, r.body);
-r = await invoke("GET", "/api/me/badges");
-check("earned badges list", parse(r).badges.length === 4, JSON.stringify(parse(r).badges.map((b) => b.id)));
+check("profile has createdAt/lastSeenAt, no xp", parse(r).lastSeenAt !== null && parse(r).xp === undefined, r.body);
 
 /* ---- validation & limits ---- */
 r = await invoke("PUT", "/api/me/courses/js-concurrency", { detail: { solved: [] } });
@@ -208,22 +184,16 @@ r = await invoke("DELETE", "/api/me/courses/js-concurrency");
 check("delete 204", r.statusCode === 204, r.statusCode);
 r = await invoke("GET", "/api/me/courses");
 check("no courses after delete", parse(r).courses.length === 0);
-r = await invoke("GET", "/api/me/badges");
-check("badges survive reset", parse(r).badges.length === 4);
-r = await invoke("GET", "/api/me");
-check("xp back to 0", parse(r).xp === 0);
 
 /* ---- full account-data erasure: unlike a reset, nothing survives ---- */
 await invoke("PUT", "/api/me/courses/js-concurrency", putBody({ solved: { a: true } }));
 r = await invoke("DELETE", "/api/me");
 check("delete account 204", r.statusCode === 204, r.statusCode);
-r = await invoke("GET", "/api/me/badges");
-check("badges erased", parse(r).badges.length === 0);
 r = await invoke("GET", "/api/me/courses");
 check("progress erased", parse(r).courses.length === 0);
 r = await invoke("GET", "/api/me");
-check("profile back to zero-state", parse(r).xp === 0 && parse(r).createdAt === null, r.body);
-check("catalogs untouched by account deletion", [...store.keys()].filter((k) => k.startsWith("USER#")).length === 0 && store.size === 6);
+check("profile back to zero-state", parse(r).createdAt === null && parse(r).lastSeenAt === null, r.body);
+check("catalog untouched by account deletion", [...store.keys()].filter((k) => k.startsWith("USER#")).length === 0 && store.size === 1);
 
 console.log(failures ? `\n${failures} FAILED` : "\nall checks passed");
 process.exit(failures ? 1 : 0);

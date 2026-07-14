@@ -78,9 +78,6 @@ check("unauthenticated /health -> 401", r.status === 401, `${r.status} ${r.text.
 r = await api("GET", "/courses");
 check("unauthenticated /courses -> 200 with courses array", r.status === 200 && Array.isArray(r.json?.courses), `${r.status} ${r.text.slice(0, 200)}`);
 
-r = await api("GET", "/badges");
-check("unauthenticated /badges -> 200 with non-empty badges array", r.status === 200 && r.json?.badges?.length > 0, `${r.status} ${r.text.slice(0, 200)}`);
-
 r = await api("GET", "/me");
 check("unauthenticated /me -> 401 (user-scoped routes stay locked)", r.status === 401, `${r.status} ${r.text.slice(0, 120)}`);
 
@@ -94,11 +91,8 @@ const sub = r.json?.sub;
 r = await api("GET", "/courses", { token });
 check("course catalog includes js-concurrency", r.status === 200 && r.json?.courses?.some((c) => c.id === COURSE_ID), r.text.slice(0, 200));
 
-r = await api("GET", "/badges", { token });
-check("badge catalog is seeded", r.status === 200 && r.json?.badges?.length > 0, r.text.slice(0, 200));
-
 r = await api("GET", "/me", { token });
-check("/me returns a profile", r.status === 200 && typeof r.json?.xp === "number", r.text.slice(0, 200));
+check("/me returns a profile", r.status === 200 && r.json !== null && "lastSeenAt" in r.json, r.text.slice(0, 200));
 
 r = await api("GET", "/nope", { token });
 check("unknown route -> 404, well-shaped body", r.status === 404 && r.json?.error === "NotFoundError", r.text.slice(0, 200));
@@ -112,7 +106,7 @@ if (process.env.SMOKE_MUTATE === "1") {
     token,
     body: { version, detail: { solved: { "smoke-test": true }, position: {}, misses: [] } }
   });
-  check("PUT progress -> 200 with summary + stats", r.status === 200 && r.json?.summary && r.json?.stats, `${r.status} ${r.text.slice(0, 200)}`);
+  check("PUT progress -> 200 with summary", r.status === 200 && r.json?.summary, `${r.status} ${r.text.slice(0, 200)}`);
 
   r = await api("PUT", `/me/courses/${COURSE_ID}`, {
     token,

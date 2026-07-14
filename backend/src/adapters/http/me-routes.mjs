@@ -10,10 +10,6 @@ const subOf = (reqCtx) => reqCtx.event.requestContext.authorizer.jwt.claims.sub;
 export const registerMeRoutes = (app, { progressService }) => {
   app.get("/me", async (reqCtx) => progressService.getProfile(subOf(reqCtx)));
 
-  app.get("/me/badges", async (reqCtx) => ({
-    badges: await progressService.listEarnedBadges(subOf(reqCtx))
-  }));
-
   app.get("/me/courses", async (reqCtx) => ({
     courses: await progressService.listCourseSummaries(subOf(reqCtx))
   }));
@@ -28,13 +24,11 @@ export const registerMeRoutes = (app, { progressService }) => {
     const { completedNow, ...result } = await progressService.syncProgress(sub, courseId, reqCtx.valid.req.body);
 
     metrics.addMetric("ProgressSynced", MetricUnit.Count, 1);
-    if (result.newBadges.length) metrics.addMetric("BadgeAwarded", MetricUnit.Count, result.newBadges.length);
     if (completedNow) metrics.addMetric("CourseCompleted", MetricUnit.Count, 1);
     logger.info("progress synced", {
       sub, courseId,
       solvedCount: result.summary.solvedCount,
-      percentComplete: result.summary.percentComplete,
-      newBadges: result.newBadges.map((b) => b.id)
+      percentComplete: result.summary.percentComplete
     });
 
     return result;

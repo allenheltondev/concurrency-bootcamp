@@ -3,23 +3,18 @@
    so the same service runs against DynamoDB in production and an in-memory
    fake in tests.
 
-   Everything gamified is derived server-side from submitted progress —
-   summaries, XP, streaks, badge awards — so nothing can drift and nothing
-   can be forged by a client. */
+   Course summaries are derived server-side from submitted progress, so they
+   can't drift or be forged. Gamification (badges, points, levels) is no longer
+   computed here — it lives in the shared cross-app Ready, Set, Cloud badge
+   chest; the app emits activity to it directly (see docs/badges/README.md). */
 import { CourseNotFoundError, OptimisticLockError, ProgressNotFoundError, VersionConflictError } from "./errors.mjs";
-import { computeXp, meetsCriteria, nextStreak } from "./gamification.mjs";
 
-const ZERO_PROFILE = {
-  xp: 0, currentStreak: 0, longestStreak: 0, lastActivityDate: null,
-  createdAt: null, lastSeenAt: null
-};
+const ZERO_PROFILE = { createdAt: null, lastSeenAt: null };
 
 export const createProgressService = ({ catalogRepository, userRepository, clock = () => new Date() }) => ({
   async getProfile(sub) {
     return { ...ZERO_PROFILE, ...((await userRepository.getProfile(sub)) ?? {}) };
   },
-
-  listEarnedBadges: (sub) => userRepository.listEarnedBadges(sub),
 
   async listCourseSummaries(sub) {
     // Summaries only — the detail blob belongs to the single-course fetch.
@@ -37,10 +32,10 @@ export const createProgressService = ({ catalogRepository, userRepository, clock
     const course = await catalogRepository.getCourse(courseId);
     if (!course) throw new CourseNotFoundError(courseId);
 
-    // One snapshot feeds versioning, stats, and badge awards.
-    const { profile, progress: allExisting, earnedBadgeIds } = await userRepository.getUserSnapshot(sub);
-    const existing = allExisting.find((p) => p.courseId === courseId);
-    const otherProgress = allExisting.filter((p) => p.courseId !== courseId);
+    const [existing, profile] = await Promise.all([
+      userRepository.getProgress(sub, courseId),
+      userRepository.getProfile(sub)
+    ]);
 
     const now = clock().toISOString();
     const totalItems = course.totalItems ?? 0;
@@ -73,50 +68,22 @@ export const createProgressService = ({ catalogRepository, userRepository, clock
       throw new VersionConflictError(await userRepository.getProgress(sub, courseId));
     }
 
-    // Derived stats: recomputed from stored progress, never accumulated.
-    const allProgress = [...otherProgress, progress];
-    const { totalSolved, coursesCompleted, xp } = computeXp(allProgress);
-    const streak = nextStreak(profile ?? {}, now.slice(0, 10));
-    const stats = { xp, ...streak };
-    await userRepository.saveProfile(sub, {
-      createdAt: profile?.createdAt ?? now,
-      lastSeenAt: now,
-      ...stats
-    });
-
-    // Badge awards: evaluate the catalog against the fresh state.
-    const ctx = { totalSolved, coursesCompleted, streak: streak.currentStreak, progress: allProgress };
-    const newBadges = [];
-    for (const badge of await catalogRepository.listBadges()) {
-      if (earnedBadgeIds.has(badge.id) || !meetsCriteria(badge.criteria ?? {}, ctx)) continue;
-      const awarded = await userRepository.awardBadge(sub, {
-        id: badge.id, name: badge.name, icon: badge.icon,
-        earnedAt: now,
-        courseId: badge.criteria?.courseId
-      });
-      if (awarded) newBadges.push({ id: badge.id, name: badge.name, icon: badge.icon, description: badge.description });
-    }
+    // Touch the profile so createdAt/lastSeenAt stay current.
+    await userRepository.saveProfile(sub, { createdAt: profile?.createdAt ?? now, lastSeenAt: now });
 
     const { detail: _detail, version, courseId: _courseId, ...summary } = progress;
     return {
       courseId,
       version,
       summary,
-      stats,
-      newBadges,
       completedNow: status === "completed" && existing?.status !== "completed"
     };
   },
 
-  async resetProgress(sub, courseId) {
-    await userRepository.deleteProgress(sub, courseId);
-    // XP is derived, so a reset just recomputes it from what remains.
-    // Badges are permanent and streaks reflect activity — both untouched.
-    const { xp } = computeXp(await userRepository.listProgress(sub));
-    await userRepository.setProfileXp(sub, xp, clock().toISOString());
-  },
+  // Reset one course; the profile and any other courses are untouched.
+  resetProgress: (sub, courseId) => userRepository.deleteProgress(sub, courseId),
 
-  /* Full erasure — unlike a course reset, nothing survives: profile, all
-     progress, and earned badges go. The user's next sync starts from zero. */
+  /* Full erasure — unlike a course reset, nothing survives: profile and all
+     progress go. The user's next sync starts from zero. */
   deleteAccountData: (sub) => userRepository.deleteAllUserData(sub)
 });

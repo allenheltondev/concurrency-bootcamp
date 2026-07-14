@@ -147,6 +147,17 @@ lesson anecdote.
 
 ## Gamification
 
+> **Superseded.** Gamification no longer lives in this backend. Badges, points,
+> and levels moved to the shared cross-app Ready, Set, Cloud badge chest
+> (rules engine + catalog + `/badges/*` API in `readysetcloud/rsc-core`); the
+> app emits activity to it and renders the chest with `@readysetcloud/ui` — see
+> `docs/badges/README.md`. The local badge catalog, XP, and streak logic
+> described below (and the `/badges`, `/me/badges` routes, the `newBadges`/
+> `stats` in the PUT response, and the `BADGE#` items in the data model) have
+> been removed. This backend is now progress-only: it still stores per-course
+> progress and a minimal profile (`createdAt`/`lastSeenAt`). The original
+> design is kept below for history.
+
 Design rule: **the server computes everything, on the progress write path.**
 The client never says "give me a badge" or "add 50 XP" — it only submits
 progress, and the `PUT` handler derives the rest. That keeps gamification

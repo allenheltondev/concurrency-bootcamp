@@ -3,8 +3,8 @@
 
    This file is the composition root of a hexagonal layout:
      adapters/http      driving adapter — routes, schemas, error mapping
-     domain             the core — services, gamification rules, errors;
-                        imports nothing from AWS, HTTP, or Powertools
+     domain             the core — services and errors; imports nothing from
+                        AWS, HTTP, or Powertools
      adapters/dynamodb  driven adapter — the DAL; owns keys and conditional
                         writes, raises domain errors, never leaks pk/sk
    Repositories are injected into services here, so tests (backend/test/)
@@ -20,8 +20,7 @@
      in adapters/dynamodb/client.mjs
    - Metrics (EMF): per-request latency/error/fault with the matched route as
      a dimension via the router middleware, business metrics in the http
-     adapter (ProgressSynced, VersionConflict, BadgeAwarded, CourseCompleted,
-     CourseReset) */
+     adapter (ProgressSynced, VersionConflict, CourseCompleted, CourseReset) */
 import middy from "@middy/core";
 import { injectLambdaContext } from "@aws-lambda-powertools/logger/middleware";
 import { captureLambdaHandler } from "@aws-lambda-powertools/tracer/middleware";
