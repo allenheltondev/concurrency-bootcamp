@@ -35,6 +35,28 @@ const MISS_KEY=KEY_PREFIX+":misses";         // persisted snapshots of missed qu
 function announceProgressChange(){ try{ window.dispatchEvent(new Event("course:progress-changed")); }catch(e){} }
 function announceProgressReset(){ try{ window.dispatchEvent(new Event("course:progress-reset")); }catch(e){} }
 
+/* Central RSC badge chest: the engine announces each accomplishment as a fact;
+   js/account.js turns these into POST /badges/activity when signed in. The
+   engine never talks to the network or knows whether an account layer exists.
+   `id` is deterministic so a retry or a sign-in replay counts exactly once;
+   `value` feeds `unique` badge counters (e.g. distinct courses completed). */
+function announceActivity(action, id, value){
+  try{ window.dispatchEvent(new CustomEvent("course:activity", { detail:{ action, id:String(id), value } })); }catch(e){}
+}
+let courseCompleteAnnounced=false;
+/* Re-emit every already-completed accomplishment (the account layer calls this
+   after sign-in). Stable ids make it a no-op for anything already counted, so
+   existing local progress lights up the chest without double-counting. */
+function replayActivity(){
+  try{
+    Object.values(DRILLS).forEach(list=>list.forEach(d=>{ if(state.solved[d.id]) announceActivity("lesson.completed", d.id); }));
+    BUGHUNT.forEach(b=>{ if(state.solved[b.id]){ announceActivity("lesson.completed", b.id); announceActivity("bug.found", b.id); } });
+    WRITE.forEach(w=>{ if(state.solved[w.id]){ announceActivity("lesson.completed", w.id); announceActivity("writeit.passed", w.id); } });
+    if(Object.keys(state.solved).length>=TOTAL && CFG.id) announceActivity("course.completed", CFG.id, CFG.id);
+  }catch(e){}
+}
+if(typeof window!=="undefined") window.__courseReplayActivity=replayActivity;
+
 /* ---- miss store: dedupe by stable key, cap 50, evict oldest, defensive like every storage helper ---- */
 function loadMisses(){
   try{ const raw=localStorage.getItem(MISS_KEY); if(raw){ const a=JSON.parse(raw); if(Array.isArray(a)) return a; } }catch(e){}
@@ -109,6 +131,10 @@ function renderProgress(){
   document.getElementById("pn").textContent=n;
   document.getElementById("pt").textContent=TOTAL;
   document.getElementById("progbar").style.width=(100*n/TOTAL)+"%";
+  if(n>=TOTAL && !courseCompleteAnnounced && CFG.id){
+    courseCompleteAnnounced=true;
+    announceActivity("course.completed", CFG.id, CFG.id);   // value=courseId feeds the distinct-course counter
+  }
 }
 
 /* ===========================================================
@@ -348,6 +374,7 @@ function buildDrillCard(d){
           // disable others
           blank.querySelectorAll(".opt").forEach(x=>{ if(x!==b) x.style.display="none"; });
           state.solved[d.id]=true; saveProgress();
+          announceActivity("lesson.completed", d.id);
         } else {
           b.classList.add("wrong");
           b.appendChild(el(`<div class="why-line" style="margin-top:6px">${esc(d.blank.whys[oi])}</div>`));
@@ -436,7 +463,8 @@ function buildBugCard(b){
     wrap.dataset.done="1";
     lineEls.forEach((r,i)=>{ r.disabled=true; r.classList.remove("sel","miss"); if(bugSet.has(i)) r.classList.add("buggy"); });
     feedback.style.display="block"; feedback.textContent=b.explain;
-    if(win){ card.classList.add("solved"); card.querySelector("[data-done]").classList.remove("hidden"); state.solved[b.id]=true; saveProgress(); }
+    if(win){ card.classList.add("solved"); card.querySelector("[data-done]").classList.remove("hidden"); state.solved[b.id]=true; saveProgress();
+      announceActivity("lesson.completed", b.id); announceActivity("bug.found", b.id); }
   };
 
   const row=el(`<div class="row"></div>`);
@@ -615,7 +643,8 @@ function buildWriteCard(w, opts={}){
       done=true;
       card.querySelector("[data-done]").classList.remove("hidden");
       notes.appendChild(el(`<div class="why-line">${esc(w.takeaway)}</div>`));
-      if(!state.solved[w.id]){ state.solved[w.id]=true; saveProgress(); }
+      if(!state.solved[w.id]){ state.solved[w.id]=true; saveProgress();
+        announceActivity("lesson.completed", w.id); announceActivity("writeit.passed", w.id); }
     } else {
       mem.fails++;
       trapNotes();
@@ -810,6 +839,8 @@ function renderTest(m){
 }
 
 function renderTestScore(){
+  // the interview sim is "completed" the moment its score screen is reached; emit once per run
+  if(test.mode==="sim" && !test.emitted && CFG.id){ test.emitted=true; announceActivity("interview.completed", CFG.id+"#"+Date.now()); }
   const nq=test.qs.length, n=nq+(test.build?1:0), s=test.score, pct=n?Math.round(100*s/n):0;
   const msg = pct>=90?"Sharp — you're ready." : pct>=70?"Solid. Patch the misses and you're close." : "Worth another pass through the drills.";
   const mc = s-(test.build&&test.build.pass?1:0);

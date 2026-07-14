@@ -15,40 +15,10 @@ export class ApiError extends Error {
   }
 }
 
-/* ---------- API shapes ---------- */
-
-export interface MeStats {
-  xp: number;
-  currentStreak: number;
-  longestStreak: number;
-  lastActivityDate: string | null;
-  createdAt: string | null;
-  lastSeenAt: string | null;
-}
-
-export interface EarnedBadge {
-  id: string;
-  name: string;
-  icon: string;
-  earnedAt: string;
-  courseId?: string;
-}
-
-export interface MyBadgesResponse {
-  badges: EarnedBadge[];
-}
-
-export interface CatalogBadge {
-  id: string;
-  name: string;
-  icon: string;
-  description: string;
-  criteria: object;
-}
-
-export interface BadgeCatalogResponse {
-  badges: CatalogBadge[];
-}
+/* ---------- API shapes ----------
+   Gamification (points, level, badges) is not served by this API — it lives in
+   the shared cross-app badge chest (see src/lib/badges.ts). This API is
+   progress-only: the course catalog and the caller's per-course progress. */
 
 export interface CatalogCourse {
   id: string;

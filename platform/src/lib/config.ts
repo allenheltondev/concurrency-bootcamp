@@ -8,7 +8,13 @@ export interface AuthConfig {
   clientId: string;
   region: string;
   apiBase: string;
+  /* Base URL of the shared Ready, Set, Cloud Core API that hosts the badge
+     chest (rsc-core SSM /readysetcloud/api-url). Distinct from apiBase, which
+     is this app's own progress API. Falls back to the prod host when absent. */
+  coreApiBase: string;
 }
+
+export const CORE_API_DEFAULT = "https://api.readysetcloud.io";
 
 let configPromise: Promise<AuthConfig | null> | null = null;
 
@@ -19,13 +25,14 @@ export function getConfig(): Promise<AuthConfig | null> {
         if (!res.ok) return null;
         const raw: unknown = await res.json();
         if (!raw || typeof raw !== "object") return null;
-        const { clientId, region, apiBase } = raw as Record<string, unknown>;
+        const { clientId, region, apiBase, coreApiBase } = raw as Record<string, unknown>;
         if (typeof clientId !== "string" || !clientId) return null;
         if (typeof region !== "string" || !region) return null;
         return {
           clientId,
           region,
-          apiBase: typeof apiBase === "string" && apiBase ? apiBase : "/api"
+          apiBase: typeof apiBase === "string" && apiBase ? apiBase : "/api",
+          coreApiBase: typeof coreApiBase === "string" && coreApiBase ? coreApiBase : CORE_API_DEFAULT
         };
       })
       .catch(() => null);

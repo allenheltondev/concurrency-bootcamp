@@ -1,39 +1,26 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { BadgeChest } from "@readysetcloud/ui";
 import {
   get,
-  type BadgeCatalogResponse,
-  type CatalogBadge,
   type CatalogCourse,
   type CourseCatalogResponse,
-  type EarnedBadge,
-  type MeStats,
-  type MyBadgesResponse,
   type MyCourse,
   type MyCoursesResponse
 } from "../lib/api";
+import { getChest, recordVisit, type Chest } from "../lib/badges";
 import { courseHref } from "../lib/courses";
 import { useConfigured } from "../lib/useConfigured";
 
-/* /profile — the signed-in gradebook: XP/streak stat tiles, per-course
-   progress cards (GET /me/courses joined with the public catalog), and the
-   badge case (GET /badges joined with GET /me/badges: earned in full color,
-   the rest locked with their description as the hint). */
-
-
-const fmtDate = (iso: string) => {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? iso
-    : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-};
+/* /profile — the signed-in gradebook: the shared cross-app BadgeChest (points,
+   level, earned + in-progress badges from GET /badges/me) plus per-course
+   progress cards (GET /me/courses joined with the public catalog). Gamification
+   is owned by the central rsc-core engine — see docs/badges/README.md. */
 
 interface ProfileData {
-  me: MeStats;
   myCourses: MyCourse[];
   catalog: CatalogCourse[];
-  allBadges: CatalogBadge[];
-  earned: EarnedBadge[];
+  chest: Chest;
 }
 
 type LoadState =
@@ -42,20 +29,12 @@ type LoadState =
   | { status: "ready"; data: ProfileData };
 
 async function loadProfile(): Promise<ProfileData> {
-  const [me, mine, catalog, badges, earned] = await Promise.all([
-    get<MeStats>("/me"),
+  const [mine, catalog, chest] = await Promise.all([
     get<MyCoursesResponse>("/me/courses"),
     get<CourseCatalogResponse>("/courses"),
-    get<BadgeCatalogResponse>("/badges"),
-    get<MyBadgesResponse>("/me/badges")
+    getChest()
   ]);
-  return {
-    me,
-    myCourses: mine.courses,
-    catalog: catalog.courses,
-    allBadges: badges.badges,
-    earned: earned.badges
-  };
+  return { myCourses: mine.courses, catalog: catalog.courses, chest };
 }
 
 export default function Profile() {
@@ -65,6 +44,7 @@ export default function Profile() {
 
   useEffect(() => {
     if (configured === false) return;
+    void recordVisit();
     let live = true;
     loadProfile().then(
       (data) => {
@@ -111,7 +91,7 @@ export default function Profile() {
       <header className="mb-8">
         <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Your progress</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          XP, streaks, and badges across every course.
+          Points, level, and badges across every Ready, Set, Cloud app.
         </p>
       </header>
 
@@ -143,47 +123,21 @@ export default function Profile() {
 function ProfileSkeleton() {
   return (
     <div className="animate-pulse" aria-hidden="true">
-      <div className="grid grid-cols-3 gap-4">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="card h-24" />
-        ))}
-      </div>
+      <div className="card h-40" />
       <div className="mt-10 h-5 w-32 rounded bg-muted" />
       <div className="card mt-4 h-36" />
-      <div className="mt-10 h-5 w-24 rounded bg-muted" />
-      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="card h-32" />
-        ))}
-      </div>
     </div>
   );
 }
 
 function ProfileBody({ data }: { data: ProfileData }) {
-  const { me, myCourses, catalog, allBadges, earned } = data;
+  const { myCourses, catalog, chest } = data;
   const catalogById = new Map(catalog.map((c) => [c.id, c]));
-  const earnedById = new Map(earned.map((b) => [b.id, b]));
-
-  const tiles = [
-    { label: "XP", value: me.xp },
-    { label: "Current streak", value: me.currentStreak },
-    { label: "Longest streak", value: me.longestStreak }
-  ];
 
   return (
     <>
-      <section aria-label="stats" className="grid grid-cols-3 gap-4">
-        {tiles.map((tile) => (
-          <div key={tile.label} className="card">
-            <div className="card-body px-3 text-center">
-              <p className="text-3xl font-bold text-foreground">{tile.value}</p>
-              <p className="mt-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {tile.label}
-              </p>
-            </div>
-          </div>
-        ))}
+      <section aria-label="badges">
+        <BadgeChest {...chest} />
       </section>
 
       <section aria-label="my courses" className="mt-10">
@@ -243,39 +197,6 @@ function ProfileBody({ data }: { data: ProfileData }) {
                         {completed ? "Revisit →" : "Resume →"}
                       </a>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <section aria-label="badges" className="mt-10">
-        <h2 className="text-lg font-semibold text-foreground">Badges</h2>
-        {allBadges.length === 0 ? (
-          <p className="mt-4 text-sm text-muted-foreground">No badges to show yet.</p>
-        ) : (
-          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
-            {allBadges.map((badge) => {
-              const earnedBadge = earnedById.get(badge.id);
-              return (
-                <div key={badge.id} className={`card ${earnedBadge ? "" : "opacity-60"}`}>
-                  <div className="card-body px-4 py-4 text-center">
-                    <div
-                      aria-hidden="true"
-                      className={`text-3xl ${earnedBadge ? "" : "opacity-50 grayscale"}`}
-                    >
-                      {badge.icon}
-                    </div>
-                    <p className="mt-2 text-sm font-medium text-foreground">{badge.name}</p>
-                    {earnedBadge ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Earned {fmtDate(earnedBadge.earnedAt)}
-                      </p>
-                    ) : (
-                      <p className="mt-1 text-xs text-muted-foreground">🔒 {badge.description}</p>
-                    )}
                   </div>
                 </div>
               );

@@ -24,9 +24,16 @@
    - The server owns versioning: a 409 hands back the current doc, we merge
      (union solved, keep local position, union misses capped at 50) and
      retry. First sign-in migrates existing local progress the same way.
-   - Badges/XP/streaks arrive in the PUT response — surfaced as toasts and
-     in the account menu. The engine never knows any of this exists; it just
-     dispatches course:progress-changed / course:progress-reset events. */
+   - The engine never knows any of this exists; it just dispatches
+     course:progress-changed / course:progress-reset events.
+
+   BADGES (docs/badges/README.md):
+   - Gamification lives in the shared cross-app Ready, Set, Cloud chest, not
+     this app's progress API. The engine announces accomplishments as
+     course:activity events; this layer POSTs them to the Core API
+     (POST {coreApiBase}/badges/activity, service "bootcamp"), and the React
+     profile reads the chest (GET /badges/me). On sign-in it replays already
+     completed work so existing local progress lights the chest up. */
 
 const CloudAccount = (() => {
   const AUTH_KEY = "rsc:auth";          // tokens are origin-wide: one sign-in covers every course
@@ -44,6 +51,11 @@ const CloudAccount = (() => {
   let dirty = false;
   let stopped = false;                  // course unknown to the catalog -> stop pushing this session
   let lastPushedBody = null;
+  let replayedThisSession = false;      // sign-in badge replay runs once per session
+
+  /* Central RSC badge chest lives on the shared Core API, not this app's /api. */
+  const CORE_API_DEFAULT = "https://api.readysetcloud.io";
+  const SERVICE = "bootcamp";
 
   /* ---------- storage helpers (defensive, like the engine's) ---------- */
   const readJson = (key) => { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } };
@@ -169,6 +181,7 @@ const CloudAccount = (() => {
     const a = tokens();
     drop(AUTH_KEY); drop(SYNC_KEY);
     lastPushedBody = null;
+    replayedThisSession = false;   // a later sign-in should replay into the chest again
     refreshUi();
     if (a && a.refreshToken) {
       try { await idp("RevokeToken", { ClientId: config.clientId, Token: a.refreshToken }); } catch (e) {}
@@ -184,6 +197,48 @@ const CloudAccount = (() => {
       headers: { authorization: `Bearer ${token}`, ...(body && { "content-type": "application/json" }) },
       body: body ? JSON.stringify(body) : undefined
     });
+  }
+
+  /* ---------- central badge chest (POST /badges/activity) ----------
+     The app only ever emits activity ("this happened"); the shared rules engine
+     decides what it earns, and the profile reads the chest. Fire-and-forget:
+     a failed post just means it counts on the next matching activity or the
+     next sign-in replay (the engine dedupes on the deterministic id). */
+  const coreApiBase = () => String((config && config.coreApiBase) || CORE_API_DEFAULT).replace(/\/+$/, "");
+  const activityId = (action, itemId) => `${COURSE_ID || SERVICE}#${action}#${itemId}`;
+
+  async function recordActivity({ action, id, value }) {
+    if (!config || !isSignedIn()) return;
+    const token = await freshIdToken();
+    if (!token) return;
+    try {
+      await fetch(`${coreApiBase()}/badges/activity`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify({ action, id, value, service: SERVICE })
+      });
+    } catch (e) { /* offline / 5xx — the next emit or sign-in replay re-sends it */ }
+  }
+
+  /* Engine accomplishments arrive as `course:activity` events. */
+  const onCourseActivity = (e) => {
+    const d = (e && e.detail) || {};
+    if (!d.action || !d.id) return;
+    recordActivity({ action: d.action, id: activityId(d.action, d.id), value: d.value });
+  };
+
+  /* A signed-in visit contributes to the ecosystem "explorer" badge; one per
+     UTC day is plenty. */
+  const recordVisit = () =>
+    recordActivity({ action: "service.visited", id: `visit#${SERVICE}#${new Date().toISOString().slice(0, 10)}`, value: SERVICE });
+
+  /* Ask the engine to re-emit every already-completed accomplishment so existing
+     local progress lights up the chest. Stable ids make it exactly-once, and the
+     session guard keeps a second sign-in/pull from re-posting. */
+  function replayCompletedActivity() {
+    if (replayedThisSession) return;
+    replayedThisSession = true;
+    try { if (typeof window.__courseReplayActivity === "function") window.__courseReplayActivity(); } catch (e) {}
   }
 
   /* ---------- sync ---------- */
@@ -205,8 +260,7 @@ const CloudAccount = (() => {
         const out = await res.json();
         writeJson(SYNC_KEY, { version: out.version });
         lastPushedBody = body;
-        (out.newBadges || []).forEach((b) => toast(`${b.icon || "🏅"} badge earned — ${b.name}`));
-        refreshUi(out.stats);
+        refreshUi(out.stats);   // badges now live in the central chest (js/badges guide), not this response
       } else if (res.status === 409) {
         // another device wrote first: adopt, merge, re-push
         const { current } = await res.json();
@@ -230,17 +284,22 @@ const CloudAccount = (() => {
      A 404 means first sign-in on this course: plain migration push. */
   async function pullAndMerge() {
     if (!COURSE_ID) return;
-    let res = null;
-    try { res = await api("GET", `/me/courses/${COURSE_ID}`); } catch (e) { return; }
-    if (!res) return;
-    if (res.status === 404) { flushSoon(500); return; }
-    if (!res.ok) return;
-    const doc = await res.json();
-    const merged = mergeDetail(localDetail(), doc.detail || {});
-    applyDetail(merged);
-    writeJson(SYNC_KEY, { version: doc.version });
-    if (JSON.stringify(merged) !== JSON.stringify(doc.detail)) flushSoon(500);
-    else lastPushedBody = JSON.stringify(merged);
+    try {
+      let res = null;
+      try { res = await api("GET", `/me/courses/${COURSE_ID}`); } catch (e) { return; }
+      if (!res) return;
+      if (res.status === 404) { flushSoon(500); return; }
+      if (!res.ok) return;
+      const doc = await res.json();
+      const merged = mergeDetail(localDetail(), doc.detail || {});
+      applyDetail(merged);
+      writeJson(SYNC_KEY, { version: doc.version });
+      if (JSON.stringify(merged) !== JSON.stringify(doc.detail)) flushSoon(500);
+      else lastPushedBody = JSON.stringify(merged);
+    } finally {
+      // engine state now reflects local (+ cloud); replay it into the badge chest
+      replayCompletedActivity();
+    }
   }
 
   /* ==========================================================
@@ -606,7 +665,8 @@ const CloudAccount = (() => {
       if (next === null) {                     // signed in
         closeModal();
         refreshUi();
-        pullAndMerge();
+        recordVisit();
+        pullAndMerge();                        // its finally replays completed work into the chest
       } else {
         showView(next);
       }
@@ -740,6 +800,7 @@ const CloudAccount = (() => {
     mountNav();
 
     window.addEventListener("course:progress-changed", () => { if (isSignedIn()) flushSoon(); });
+    window.addEventListener("course:activity", onCourseActivity);   // -> POST /badges/activity
     window.addEventListener("course:progress-reset", async () => {
       if (!isSignedIn() || !COURSE_ID) return;
       try { await api("DELETE", `/me/courses/${COURSE_ID}`); } catch (e) {}
@@ -747,7 +808,7 @@ const CloudAccount = (() => {
     });
     window.addEventListener("online", () => { if (dirty) flushSoon(500); });
 
-    if (isSignedIn()) pullAndMerge();
+    if (isSignedIn()) { recordVisit(); pullAndMerge(); }   // pullAndMerge's finally replays into the chest
   }
 
   if (typeof document !== "undefined" && document.addEventListener) {

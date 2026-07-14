@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /* Catalog seeder for the Concurrency Bootcamp backend.
 
-   Reads backend/data/courses.json + badges.json, validates them, and emits
-   DynamoDB BatchWriteItem request payloads (chunks of 25) as a JSON array on
-   stdout. The deploy workflow feeds each chunk to
-   `aws dynamodb batch-write-item` — no SDK dependency, no npm install.
+   Reads backend/data/courses.json, validates it, and emits DynamoDB
+   BatchWriteItem request payloads (chunks of 25) as a JSON array on stdout.
+   The deploy workflow feeds each chunk to `aws dynamodb batch-write-item` —
+   no SDK dependency, no npm install. (Badges are authored in the shared
+   rsc-core catalog, not here — see docs/badges/README.md.)
 
    A course with "totalItems": "auto" gets its count computed by loading the
    app content the same way tools/validate-content.mjs does (core + content +
@@ -28,13 +29,8 @@ if (!tableName) {
 
 const readJson = (rel) => JSON.parse(fs.readFileSync(path.join(root, rel), "utf8"));
 const courses = readJson("backend/data/courses.json");
-const badges = readJson("backend/data/badges.json");
 
 /* ---- validation: a bad catalog entry must fail CI, not deploy quietly ---- */
-const CRITERIA_TYPES = new Set([
-  "total-solved", "streak", "courses-completed",
-  "course-started", "percent-complete", "course-completed"
-]);
 const die = (msg) => { console.error(`seed-catalog: ${msg}`); process.exit(1); };
 const idOk = (id) => typeof id === "string" && /^[a-z0-9-]{1,64}$/.test(id);
 
@@ -49,15 +45,6 @@ for (const c of courses) {
     const dir = path.join(root, c.contentRoot || ".");
     if (!fs.existsSync(path.join(dir, "js/content.js"))) die(`course ${c.id}: contentRoot ${c.contentRoot || "."} has no js/content.js`);
   }
-}
-const badgeIds = new Set();
-for (const b of badges) {
-  if (!idOk(b.id)) die(`bad badge id: ${JSON.stringify(b.id)}`);
-  if (badgeIds.has(b.id)) die(`duplicate badge id: ${b.id}`);
-  badgeIds.add(b.id);
-  if (!b.name || !b.description || !b.icon) die(`badge ${b.id} needs name + description + icon`);
-  if (!CRITERIA_TYPES.has(b.criteria?.type)) die(`badge ${b.id}: unknown criteria type ${JSON.stringify(b.criteria?.type)}`);
-  if (b.criteria.courseId && !courseIds.has(b.criteria.courseId)) die(`badge ${b.id}: unknown courseId ${b.criteria.courseId}`);
 }
 
 /* ---- totalItems: "auto" — same loading strategy as tools/validate-content.mjs,
@@ -97,14 +84,11 @@ function marshal(v) {
   die(`cannot marshal value of type ${typeof v}`);
 }
 
-const items = [
-  ...courses.map(({ contentRoot, ...c }) => ({
-    pk: "COURSES", sk: `COURSE#${c.id}`, type: "course",
-    ...c,
-    totalItems: c.totalItems === "auto" ? computedTotal(contentRoot) : c.totalItems
-  })),
-  ...badges.map((b) => ({ pk: "BADGES", sk: `BADGE#${b.id}`, type: "badge", ...b }))
-];
+const items = courses.map(({ contentRoot, ...c }) => ({
+  pk: "COURSES", sk: `COURSE#${c.id}`, type: "course",
+  ...c,
+  totalItems: c.totalItems === "auto" ? computedTotal(contentRoot) : c.totalItems
+}));
 
 const chunks = [];
 for (let i = 0; i < items.length; i += 25) {
@@ -113,4 +97,4 @@ for (let i = 0; i < items.length; i += 25) {
   });
 }
 console.log(JSON.stringify(chunks));
-console.error(`seed-catalog: ${courses.length} courses + ${badges.length} badges -> ${chunks.length} batch(es)`);
+console.error(`seed-catalog: ${courses.length} courses -> ${chunks.length} batch(es)`);
