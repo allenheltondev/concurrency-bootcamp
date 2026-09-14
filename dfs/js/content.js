@@ -131,19 +131,20 @@ console.log(findNode(tree, "B1"));`,
   { code:`// the same 6-node tree, but with a QUEUE
 function walk(root) {
   const q = [root];
-  while (q.length) {
-    const node = q.shift();
+  let head = 0;
+  while (head < q.length) {
+    const node = q[head++];
     console.log(node.name);
     for (const c of node.children) q.push(c);
   }
 }
 walk(tree);`,
-    options:["root, A, B, A1, A2, B1 — shift() drains a level before descending",
+    options:["root, A, B, A1, A2, B1 — taking from the front drains a level before descending",
              "root, A, A1, A2, B, B1 — a stack and a queue visit a tree in the same order",
              "root, B, B1, A, A2, A1 — the children come back out in reverse order"],
     answer:0,
     whys:[
-      "Right. One character decides the whole algorithm: `shift()` (take the oldest) drains a level before descending, `pop()` (take the newest) dives. Same code, same tree, same O(n) — BFS finds the SHALLOWEST match first (which is why it's the shortest-path traversal) and pays O(width) memory for the frontier. DFS pays O(height).",
+      "Right. Which end you take from decides the whole algorithm: the front (oldest first) drains a level before descending, the back (`pop()`, newest first) dives. Same tree, same O(n) — BFS finds the SHALLOWEST match first (which is why it's the shortest-path traversal) and pays O(width) memory for the frontier; DFS pays O(height). The head index matters: `q.shift()` reindexes the array every call and quietly makes this quadratic.",
       "They visit the same NODES, never in the same ORDER. A stack is LIFO — the child you pushed last comes back first, so you plunge. A queue is FIFO — you finish the generation you're on. If order didn't matter, the distinction wouldn't exist.",
       "Reversal is what you'd get from an explicit STACK (`pop()`) with children pushed in natural order: root, B, B1, A, A2, A1. It's the classic tell that you converted recursion to a stack without reversing the pushes."] },
 ];
@@ -164,7 +165,7 @@ function preorder(node, out = []) {
 `  out.push(...node.children.map(c => c.name));
   for (const child of node.children) preorder(child, out);`,
 `  const queue = [...node.children];
-  while (queue.length) preorder(queue.shift(), out);`],
+  for (let head = 0; head < queue.length; head++) preorder(queue[head], out);`],
         answer:0,
         whys:["Right. The recursive call doesn't return until the child's entire subtree is done, so the loop can't advance to B until every descendant of A has been visited. That blocking property IS depth-first — you don't implement the backtracking, the call stack does it for you when each frame returns.",
               "Announcing the children before descending gives you root, A, B, A, A1, A2, … — names appear twice and the order is neither depth-first nor breadth-first. A node is visited in exactly one place: at the top of its own frame.",
@@ -769,11 +770,11 @@ function walkIter(root) {
     <p><b class="hl">Why it matters:</b> "why recursion here?" is a real interview question, and "it's cleaner" is a weak answer. The strong one: <i>"DFS needs a stack of paused states, and the call stack is exactly that — with locals saved for free. I'd switch to an explicit stack only if the structure could nest deep enough to overflow."</i></p>` },
 
   { eb:"lesson 05 · what dfs is", title:"BFS, briefly — and when to switch", html:`
-    <p class="big">One character separates the two traversals. <b class="hl">Take the newest item (a stack) and you dive; take the oldest (a queue) and you sweep level by level.</b> Same nodes, same O(n), different order, different memory bill — and the order is the entire reason to pick one.</p>
+    <p class="big">Which end of the array you take from separates the two traversals. <b class="hl">Take the newest item (a stack) and you dive; take the oldest (a queue) and you sweep level by level.</b> Same nodes, same O(n), different order, different memory bill — and the order is the entire reason to pick one.</p>
     <div class="diagram anim" style="--step:.5s">
       <div class="dlabel">the same six-node tree &middot; two containers &middot; watch where each one goes third</div>
       <svg class="estage" viewBox="0 0 340 160" width="100%" style="max-width:360px" font-family="ui-monospace,monospace">
-      <text x="85" y="12" fill="#34d3bf" font-size="9" text-anchor="middle">DFS · stack.pop()</text><text x="255" y="12" fill="#4eaeff" font-size="9" text-anchor="middle">BFS · queue.shift()</text><line x1="170" y1="6" x2="170" y2="154" stroke="#2c3350" stroke-dasharray="2 4"/><line x1="85" y1="35.8" x2="45" y2="85.1" stroke="#2c3350" stroke-width="1.4"/>
+      <text x="85" y="12" fill="#34d3bf" font-size="9" text-anchor="middle">DFS · stack.pop()</text><text x="255" y="12" fill="#4eaeff" font-size="9" text-anchor="middle">BFS · queue[head++]</text><line x1="170" y1="6" x2="170" y2="154" stroke="#2c3350" stroke-dasharray="2 4"/><line x1="85" y1="35.8" x2="45" y2="85.1" stroke="#2c3350" stroke-width="1.4"/>
       <line x1="85" y1="35.8" x2="125" y2="85.1" stroke="#2c3350" stroke-width="1.4"/>
       <line x1="45" y1="85.1" x2="25" y2="132.7" stroke="#2c3350" stroke-width="1.4"/>
       <line x1="45" y1="85.1" x2="65" y2="132.7" stroke="#2c3350" stroke-width="1.4"/>
@@ -785,7 +786,7 @@ function walkIter(root) {
       </svg>
       <div class="lanes">
         <div class="lanehead seq" style="--i:0">dfs</div><div class="lstep good seq" style="--i:0">root &rarr; A &rarr; A1 &rarr; A2 &rarr; B &rarr; B1 &nbsp;&middot;&nbsp; <code>stack.pop()</code> / recursion</div>
-        <div class="lanehead seq" style="--i:1">bfs</div><div class="lstep seq" style="--i:1">root &rarr; A &rarr; B &rarr; A1 &rarr; A2 &rarr; B1 &nbsp;&middot;&nbsp; <code>queue.shift()</code></div>
+        <div class="lanehead seq" style="--i:1">bfs</div><div class="lstep seq" style="--i:1">root &rarr; A &rarr; B &rarr; A1 &rarr; A2 &rarr; B1 &nbsp;&middot;&nbsp; <code>queue[head++]</code></div>
         <div class="lanehead seq" style="--i:2">memory</div><div class="lstep seq" style="--i:2">DFS holds one root-to-leaf path: <b>O(height)</b> &middot; BFS holds a whole level: <b>O(width)</b></div>
         <div class="lanehead seq" style="--i:3">finds</div><div class="lstep bad seq pop" style="--i:3">DFS finds <i>some</i> match first &middot; BFS finds the <b>shallowest</b> match first &mdash; that's shortest-path</div>
       </div>
@@ -794,9 +795,11 @@ function walkIter(root) {
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
     <p>There's one more practical difference worth a sentence in an interview: <b class="hl">BFS doesn't recurse</b>, so it can't overflow a stack, and it gives you levels for free (drain the queue in batches of <code>queue.length</code>). But it can't naturally carry ancestor state — the price you'd inherit, the path you walked — because a queued node has been separated from its parent's context. Every node would have to carry that state with it into the queue, which is the pattern's real cost.</p>
     <div class="impl">
-      <div class="dlabel">reference &middot; the one-character difference</div>
-      <pre class="code">const next = queue.shift();   <span class="cm">// FIFO -> breadth-first</span>
+      <div class="dlabel">reference &middot; the one-line difference</div>
+      <pre class="code">const next = queue[head++];   <span class="cm">// FIFO -> breadth-first</span>
 const next = stack.pop();     <span class="cm">// LIFO -> depth-first</span>
+<span class="cm">// not queue.shift(): it reindexes the array on every call,</span>
+<span class="cm">// which turns an O(n) traversal quadratic. a head index is O(1).</span>
 
 <span class="ok">// everything else in the loop is identical:</span>
 visit(next);

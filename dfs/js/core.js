@@ -160,11 +160,14 @@ function postorder(node, out = []) {
   return out;
 }
 
-/* breadth-first, for contrast only: a QUEUE instead of the call stack */
+/* breadth-first, for contrast only: a QUEUE instead of the call stack.
+   A head index, not Array.shift(): shift() reindexes the whole array on
+   every dequeue, which quietly turns an O(n) traversal quadratic. */
 function bfsOrder(root) {
   const out = [], queue = [root];
-  while (queue.length) {
-    const node = queue.shift();                // FIFO — the only difference
+  let head = 0;
+  while (head < queue.length) {
+    const node = queue[head++];                // FIFO — the only difference
     out.push(node.name);
     for (const child of node.children) queue.push(child);
   }
@@ -246,11 +249,13 @@ function getItemPriceLoose(node, itemId, inherited = null) {
 }
 
 /* ---- follow-up 1: every match, not the first ----
-   Drop the short-circuit and concatenate what each subtree returns. */
+   Drop the short-circuit and push into an accumulator. The predicate is
+   handed the item's FINAL effective price (its own, else the inherited one)
+   so callers never have to redo the inheritance themselves. */
 function findAllItems(node, predicate, inherited = null, out = []) {
   const effective = node.price ?? inherited;
   for (const item of node.items || []) {
-    if (predicate(item, effective)) out.push(item);
+    if (predicate(item, item.price ?? effective)) out.push(item);
   }
   for (const group of node.groups || []) findAllItems(group, predicate, effective, out);
   return out;                                  // no early return anywhere
@@ -259,7 +264,9 @@ function findAllItems(node, predicate, inherited = null, out = []) {
 /* ---- follow-up 2: the path to the item ----
    The trail is state travelling down, exactly like the price. Build it with
    concat (a fresh array per call, nothing to undo) or push/pop — but if you
-   push, you MUST pop on the way out or siblings inherit the trail. */
+   push, you MUST pop on the way out or siblings inherit the trail. concat
+   copies O(depth) per frame, so the traversal is O(n·h) rather than O(n);
+   push/pop is the O(n) version, at the cost of the cleanup discipline. */
 function findItemPath(node, itemId, trail = []) {
   const here = trail.concat(node.name);
   for (const item of node.items || []) {
@@ -399,7 +406,7 @@ async function demoBfsContrast(){
     {t:`same tree, two container choices`},
     {t:`DFS (stack / recursion): ${dfs.join(" -> ")}`},
     {t:`BFS (queue):             ${bfs.join(" -> ")}`},
-    {t:`swap pop() for shift() and depth-first becomes breadth-first — nothing else changes`},
+    {t:`take from the back (pop) and it's depth-first; take from the front (queue[head++]) and it's breadth-first`},
   ], pass, verdict: pass?"the container is the algorithm: LIFO goes deep, FIFO goes wide":`dfs=${dfs} bfs=${bfs}`};
 }
 
@@ -469,13 +476,13 @@ async function demoNullishTrap(){
 }
 
 async function demoAllMatches(){
-  const cheap = findAllItems(PRICED_MENU, (item, eff) => (item.price ?? eff) <= 8).map(i => i.id);
+  const cheap = findAllItems(PRICED_MENU, (_item, price) => price <= 8).map(i => i.id);
   const first = findMenuItem(PRICED_MENU, "wings").id;
   const pass = cheap.join(",") === "wings,fries,garden" && first === "wings";
   return {lines:[
     {t:`"every item at $8 or less" — the same walk with the early return deleted`},
     {t:`matches: ${cheap.join(", ")}`},
-    {t:`note the predicate gets the INHERITED price too — wings has none of its own`},
+    {t:`the predicate gets each item's RESOLVED price — wings has none of its own, cobb's own $10 beats Salads' $8`},
     {t:`find-first returns as soon as it knows; find-all can never return early — it's O(n), always`},
   ], pass, verdict: pass?"collect instead of return: push into an accumulator and let every branch finish":`cheap=${cheap}`};
 }
@@ -491,7 +498,7 @@ async function demoPath(){
     {t:`findItemPath(menu, "wings") -> ${wings.join(" > ")}`},
     {t:`findItemPath(menu, "sushi") -> ${String(ghost)}`},
     {t:`the trail is inherited state, exactly like the price: trail.concat(node.name) on the way down`},
-  ], pass, verdict: pass?"concat hands each child its own array — nothing to undo when the branch fails":`cobb=${cobb}`};
+  ], pass, verdict: pass?"concat hands each child its own array — nothing to undo when the branch fails (the copy costs O(depth) per frame)":`cobb=${cobb}`};
 }
 
 async function demoFlatten(){
@@ -504,7 +511,7 @@ async function demoFlatten(){
     {t:`one traversal, carrying BOTH inherited values (price and path)`},
     ...rows.map(r => ({t:`${r.id.padEnd(7)} ${String(money(r.price)).padEnd(4)} ${r.path.join(" > ")}`})),
     {t:`flat order is DFS order — that's why the export reads top-to-bottom like the printed menu`},
-  ], pass, verdict: pass?"5 items, every price resolved, every path recorded — in a single O(n) pass":`ids=${ids} prices=${prices}`};
+  ], pass, verdict: pass?"5 items, every price resolved, every path recorded — one traversal (plus O(h) per row to copy its path)":`ids=${ids} prices=${prices}`};
 }
 
 async function demoPriceMap(){

@@ -59,7 +59,7 @@
       <div class="dlabel">the follow-up map &middot; volunteer these before they're asked</div>
       <p>Each one is the same traversal with a single change. Saying the list out loud when you finish usually ends the question early, in your favour: <i>"if you wanted all matches I'd drop the early return; if you wanted the path I'd carry a trail; if this ran on every render I'd index it once."</i></p>
       <pre class="code"><span class="cm">// all matches       </span>drop the early return, push into an accumulator &rarr; O(n) always
-<span class="cm">// the path          </span>carry a trail down; concat, so a dead end needs no cleanup
+<span class="cm">// the path          </span>carry a trail down; concat (O(depth) per copy) so a dead end needs no cleanup
 <span class="cm">// flatten           </span>both carried values + one accumulator, one pass
 <span class="cm">// price everything  </span>same walk, Map accumulator &mdash; <span class="kw">not</span> a search per item (that's O(n²))
 <span class="cm">// no recursion      </span>explicit stack; push children reversed, push carried state alongside
@@ -79,6 +79,9 @@
 
 <span class="cm"> The short-circuit improves the average case, not the worst:</span>
 <span class="cm"> proving an item is absent means looking everywhere.</span>
+
+<span class="cm"> If I materialize paths, each copy is O(depth), so that part</span>
+<span class="cm"> is O(n·h) — separate from the O(n) traversal.</span>
 
 <span class="ok"> If it's a graph, it becomes O(V+E) with O(V) for the set."</span></pre>
     </div>

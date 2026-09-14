@@ -92,7 +92,9 @@ problem is built to test, then the questions that come after it works.
   because a $0 promo price is real. `priceEveryItem` is the same walk with an
   accumulator — one pass, not one search per item.
 - **flatten-menu** — two carried values (price and path) and one accumulator,
-  in a single O(n) pass, emitting rows in menu order.
+  in a single traversal, emitting rows in menu order. Name the cost honestly:
+  O(n) nodes visited, plus O(h) per row to copy its path — O(n·h) with the
+  output.
 
 ### The follow-ups
 

@@ -53,12 +53,12 @@
       </svg>
       <div class="dlabel" style="margin-top:12px">two ways to carry it &middot; one of them needs cleanup</div>
       <div class="lanes">
-        <div class="lanehead seq" style="--i:0">concat</div><div class="lstep good seq" style="--i:0"><code>const here = trail.concat(node.name);</code> &mdash; a fresh array per frame, <b>nothing to undo</b></div>
-        <div class="lanehead seq" style="--i:1">push/pop</div><div class="lstep seq" style="--i:1"><code>trail.push(name)</code> … recurse … <code>trail.pop()</code> &mdash; one array, and the pop is <b>mandatory</b></div>
+        <div class="lanehead seq" style="--i:0">concat</div><div class="lstep good seq" style="--i:0"><code>const here = trail.concat(node.name);</code> &mdash; a fresh array per frame, <b>nothing to undo</b> &middot; costs O(depth) per copy</div>
+        <div class="lanehead seq" style="--i:1">push/pop</div><div class="lstep seq" style="--i:1"><code>trail.push(name)</code> … recurse … <code>trail.pop()</code> &mdash; one array, O(1) per frame, and the pop is <b>mandatory</b></div>
         <div class="lanehead seq" style="--i:2">forgot</div><div class="lstep bad seq pop" style="--i:2">no pop &rarr; Appetizers stays in the trail while you search Entrees &rarr; every path after the first is wrong</div>
       </div>
       <div class="flowarrow seq" style="--i:3">&darr; the classic backtracking bug, and why interviewers plant it &darr;</div>
-      <div class="dnote seq" style="--i:4">Missing-pop bugs are <b style="color:var(--ordered)">order-dependent</b>: the first path found is correct, every later one carries its siblings' names. On a one-branch fixture the tests pass. Prefer <code>concat</code> unless the trail is hot enough for the allocation to matter — then push/pop, with the pop on every exit path.</div>
+      <div class="dnote seq" style="--i:4">Missing-pop bugs are <b style="color:var(--ordered)">order-dependent</b>: the first path found is correct, every later one carries its siblings' names. On a one-branch fixture the tests pass. Prefer <code>concat</code> unless the trail is hot enough for the copying to matter — then push/pop, with the pop on every exit path. And name the trade: copying a path is O(depth), so the concat version is O(n&middot;h), not O(n); each live frame also owns its own copy, so auxiliary memory is more than the O(h) call stack.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
     <p>Paths generalize the same way prices do: swap names for ids and you have a breadcrumb the UI can link; keep the node objects and you have the ancestor chain for a "move this item" operation; count instead of collecting and you have the depth. <b class="hl">One parameter, three features.</b></p>
@@ -91,7 +91,7 @@
       <div class="dnote seq" style="--i:4">That last line is a genuine product win worth mentioning out loud: <b style="color:var(--ordered)">DFS order is the order humans read a nested document in</b>. BFS would emit every section header, then every appetizer and entrée interleaved — technically complete, useless as an export.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
-    <p>Flattening is also the natural place to say the complexity story cleanly: <b class="hl">O(n) time, O(n) output, O(h) stack</b>. And it's the setup for the last follow-up — once you have a flat list, building a lookup index from it is one <code>Map</code> and a loop, which is lesson 20.</p>
+    <p>Flattening is also the natural place to say the complexity story precisely: <b class="hl">the traversal is O(n) and the stack is O(h) — but every row copies its path, and a path is O(depth) long, so the output and the copying are O(n&middot;h)</b>, which degenerates to O(n²) on a chain. Say "O(n) nodes visited, O(n&middot;h) to materialize the paths" and you've been more careful than most candidates. And it's the setup for the last follow-up — once you have a flat list, building a lookup index from it is one <code>Map</code> and a loop, which is lesson 20.</p>
     <div class="impl">
       <div class="dlabel">reference &middot; everything at once</div>
       <pre class="code">function flattenMenu(node, inherited = null, trail = [], out = []) {
@@ -241,10 +241,10 @@
         <div class="lanehead seq" style="--i:1">space</div><div class="lstep good seq" style="--i:1"><b>O(h)</b> &mdash; only one root-to-leaf path is on the stack at a time, h = height</div>
         <div class="lanehead seq" style="--i:2">h?</div><div class="lstep seq" style="--i:2">balanced &rarr; O(log n) &middot; a degenerate chain &rarr; <b>h = n</b>, and that's the overflow case</div>
         <div class="lanehead seq" style="--i:3">early exit</div><div class="lstep seq" style="--i:3">improves the average, never the worst &mdash; proving absence requires looking everywhere</div>
-        <div class="lanehead seq" style="--i:4">output</div><div class="lstep seq" style="--i:4">find-all / flatten add <b>O(n) output space</b>, separate from the stack</div>
+        <div class="lanehead seq" style="--i:4">output</div><div class="lstep seq" style="--i:4">find-all adds <b>O(n) output</b>; anything that materializes <b>paths</b> adds O(h) per copy &rarr; <b>O(n&middot;h)</b> for flatten, and each live frame's own copy on top of the O(h) stack</div>
         <div class="lanehead seq" style="--i:5">k lookups</div><div class="lstep good seq pop" style="--i:5">O(k&middot;n) walked vs <b>O(n + k)</b> indexed &mdash; the preprocessing trade, in one comparison</div>
       </div>
-      <div class="dnote seq" style="--i:6">BFS for contrast, in one line: same O(n) time, but <b style="color:var(--ordered)">O(width) memory instead of O(height)</b>. On a wide, shallow menu that's most of the menu in the queue versus three frames on the stack.</div>
+      <div class="dnote seq" style="--i:6">BFS for contrast, in one line: same O(n) time (with a head index &mdash; <code>shift()</code> makes it quadratic), but <b style="color:var(--ordered)">O(width) memory instead of O(height)</b>. On a wide, shallow menu that's most of the menu in the queue versus three frames on the stack.</div>
     </div>
     <div class="row"><button class="playbtn" data-play>&#9654; replay</button></div>
     <p>Be precise about <b class="hl">what n counts</b>, because in this problem there are two things to count: groups and items. "n is every node I touch — groups plus items" is exact and takes three extra words. And when the structure is a graph, the number becomes <b class="hl">O(V+E)</b>: the visited Set is what turns "entered once per path" into "entered once, ever."</p>

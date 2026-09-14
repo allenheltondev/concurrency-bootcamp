@@ -72,7 +72,7 @@ function findItemPath(node, itemId, trail = []) {`,
   }
   return null;`],
       answer:0,
-      whys:["Right. `concat` hands each frame its own array, so a branch that fails simply drops its copy — there is nothing to undo. The trail is state travelling down, the path is the answer travelling up, and the short-circuit still works unchanged.",
+      whys:["Right. `concat` hands each frame its own array, so a branch that fails simply drops its copy — there is nothing to undo. The trail is state travelling down, the path is the answer travelling up, and the short-circuit still works unchanged. Say the price of the copy out loud: O(depth) per frame, so O(n·h) overall rather than O(n) — push/pop is the O(n) version if the cleanup discipline is worth it.",
             "Push with no matching pop: Appetizers' name stays in the shared array after its branch returns null, so the path reported for the Cobb Salad includes a section it isn't in. Push/pop is fine — but the pop has to happen on EVERY exit path, which is the bug interviewers plant here.",
             "Returns the path to the item's GROUP, not to the item — `[\"Lunch\",\"Appetizers\"]` instead of `[\"Lunch\",\"Appetizers\",\"Wings\"]`. Off by one element, and it reads correct in a demo where the caller appends the name anyway."] },
     post:`}
@@ -106,7 +106,7 @@ function flattenMenu(node, inherited = null, trail = [], out = []) {
     flattenMenu(group, effective, here, out);
   return out;`],
       answer:0,
-      whys:["Right. Both carried values are already resolved in this frame, so each row is built with no extra work: the price falls back to `effective`, the path is `here` plus the item's own name. One visit per node, O(n) time, O(n) output, DFS order — which is the order the printed menu reads in.",
+      whys:["Right. Both carried values are already resolved in this frame, so each row is built with no extra work: the price falls back to `effective`, the path is `here` plus the item's own name. One visit per node; O(n) traversal plus O(h) per row to copy its path, so O(n·h) in total with the output; DFS order — which is the order the printed menu reads in.",
             "Calling the single-item search from inside the traversal re-walks the subtree once per item: O(n²), re-deriving a value the frame is already holding in `effective`. This is the most common way a 'flatten it' follow-up goes quadratic without anyone noticing on a five-item menu.",
             "Two bugs in three lines: `item.price` skips inheritance entirely (every inheriting item exports as null), and `path` stops at the group, so every item in a section shares one path that doesn't name it. Both look right until you read the output."] },
     post:`}
@@ -119,7 +119,7 @@ function flattenMenu(node, inherited = null, trail = [], out = []) {
 //
 // same nodes, same O(n). the container decides the order:
 //   stack.pop()   -> depth-first
-//   queue.shift() -> breadth-first`,
+//   queue[head++] -> breadth-first (a head index; shift() reindexes)`,
     blank:{ q:"Fewest clicks, over a structure with shared nodes. Which traversal answers it, and why?",
       options:[
 `// BFS: the first time it reaches the item, it arrived by a
@@ -289,7 +289,7 @@ assert(again.join(" > ") === cobb.join(" > "), "repeated calls must return ident
 assert(findItemPath(menu, "wings").length === 3, "and the earlier path must not have grown, got " + findItemPath(menu, "wings").length);
 log("four lookups, no drift — nothing leaked between branches");`,
     pass:"every path correct, including the one that had to walk past a failed branch first — and no drift across repeated calls",
-    takeaway:"The trail is inherited state, same as the price: build it on the way down, return it on the way up. `concat` gives each frame its own array, so a dead end costs you nothing and there is no cleanup to forget.",
+    takeaway:"The trail is inherited state, same as the price: build it on the way down, return it on the way up. `concat` gives each frame its own array, so a dead end costs you nothing and there is no cleanup to forget — at O(depth) per copy, which is the trade you name when asked for the complexity.",
     hint:"First line of the body: `const here = trail.concat(node.name);`. Items return `here.concat(item.name)`. Groups recurse with `here` (not `trail`), capturing the result and returning it only if truthy." },
 
   { id:"w-flatten", title:"flattenMenu — write it", why:"the export ticket: every item, priced, with its location", lesson:15,
@@ -367,7 +367,7 @@ assert(flattenMenu({ name: "Empty" }).length === 0, "a node with no items or gro
       { code:"    for (const child of node.children) stack.push(child);",
         why:"Natural push order plus pop() mirrors the traversal: root, B, B1, A, A2, A1. Still depth-first, still every node — and the wrong order everywhere order matters." },
       { code:"    const node = stack.shift();",
-        why:"shift() takes the oldest, which makes this breadth-first: root, A, B, A1, A2, B1. One word turns a DFS into a BFS." },
+        why:"shift() takes the oldest, which makes this breadth-first: root, A, B, A1, A2, B1 — and it reindexes the array on every call, so it's a quadratic BFS on top of being the wrong traversal." },
       { code:"    if (!node.children.length) continue;",
         why:"Harmless-looking and pointless: a leaf's loop already runs zero times. It's the iterative version of inventing a leaf base case — extra branch, no behavior change, one more thing to get wrong." },
     ],
