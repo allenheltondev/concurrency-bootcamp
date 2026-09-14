@@ -43,7 +43,7 @@ jobs:
       - name: Check JavaScript syntax
         # App scripts live in js/ (now just the shared engine + account
         # layer) plus each course directory (js-concurrency/,
-        # distributed-systems/), the standalone files (worker, Node
+        # distributed-systems/, …, dfs/), the standalone files (worker, Node
         # reference, service workers) and the backend Lambda handlers. Parse
         # them all so a typo can't ship a broken page, worker, cache, or API
         # route.
@@ -57,7 +57,8 @@ jobs:
           node --check database-internals/sw.js
           node --check performance/sw.js
           node --check observability/sw.js
-          for f in js/*.js js-concurrency/js/*.js js-concurrency/js/packs/*.js distributed-systems/js/*.js distributed-systems/js/packs/*.js agent-memory/js/*.js agent-memory/js/packs/*.js database-internals/js/*.js database-internals/js/packs/*.js performance/js/*.js performance/js/packs/*.js observability/js/*.js observability/js/packs/*.js backend/src/*.mjs backend/src/*/*.mjs; do
+          node --check dfs/sw.js
+          for f in js/*.js js-concurrency/js/*.js js-concurrency/js/packs/*.js distributed-systems/js/*.js distributed-systems/js/packs/*.js agent-memory/js/*.js agent-memory/js/packs/*.js database-internals/js/*.js database-internals/js/packs/*.js performance/js/*.js performance/js/packs/*.js observability/js/*.js observability/js/packs/*.js dfs/js/*.js dfs/js/packs/*.js backend/src/*.mjs backend/src/*/*.mjs; do
             [ -e "$f" ] || continue
             node --check "$f"
           done
@@ -83,6 +84,9 @@ jobs:
 
       - name: Validate content (observability)
         run: node tools/validate-content.mjs --root observability
+
+      - name: Validate content (dfs)
+        run: node tools/validate-content.mjs --root dfs
 
       - name: Validate the account layer
         # Loads js/account.js in a bare VM (proving it stays dormant without
@@ -150,6 +154,9 @@ jobs:
       - name: Run observability practice pack tests
         run: node tools/test-solutions.mjs --root observability
 
+      - name: Run dfs practice pack tests
+        run: node tools/test-solutions.mjs --root dfs
+
       - name: Check service workers precache every app script
         # A js/ file missing from a SHELL list breaks that course offline.
         # The root sw.js is now a kill-switch (no SHELL) so it's excluded here.
@@ -157,7 +164,7 @@ jobs:
           node -e '
             const fs = require("fs");
             const courses = ["js-concurrency", "distributed-systems", "agent-memory",
-                             "database-internals", "performance", "observability"];
+                             "database-internals", "performance", "observability", "dfs"];
             let failed = false;
             for (const course of courses) {
               const sw = fs.readFileSync(course + "/sw.js", "utf8");

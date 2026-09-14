@@ -1,0 +1,19 @@
+{
+  "name": "DFS & Recursive Traversal Bootcamp",
+  "short_name": "DFS Bootcamp",
+  "description": "A mobile-first, offline-capable bootcamp for depth-first search and recursive tree traversal — the nested-menu interview problem from first principles; animated lessons, tap-driven drills, a step-through walkthrough, and a scored test.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#061420",
+  "theme_color": "#061420",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

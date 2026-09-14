@@ -52,5 +52,14 @@
     "contentVersion": 1,
     "totalItems": "auto",
     "contentRoot": "observability"
+  },
+  {
+    "id": "dfs",
+    "title": "DFS & Recursive Traversal Bootcamp",
+    "description": "Learn and practice depth-first search from first principles, aimed at the nested-menu interview problem: animated lessons on visit order, backtracking, and the base case; DFS that carries inherited state down a nested restaurant menu; a step-through walkthrough of the call stack; tap-driven drills that run real traversals; spot-the-bug and write-it modules; and a scored test mode.",
+    "status": "active",
+    "contentVersion": 1,
+    "totalItems": "auto",
+    "contentRoot": "dfs"
   }
 ]
