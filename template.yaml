@@ -119,7 +119,8 @@ Resources:
           // .github/workflows/deploy.yml.
           var courses = [
             '/js-concurrency', '/distributed-systems', '/agent-memory',
-            '/database-internals', '/performance', '/observability'
+            '/database-internals', '/performance', '/observability',
+            '/dfs'
           ];
           for (var i = 0; i < courses.length; i++) {
             if (uri === courses[i] || uri.startsWith(courses[i] + '/')) {

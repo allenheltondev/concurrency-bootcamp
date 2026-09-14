@@ -33,6 +33,12 @@ pattern, the home of more than one course:
   answer, cardinality, sampling, SLOs and burn-rate alerting, and the triage
   loop for reading an incident out of telemetry. See
   `observability/README.md`.
+- **`/dfs/`** — the **DFS & Recursive Traversal Bootcamp**: the same format
+  applied to depth-first search from first principles, aimed at one interview
+  problem — a nested restaurant menu whose prices are inherited from
+  ancestors. Visit order and backtracking, the base case, the short-circuit,
+  DFS that carries state down, and the follow-ups (all matches, the path,
+  flatten, explicit stack, cycles, indexing). See `dfs/README.md`.
 - **`docs/COURSE_PATTERN.md`** — the extracted pattern: the shared engine
   contract, content schemas, animation conventions, and the checklist for
   reproducing the whole format as a new course.

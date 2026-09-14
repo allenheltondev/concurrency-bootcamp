@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="DFS &amp; Recursive Traversal Bootcamp">
+  <rect width="512" height="512" fill="#0b1f2e"/>
+  <!-- the tree: a root, two branches — the left one taken all the way down -->
+  <path d="M256 150 L152 250 M256 150 L376 250 M152 250 L104 350 M152 250 L208 350 M376 250 L376 350"
+        stroke="#244155" stroke-width="14" stroke-linecap="round" fill="none"/>
+  <!-- the depth-first path: root -> left child -> its first leaf, highlighted -->
+  <path d="M256 150 L152 250 L104 350"
+        stroke="#34d3bf" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- the backtrack: the one hop back up before the next branch -->
+  <path d="M132 318 L180 250" stroke="#fb923c" stroke-width="10" stroke-linecap="round" stroke-dasharray="6 20" fill="none"/>
+  <circle cx="256" cy="150" r="34" fill="#071726" stroke="#34d3bf" stroke-width="14"/>
+  <circle cx="152" cy="250" r="28" fill="#071726" stroke="#34d3bf" stroke-width="14"/>
+  <circle cx="376" cy="250" r="28" fill="#071726" stroke="#244155" stroke-width="14"/>
+  <circle cx="104" cy="350" r="24" fill="#34d3bf"/>
+  <circle cx="208" cy="350" r="24" fill="#071726" stroke="#244155" stroke-width="12"/>
+  <circle cx="376" cy="350" r="24" fill="#071726" stroke="#244155" stroke-width="12"/>
+</svg>
