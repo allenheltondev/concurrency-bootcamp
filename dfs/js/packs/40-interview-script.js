@@ -106,9 +106,9 @@ function countItems(node) {
 // Lunch -> Appetizers(wings, fries)
 //       -> Entrees(burger) -> Salads(cobb, garden)
 console.log(countItems(menu));`,
-    options:["0 — the root has no items of its own, and every recursive result is discarded",
-             "5 — the recursion visits every group and adds up their items",
-             "2 — it counts the first group's items and stops"],
+    options:["0 — every recursive result is discarded",
+             "5 — the recursion visits every group, and n accumulates their items as each call returns",
+             "2 — it counts the first group's items and stops there"],
     answer:0,
     whys:[
       "Right. `countItems(g)` is called, computes the correct count for that subtree, and the value is thrown away — nothing accumulates it. The root declares no items of its own, so `n` stays 0. The fix is one character: `n += countItems(g);`. This is the aggregate-coming-UP mistake, and it's the mirror image of discarding a search result.",
